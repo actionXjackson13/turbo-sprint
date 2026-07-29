@@ -5,7 +5,7 @@
 // CACHE is a purge knob, not a release knob: bump it to throw away everything
 // and re-download. Ordinary updates don't need it, because of the
 // stale-while-revalidate policy below.
-const CACHE = 'turbo-sprint-v1';
+const CACHE = 'turbo-sprint-v2';
 
 const ASSETS = [
     './',
@@ -23,6 +23,8 @@ const ASSETS = [
     './target.js',
     './player.js',
     './ai-car.js',
+    './net.js',
+    './remote-car.js',
     './game.js',
     './manifest.webmanifest',
     './icons/apple-touch-icon.png',

@@ -27,8 +27,13 @@ const ROTATE_HINT_KEY = 'turboSprint.rotateHintOff';
 
 const view = { width: 0, height: 0, inset: { top: 0, right: 0, bottom: 0, left: 0 } };
 
-// title | howto | select | records | countdown | racing | paused | finished
+// title | howto | select | records | mpMenu | lobby | countdown | racing |
+// paused | finished
 let screen = 'title';
+let mp = false;            // is this a multiplayer race?
+let mpError = '';
+let mpBusy = '';           // spinner text while connecting
+let mpStandings = null;    // results from the host, in multiplayer
 let level = Difficulty.DEFAULT;
 let mapId = Maps.DEFAULT;
 let player, aiCars, allCars;
@@ -77,7 +82,7 @@ function readSafeInsets() {
 // of the track ahead.
 function updateRotateHint() {
     const wanted = view.height > view.width
-        && ['title', 'howto', 'select', 'records', 'finished'].includes(screen)
+        && ['title', 'howto', 'select', 'records', 'mpMenu', 'lobby', 'finished'].includes(screen)
         && !rotateHintOff;
     el.rotateHint.classList.toggle('on', wanted);
 }
@@ -91,8 +96,22 @@ function applySettings() {
     Physics.decay = Physics.DECAY_BASE * Difficulty.decayMult(level) * map.decayMult;
     Physics.minSpeed = Difficulty.minSpeed(level);
 
-    player = new PlayerCar(1);
-    aiCars = AICar.ROSTER.map(cfg => new AICar(cfg));   // rivals run one pace at every level
+    if (mp && Net.active && Net.players.length) {
+        // Multiplayer races are players only — no AI rivals to pad the grid.
+        // One lane each, so the track splits evenly however many turned up.
+        Track.LANES = Math.max(2, Net.players.length);
+        const mine = Net.me();
+        player = new PlayerCar(mine ? mine.lane : 0);
+        player.name = mine ? mine.name : 'You';
+        player.colors = mine ? mine.colors : { light: '#5cc8ff', dark: '#1667c4' };
+        player.pipColor = player.colors.light;
+        player.number = (mine ? mine.lane : 0) + 1;
+        aiCars = Net.players.filter(p => !p.isMe).map(p => new RemoteCar(p));
+    } else {
+        Track.LANES = 4;
+        player = new PlayerCar(1);
+        aiCars = AICar.ROSTER.map(cfg => new AICar(cfg));   // rivals run one pace at every level
+    }
     allCars = [player, ...aiCars];
 
     camera = cameraTarget();
@@ -115,12 +134,12 @@ function buildPips() {
 
 function setScreen(next) {
     screen = next;
-    const inMenu = ['title', 'howto', 'select', 'records', 'finished', 'paused'].includes(next);
+    const inMenu = ['title', 'howto', 'select', 'records', 'mpMenu', 'lobby', 'finished', 'paused'].includes(next);
     el.overlay.classList.toggle('dim', inMenu);
     el.overlay.classList.toggle('interactive', inMenu);
-    el.hud.classList.toggle('hidden', ['title', 'howto', 'select', 'records'].includes(next));
+    el.hud.classList.toggle('hidden', ['title', 'howto', 'select', 'records', 'mpMenu', 'lobby'].includes(next));
     el.hint.classList.toggle('on', ['countdown', 'racing'].includes(next));
-    el.pauseBtn.classList.toggle('on', ['racing', 'countdown'].includes(next));
+    el.pauseBtn.classList.toggle('on', !mp && ['racing', 'countdown'].includes(next));
 
     // The box is only tappable while actually racing.
     if (next === 'racing') Target.show(); else Target.hide();
@@ -128,10 +147,31 @@ function setScreen(next) {
 }
 
 function showTitle() {
+    if (Net.active) Net.leave();
+    mp = false;
+    mpError = '';
+    mpBusy = '';
+    mpStandings = null;
     applySettings();
     Particles.clear();
     setScreen('title');
     render_title();
+}
+
+function showMpMenu() {
+    if (Net.active) Net.leave();
+    mp = false;
+    mpBusy = '';
+    mpStandings = null;
+    applySettings();
+    Particles.clear();
+    setScreen('mpMenu');
+    render_mpMenu();
+}
+
+function showLobby() {
+    setScreen('lobby');
+    render_lobby();
 }
 
 function showSelect() {
@@ -150,10 +190,22 @@ function showHowTo() {
     render_howto();
 }
 
+// In multiplayer only the host may start, and it starts for everybody.
+function requestStart() {
+    if (mp && Net.role === 'host') {
+        if (Net.players.length < 2) return;
+        Net.armRace();
+        Net.hostStart(mapId, level);   // fires the local 'start' handler too
+        return;
+    }
+    startRace();
+}
+
 function startRace() {
     applySettings();
     Difficulty.save(level);
     Maps.save(mapId);
+    mpStandings = null;
 
     countdown = COUNTDOWN_FROM;
     lastCountdownBeep = -1;
@@ -163,12 +215,13 @@ function startRace() {
     popups = [];
     shake = 0;
     Particles.clear();
-    prAtStart = Records.get(mapId, level);
+    prAtStart = mp ? null : Records.get(mapId, level);
 
     Target.reset();
     el.hint.style.opacity = '1';
-    el.ghost.style.display = prAtStart ? 'block' : 'none';
-    el.pr.textContent = Records.format(prAtStart);
+    // No personal-best pace car in multiplayer — you're chasing people, not a ghost.
+    el.ghost.style.display = (!mp && prAtStart) ? 'block' : 'none';
+    el.pr.textContent = mp ? '—' : Records.format(prAtStart);
     setScreen('countdown');
     updateHud();
 }
@@ -198,11 +251,28 @@ function onKey(key) {
         if (key === 'ENTER' || key === 'SPACE') showSelect();
         if (key === 'R') showRecords();
         if (key === 'H') showHowTo();
+        if (key === 'F') showMpMenu();
         return;
     }
 
     if (screen === 'howto' || screen === 'records') {
         if (key === 'ESCAPE' || key === 'ENTER' || key === 'SPACE') showTitle();
+        return;
+    }
+
+    if (screen === 'mpMenu') {
+        if (key === 'ESCAPE') showTitle();
+        return;
+    }
+
+    if (screen === 'lobby') {
+        if (key === 'ESCAPE') showMpMenu();
+        if ((key === 'ENTER' || key === 'SPACE') && Net.role === 'host') requestStart();
+        if (/^[0-9]$/.test(key) && Net.role === 'host') {
+            level = Difficulty.clamp(parseInt(key, 10));
+            applySettings();
+            render_lobby();
+        }
         return;
     }
 
@@ -224,11 +294,13 @@ function onKey(key) {
     }
 
     if (screen === 'finished') {
-        if (key === 'ARROWLEFT')  { level = Difficulty.clamp(level - 1); render_results(); }
-        if (key === 'ARROWRIGHT') { level = Difficulty.clamp(level + 1); render_results(); }
-        if (/^[0-9]$/.test(key)) { level = Difficulty.clamp(parseInt(key, 10)); render_results(); }
-        if (key === 'ENTER' || key === 'SPACE') startRace();
-        if (key === 'ESCAPE') showTitle();
+        if (!mp) {
+            if (key === 'ARROWLEFT')  { level = Difficulty.clamp(level - 1); render_results(); }
+            if (key === 'ARROWRIGHT') { level = Difficulty.clamp(level + 1); render_results(); }
+            if (/^[0-9]$/.test(key)) { level = Difficulty.clamp(parseInt(key, 10)); render_results(); }
+        }
+        if (key === 'ENTER' || key === 'SPACE') requestStart();
+        if (key === 'ESCAPE') { if (mp) showLobby(); else showTitle(); }
     }
 }
 
@@ -281,16 +353,126 @@ function onAction(action, value) {
         case 'records':  showRecords(); break;
         case 'howto':    showHowTo(); break;
         case 'title':    showTitle(); break;
-        case 'start':    startRace(); break;
-        case 'again':    startRace(); break;
+        case 'start':    requestStart(); break;
+        case 'again':    requestStart(); break;
         case 'resume':   resumeRace(); break;
-        case 'map':      mapId = value; applySettings(); render_select(); break;
+        case 'mp':       showMpMenu(); break;
+        case 'mpHost':   hostGame(); break;
+        case 'mpJoin':   joinGame(); break;
+        case 'lobby':    if (Net.active) showLobby(); else showMpMenu(); break;
+        case 'map':      mapId = value; applySettings();
+                         if (screen === 'lobby') render_lobby(); else render_select(); break;
         case 'level':    level = Difficulty.clamp(parseInt(value, 10)); applySettings();
-                         (screen === 'finished' ? render_results : render_select)(); break;
+                         if (screen === 'lobby') render_lobby();
+                         else if (screen === 'finished') render_results();
+                         else render_select(); break;
         case 'clearPR':  Records.clear(); render_records(); break;
         case 'mute':     toggleMute(); break;
     }
 }
+
+/* --------------------------------------------------------- multiplayer -- */
+
+function readName() {
+    const input = document.getElementById('nameInput');
+    const name = (input ? input.value : '').trim().slice(0, 12) || 'Racer';
+    Net.saveName(name);
+    return name;
+}
+
+async function hostGame() {
+    const name = readName();
+    mpError = '';
+    mpBusy = 'Creating a game…';
+    render_mpMenu();
+    try {
+        mp = true;
+        await Net.startHosting(name);
+        mpBusy = '';
+        applySettings();
+        showLobby();
+    } catch (e) {
+        mp = false;
+        mpBusy = '';
+        mpError = netErrorText(e);
+        render_mpMenu();
+    }
+}
+
+async function joinGame() {
+    const codeInput = document.getElementById('codeInput');
+    const code = (codeInput ? codeInput.value : '').trim().toUpperCase();
+    if (code.length !== Net.CODE_LEN) {
+        mpError = `A game code is ${Net.CODE_LEN} characters.`;
+        render_mpMenu();
+        return;
+    }
+    const name = readName();
+    mpError = '';
+    mpBusy = 'Looking for that game…';
+    render_mpMenu();
+    try {
+        mp = true;
+        await Net.joinGame(code, name);
+        mpBusy = 'Connecting to the host…';
+        render_mpMenu();
+    } catch (e) {
+        mp = false;
+        mpBusy = '';
+        mpError = netErrorText(e);
+        render_mpMenu();
+    }
+}
+
+function netErrorText(e) {
+    const msg = (e && e.message) || '';
+    if (msg === 'SIGNAL-FAILED' || msg === 'SIGNAL-CLOSED') {
+        return "Couldn't reach the matchmaking server. Check your internet connection — multiplayer needs one, even though the game itself doesn't.";
+    }
+    if (msg === 'ID-TAKEN') return 'Every code we tried was busy. Try again.';
+    return 'Something went wrong setting that up. Try again.';
+}
+
+Net.handlers = {
+    lobby() {
+        applySettings();
+        if (screen === 'mpMenu' || screen === 'lobby') {
+            mpBusy = '';
+            mpError = '';
+            showLobby();
+        } else if (screen === 'finished') {
+            render_results();   // keep the swatches fresh if someone leaves
+        }
+    },
+
+    start(info) {
+        mp = true;
+        mapId = info.mapId;
+        level = Difficulty.clamp(info.level);
+        Net.armRace();
+        startRace();
+    },
+
+    results(standings) { onMpResults(standings); },
+
+    playerLeft() {
+        if (screen === 'lobby') render_lobby();
+    },
+
+    error(text) {
+        mpError = text;
+        mpBusy = '';
+        mp = false;
+        if (['racing', 'countdown', 'paused', 'finished'].includes(screen)) {
+            Target.reset();
+            showMpMenu();
+        } else {
+            showMpMenu();
+        }
+        mpError = text;      // showMpMenu clears it, so set it after
+        render_mpMenu();
+    }
+};
 
 function toggleMute() {
     const muted = Sfx.toggle();
@@ -300,6 +482,7 @@ function toggleMute() {
 
 function pauseRace() {
     if (screen !== 'racing') return;
+    if (mp) return;   // pausing would freeze only your car while everyone else races on
     setScreen('paused');
     render_paused();
 }
@@ -332,6 +515,7 @@ function render_title() {
         <div class="title-tag">Tap to build speed · No steering, just pace</div>
         <div class="menu-list">
             <button class="btn primary" data-action="play">▶  Race</button>
+            <button class="btn" data-action="mp">👥  Race Your Friends</button>
             <button class="btn" data-action="records">🏆  Personal Records</button>
             <button class="btn" data-action="howto">?  How to Play</button>
         </div>
@@ -352,6 +536,86 @@ function render_howto() {
             <div class="how-item"><span class="num">7</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
         </div>
         <div class="btn-row"><button class="btn" data-action="title">← Back</button></div>`;
+}
+
+function render_mpMenu() {
+    const name = escapeHtml(Net.loadName());
+    el.overlayInner.innerHTML = `
+        <div class="section-title">Race Your Friends</div>
+        <div class="section-sub">One of you hosts and shares the code. Everyone else joins with it.</div>
+
+        <div class="field">
+            <label for="nameInput">Your name</label>
+            <input id="nameInput" class="text-input" type="text" maxlength="12"
+                   autocomplete="off" autocapitalize="words" spellcheck="false"
+                   placeholder="Racer" value="${name}">
+        </div>
+
+        ${mpBusy ? `<div class="mp-busy">${escapeHtml(mpBusy)}</div>` : ''}
+        ${mpError ? `<div class="mp-error">${escapeHtml(mpError)}</div>` : ''}
+
+        <div class="mp-split">
+            <div class="mp-card">
+                <div class="mp-card-title">Host a race</div>
+                <div class="mp-card-body">You pick the track and difficulty, and you start the race.</div>
+                <button class="btn primary" data-action="mpHost">Create a game</button>
+            </div>
+            <div class="mp-card">
+                <div class="mp-card-title">Join a race</div>
+                <div class="mp-card-body">Type the 4-character code the host gives you.</div>
+                <input id="codeInput" class="text-input code" type="text" maxlength="4"
+                       autocomplete="off" autocapitalize="characters" spellcheck="false"
+                       inputmode="text" placeholder="CODE">
+                <button class="btn" data-action="mpJoin">Join game</button>
+            </div>
+        </div>
+
+        <div class="btn-row"><button class="btn small" data-action="title">← Menu</button></div>`;
+}
+
+function render_lobby() {
+    const v = Net.lobbyView();
+    const isHost = v.role === 'host';
+    const rows = v.players.map((p, i) => `
+        <div class="standing${p.isMe ? ' you' : ''}">
+            <span class="rank">${i + 1}</span>
+            <span class="swatch" style="background:${p.colors ? p.colors.light : '#888'}"></span>
+            <span class="name">${escapeHtml(p.name)}${p.isMe ? ' (you)' : ''}</span>
+            <span class="split">${i === 0 ? 'host' : 'ready'}</span>
+        </div>`).join('');
+
+    const map = Maps.byId(mapId);
+    const canStart = isHost && v.players.length >= 2;
+
+    el.overlayInner.innerHTML = `
+        <div class="section-title">Lobby</div>
+        <div class="code-display">
+            <span class="code-label">Game code</span>
+            <span class="code-value">${escapeHtml(v.code || '····')}</span>
+        </div>
+        <div class="section-sub">${isHost
+            ? 'Share that code. The race starts when you say so.'
+            : 'Waiting for the host to start the race.'}</div>
+
+        ${mpError ? `<div class="mp-error">${escapeHtml(mpError)}</div>` : ''}
+
+        <div class="standings">${rows}</div>
+
+        <div class="next-level">
+            ${map.icon} ${escapeHtml(map.name)} ·
+            <span class="level-num small" style="color:${Difficulty.color(level)}">${level}</span>
+            <span class="level-name" style="font-size:1em">${Difficulty.name(level)}</span>
+        </div>
+        ${isHost ? levelBar(true) : ''}
+        ${isHost ? `<div class="lobby-maps">${Maps.LIST.map(m => `
+            <button class="btn small${m.id === mapId ? ' primary' : ''}" data-action="map" data-value="${m.id}">${m.icon} ${escapeHtml(m.name)}</button>`).join('')}</div>` : ''}
+
+        <div class="btn-row">
+            ${isHost
+                ? `<button class="btn primary" data-action="start"${canStart ? '' : ' disabled'}>▶  Start Race${canStart ? '' : ' (need 2+)'}</button>`
+                : ''}
+            <button class="btn small" data-action="mp">← Leave</button>
+        </div>`;
 }
 
 function render_select() {
@@ -439,7 +703,16 @@ function render_paused() {
         <div class="menu-hint"><b>Esc</b> to resume</div>`;
 }
 
+// Player names go through innerHTML, and they come off the network.
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+
 function render_results() {
+    if (mp) { render_mpResults(); return; }
+
     const r = lastResult;
     if (!r) return;
 
@@ -478,6 +751,43 @@ function render_results() {
         <div class="menu-hint"><b>←</b><b>→</b> difficulty · <b>Enter</b> race again</div>`;
 }
 
+function render_mpResults() {
+    const isHost = Net.role === 'host';
+
+    if (!mpStandings) {
+        el.overlayInner.innerHTML = `
+            <div class="section-title">Finished!</div>
+            <div class="section-sub">Your time: <b>${raceTime.toFixed(2)}s</b></div>
+            <div class="mp-busy">Waiting for the others to cross the line…</div>
+            <div class="btn-row"><button class="btn small" data-action="lobby">Back to lobby</button></div>`;
+        return;
+    }
+
+    const mineIdx = mpStandings.findIndex(s => s.id === Net.myId);
+    const won = mineIdx === 0;
+    const rows = mpStandings.map((s, i) => {
+        const p = Net.players.find(q => q.id === s.id);
+        const color = p && p.colors ? p.colors.light : '#888';
+        return `<div class="standing${s.id === Net.myId ? ' you' : ''}">
+            <span class="rank">${ordinal(i + 1)}</span>
+            <span class="swatch" style="background:${color}"></span>
+            <span class="name">${escapeHtml(s.name)}</span>
+            <span class="split">${s.time !== null ? s.time.toFixed(2) + 's' : Math.max(0, Math.round(Track.LENGTH - s.x)) + 'm back'}</span>
+        </div>`;
+    }).join('');
+
+    el.overlayInner.innerHTML = `
+        <div class="result-title ${won ? 'win' : 'lose'}">${won ? 'YOU WIN!' : ordinal(mineIdx + 1) + ' PLACE'}</div>
+        <div class="result-sub">${escapeHtml(Maps.byId(mapId).name)} · Level ${level} ${Difficulty.name(level)} · best streak ${bestStreak}</div>
+        <div class="standings">${rows}</div>
+        <div class="btn-row">
+            ${isHost ? '<button class="btn primary" data-action="again">↻  Race Again</button>' : ''}
+            <button class="btn" data-action="lobby">👥  Lobby</button>
+            <button class="btn small" data-action="title">⌂  Menu</button>
+        </div>
+        ${isHost ? '' : '<div class="menu-hint-always">The host decides when to run it again.</div>'}`;
+}
+
 /* ---------------------------------------------------------------- update -- */
 
 function update(dt) {
@@ -502,9 +812,21 @@ function update(dt) {
         raceTime += dt;
         for (const car of allCars) {
             car.update(dt);
-            if (car.finishTime === null && car.x >= Track.LENGTH) car.finishTime = raceTime;
+            // Remote cars own their own finish time; it arrives over the network.
+            if (!car.isRemote && car.finishTime === null && car.x >= Track.LENGTH) {
+                car.finishTime = raceTime;
+                if (mp && car.isPlayer) Net.reportFinish(raceTime);
+            }
         }
-        if (player.finishTime !== null || aiCars.every(c => c.finishTime !== null)) finishRace();
+
+        if (mp) {
+            Net.reportPosition(player.x, player.speed);
+            // The host decides when a multiplayer race is over; everyone waits
+            // for the standings rather than ending on their own line crossing.
+            if (player.finishTime !== null && screen === 'racing') finishRace();
+        } else if (player.finishTime !== null || aiCars.every(c => c.finishTime !== null)) {
+            finishRace();
+        }
     }
 
     if (screen !== 'paused') {
@@ -594,6 +916,8 @@ function render() {
 }
 
 function finishRace() {
+    if (mp) { finishMultiplayerRace(); return; }
+
     const standings = [...allCars].sort((a, b) => {
         if (a.finishTime !== null && b.finishTime !== null) return a.finishTime - b.finishTime;
         if (a.finishTime !== null) return -1;
@@ -632,6 +956,25 @@ function finishRace() {
 
     if (isRecord) { Sfx.record(); Particles.confetti(view.width, view.height); }
     else if (won) { Sfx.win(); Particles.confetti(view.width, view.height); }
+    else Sfx.lose();
+}
+
+// You've crossed the line but the race isn't decided until the host says so, so
+// park on a "waiting" screen until the standings land.
+function finishMultiplayerRace() {
+    Target.reset();
+    setScreen('finished');
+    render_results();
+}
+
+// The standings arrived (or we're the host and just computed them).
+function onMpResults(standings) {
+    mpStandings = standings;
+    if (screen !== 'finished') { Target.reset(); setScreen('finished'); }
+    render_results();
+
+    const mine = standings.findIndex(s => s.id === Net.myId);
+    if (mine === 0) { Sfx.win(); Particles.confetti(view.width, view.height); }
     else Sfx.lose();
 }
 

@@ -38,9 +38,60 @@ Tapping (or clicking) is the whole game; the keyboard only drives the menus.
 | `↑` `↓` | Change track |
 | `Enter` / `Space` | Confirm, start, race again |
 | `Esc` | Pause mid-race, or back out of a menu |
+| `F` | Race your friends |
 | `M` | Mute / unmute |
 
+There's no pausing in a multiplayer race — it would freeze only your own car.
+
 Keyboard hints are hidden on touch devices, where they'd be noise.
+
+## Multiplayer
+
+Up to **6 players** race the same track at once. From the main menu, *Race Your
+Friends*: one person hosts and gets a 4-character code, everyone else types it in.
+Enter a name and it's remembered for next time.
+
+The host picks the track and difficulty and starts the race. There are no AI cars
+in a multiplayer race — one lane per player, and the road widens for a full grid.
+Everyone taps their own box on their own screen; you see everyone else's car
+moving in real time. Personal records aren't touched by multiplayer races, since
+they're per track-and-level and this isn't a solo run.
+
+### How it works
+
+There's no backend — the game is static files on GitHub Pages. Players connect
+**directly to each other** over WebRTC data channels, and the only thing that
+touches a third party is the initial handshake, which goes through the public
+PeerJS relay. No gameplay data passes through it.
+
+`net.js` talks to that relay over a plain WebSocket rather than using the PeerJS
+client library, because we need about 5% of what it does and this keeps the
+project dependency-free. One wrinkle worth knowing if you ever touch that file:
+**the relay validates the shape of what it forwards and hangs up on anything that
+doesn't look like the official client.** A minimal `{sdp}` payload gets the socket
+closed with code 1000 and no error message. So every signalling payload is padded
+with the fields that client would send; only `sdp`, `candidate` and `connectionId`
+actually matter to us.
+
+The topology is a star, with the host as the authority: guests report their own
+position to the host and the host echoes everyone's positions back out at 15Hz.
+Between updates each remote car dead-reckons at its last known speed and eases
+toward the authoritative position, so a late packet doesn't make it stutter.
+There's deliberately no anti-cheat — anyone can edit their own speed in a console.
+
+### Limitations
+
+- **Backgrounding the app freezes your car.** Browsers stop
+  `requestAnimationFrame` in hidden tabs, and iOS suspends the whole page when you
+  switch apps, so your car stops while everyone else keeps racing. The host resolves
+  the race 12s after the first finisher rather than waiting forever, and there's a
+  90s hard stop in case nobody finishes.
+- **Some networks block direct connections.** WebRTC uses STUN to punch through
+  NAT, which works on most home and mobile networks but not all. There's no TURN
+  relay to fall back on, so a strict corporate or carrier NAT can fail to connect.
+  Joining says so rather than hanging.
+- **Multiplayer needs internet**, even though single-player works fully offline.
+- If the host leaves, the race ends for everyone.
 
 ## Tracks
 
@@ -143,7 +194,9 @@ ahead of your own pace.
 | `target.js` | The tap box — where it lands, how big, how long it's been there |
 | `input.js` | Keyboard handling, for the menus only |
 | `player.js` | Your car — coasts down, boosted by taps |
-| `ai-car.js` | Rival cars and the level-10 pace table |
+| `ai-car.js` | Rival cars and their (level-independent) speeds |
+| `net.js` | Multiplayer: signalling, WebRTC peers, lobby and race sync |
+| `remote-car.js` | Another player's car, positioned from the network |
 | `game.js` | Screen flow, tap hit/miss handling, camera, HUD, results |
 | `sw.js` | Service worker: makes the installed app work offline |
 | `manifest.webmanifest` | App name, colours and icons for installation |

@@ -9,8 +9,9 @@ const Track = {
     setTheme(map) { this.theme = map; },
     pal() { return this.theme.palette; },
 
-    // Vertical band of the screen occupied by the asphalt.
-    bandTop(view)    { return view.height * 0.50; },
+    // Vertical band of the screen occupied by the asphalt. A full multiplayer grid
+    // needs a wider road, or the lanes get thinner than the cars are tall.
+    bandTop(view)    { return view.height * (this.LANES > 4 ? 0.40 : 0.50); },
     bandBottom(view) { return view.height * 0.90; },
 
     laneY(index, view) {
