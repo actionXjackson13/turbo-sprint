@@ -1,0 +1,316 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0b1020;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    color: #fff;
+    user-select: none;
+}
+
+#game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameCanvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------- Top HUD ---------- */
+
+#hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 22px 18px;
+    display: flex;
+    align-items: center;
+    gap: 34px;
+    background: linear-gradient(180deg, rgba(6, 10, 24, 0.88) 0%, rgba(6, 10, 24, 0) 100%);
+    pointer-events: none;
+}
+
+.stat {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.stat .label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8fa3c8;
+}
+
+.stat .value {
+    font-size: 30px;
+    font-weight: 800;
+    color: #ffd24a;
+    font-variant-numeric: tabular-nums;
+    min-width: 60px;
+}
+
+.stat .unit {
+    font-size: 12px;
+    color: #8fa3c8;
+}
+
+.stat.time .value {
+    color: #fff;
+    font-size: 24px;
+}
+
+/* Progress bar showing every car's position on the track */
+#progressTrack {
+    position: relative;
+    flex: 1;
+    height: 34px;
+    margin-left: auto;
+    max-width: 46%;
+}
+
+.progress-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 26px;
+    height: 6px;
+    margin-top: -3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.progress-flag {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+}
+
+.pip {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.45);
+    transition: left 0.12s linear;
+}
+
+.pip.player {
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    box-shadow: 0 0 12px rgba(80, 190, 255, 0.9);
+    z-index: 2;
+}
+
+/* ---------- Key prompts ---------- */
+
+#promptBar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 20px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+}
+
+#promptHint {
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+    transition: opacity 0.3s;
+}
+
+#chips {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 118px;
+}
+
+.chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: rgba(14, 22, 44, 0.82);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    font-size: 26px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    opacity: 0.65;
+    transform: scale(0.82);
+    transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.chip.current {
+    width: 104px;
+    height: 104px;
+    border-radius: 22px;
+    font-size: 46px;
+    color: #0b1020;
+    background: linear-gradient(180deg, #ffe98a 0%, #ffc93c 100%);
+    border-color: #fff3c4;
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 34px rgba(255, 201, 60, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
+    animation: pop 0.18s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.chip.current .timer {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 7px;
+    background: #ff5f5f;
+    width: 100%;
+}
+
+.chip.miss {
+    animation: shake 0.22s ease;
+    background: linear-gradient(180deg, #ff8a8a 0%, #e03b3b 100%);
+    border-color: #ffc9c9;
+}
+
+@keyframes pop {
+    0%   { transform: scale(0.6); }
+    60%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: scale(1) translateX(0); }
+    25%      { transform: scale(1) translateX(-9px); }
+    75%      { transform: scale(1) translateX(9px); }
+}
+
+/* ---------- Overlay (countdown / results) ---------- */
+
+#overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#overlay.dim {
+    background: rgba(6, 10, 24, 0.72);
+}
+
+#overlayInner {
+    text-align: center;
+    text-shadow: 0 6px 24px rgba(0, 0, 0, 0.75);
+}
+
+.count {
+    font-size: 150px;
+    font-weight: 900;
+    color: #ffd24a;
+    animation: pop 0.4s ease;
+    line-height: 1;
+}
+
+.go {
+    color: #6dff8f;
+}
+
+.result-title {
+    font-size: 62px;
+    font-weight: 900;
+    margin-bottom: 6px;
+}
+
+.result-title.win  { color: #6dff8f; }
+.result-title.lose { color: #ff7b7b; }
+
+.result-sub {
+    font-size: 18px;
+    color: #b9c7e2;
+    margin-bottom: 26px;
+}
+
+.standings {
+    display: inline-block;
+    text-align: left;
+    background: rgba(10, 16, 34, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 16px 22px;
+    margin-bottom: 26px;
+    min-width: 340px;
+}
+
+.standing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 18px;
+}
+
+.standing .rank {
+    width: 38px;
+    color: #8fa3c8;
+    font-weight: 700;
+}
+
+.standing .swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.standing .name { flex: 1; }
+
+.standing .split {
+    color: #b9c7e2;
+    font-variant-numeric: tabular-nums;
+}
+
+.standing.you .name { color: #ffd24a; font-weight: 800; }
+
+.restart {
+    font-size: 18px;
+    color: #fff;
+}
+
+.restart b {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}

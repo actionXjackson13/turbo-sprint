@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turbo Sprint</title>
+    <link rel="stylesheet" href="styles.css?v=4">
+</head>
+<body>
+    <div id="game">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="hud">
+            <div class="stat">
+                <span class="label">Speed</span>
+                <span class="value" id="speedValue">0</span>
+                <span class="unit">km/h</span>
+            </div>
+            <div class="stat">
+                <span class="label">Place</span>
+                <span class="value" id="placeValue">4th</span>
+            </div>
+            <div class="stat">
+                <span class="label">Streak</span>
+                <span class="value" id="streakValue">0</span>
+            </div>
+            <div class="stat time">
+                <span class="label">Time</span>
+                <span class="value" id="timeValue">0.0</span>
+            </div>
+            <div id="progressTrack">
+                <div class="progress-line"></div>
+                <div class="progress-flag">🏁</div>
+            </div>
+        </div>
+
+        <div id="promptBar">
+            <div id="promptHint">Hit the keys in order — the faster you tap, the faster you go</div>
+            <div id="chips"></div>
+        </div>
+
+        <div id="overlay">
+            <div id="overlayInner"></div>
+        </div>
+    </div>
+
+    <script src="physics.js?v=4"></script>
+    <script src="track.js?v=4"></script>
+    <script src="car-sprite.js?v=4"></script>
+    <script src="input.js?v=4"></script>
+    <script src="player.js?v=4"></script>
+    <script src="ai-car.js?v=4"></script>
+    <script src="game.js?v=4"></script>
+</body>
+</html>
