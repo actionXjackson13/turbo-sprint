@@ -20,6 +20,9 @@ no asset files beyond the app icons; even the sound is synthesised at runtime.
 - A clean streak adds up to +25% on every boost.
 - Beat the three rivals to the line. Your best time is saved per track and level.
 
+Races last about **8 seconds**. Level 5 is tuned as a dead heat for a player
+tapping around 450ms, so if you're winning it comfortably, move up.
+
 Timing windows are wider than a keyboard game's would be, because a "reaction"
 here includes finding the box and moving your thumb to it — not just twitching a
 finger already resting on a key.
@@ -49,43 +52,71 @@ character of the race changes.
 | Track | Length | Character |
 | --- | --- | --- |
 | 🏁 Sunset Speedway | ×1.0 | The reference tuning |
-| 🌃 Neon City | ×0.78 | Short sprint — less room to build speed |
-| 🏜️ Desert Dash | ×1.3 | Endurance; slightly gentler decay |
-| 🏔️ Alpine Pass | ×1.0 | Speed drains 18% faster |
+| 🌃 Neon City | ×0.94 | Short sprint — less room to build speed |
+| 🏜️ Desert Dash | ×1.15 | Endurance; slightly gentler decay |
+| 🏔️ Alpine Pass | ×1.0 | Speed drains 8% faster |
+
+The modifiers are deliberately mild. The difficulty curve now runs close to the
+limit of what a thumb can physically do, so a map swinging length by 20–30% shoves
+its top levels past that limit — Neon at its old ×0.78 made levels 9 and 10
+unwinnable.
 
 ## Difficulty
 
-Levels run **0–10**, where **10 is the reference tuning** and everything below
-scales down from it. Five levers move together:
+Levels run **0–10**. Every race is about **8 seconds** and **the rivals always run
+the same speed** — a level doesn't change how fast they go, it changes how hard it
+is for you to keep up. Three levers move together:
 
-- **Rival pace** — 52% of full speed at level 0
-- **Track length** — shorter at low levels, so races stay ~14s throughout
-- **Speed decay** — how fast you bleed speed between taps
-- **Box size** — 148px down to 78px, capped to a share of the viewport so it
-  never swallows a phone screen
+- **Box size** — 148px down to 78px, capped to a share of the viewport so it never
+  swallows a phone screen
 - **Box travel** — how far the box jumps each time, as a fraction of the playable
   diagonal. Both ends matter: a *minimum* stops it reappearing under your thumb,
-  and a *maximum* is what actually makes low levels gentle. In portrait on a
-  phone that works out to a ~94px hop at level 0 against ~493px at level 10.
+  and a *maximum* is what makes low levels gentle. On a phone in landscape that's
+  a ~97px hop at level 0 against ~533px at level 10.
+- **Speed decay** — how fast you bleed speed between taps
 
-The slowest tap interval that still wins, per track and level:
+### Why raw tap intervals stopped being the yardstick
 
-| Level | Speedway | Neon | Desert | Alpine |
-| --- | --- | --- | --- | --- |
-| 0 | 1373ms | 1281ms | 1404ms | 1321ms |
-| 2 | 1062ms | 1025ms | 1126ms | 985ms |
-| 4 | 916ms | 870ms | 980ms | 844ms |
-| 6 | 807ms | 760ms | 871ms | 742ms |
-| 8 | 718ms | 670ms | 778ms | 657ms |
-| 10 | **635ms** | 582ms | 690ms | 580ms |
+The obvious difficulty metric is "the slowest tap interval that still wins", and
+it was the right one when every prompt was a keypress under your finger. It isn't
+any more, because the box's own size and travel decide how fast a thumb can
+*possibly* go. A 78px box half a screen away can't be hit as quickly as a 148px
+box that barely moves, so the same 500ms interval is trivial at level 0 and
+superhuman at level 10.
 
-Every combination is monotonic (higher level is never easier) and idling always
-loses, so there's a reason to tap at every setting.
+So the model has two numbers per level. **Achievable** is what a thumb can
+physically do at that level's box geometry, from Fitts' law —
+`180ms + 130ms × log₂(jump / size + 1)` — calibrated against real play. **Required**
+is the slowest interval that still beats the rivals. Difficulty is the ratio:
 
-These thresholds are looser than the old keyboard version's, because a tap costs
-you thumb travel that a keypress didn't. In practice level 10 is *harder* than it
-was: 580ms is a comfortable keypress interval but a demanding one when the box is
-78px wide and half a screen away.
+**demand ratio = required ÷ achievable**
+
+Above 1.0 you have slack; 1.0 is a photo finish; below 1.0 you have to beat the
+average thumb. *This* is what has to fall monotonically, and it does:
+
+| Level | Achievable | Speedway required | Ratio | Neon | Desert | Alpine |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 288ms | 594ms | 2.07 | 2.00 | 2.33 | 2.06 |
+| 2 | 366ms | 525ms | 1.44 | 1.38 | 1.61 | 1.42 |
+| 4 | 428ms | 472ms | 1.10 | 1.07 | 1.23 | 1.08 |
+| 5 | 459ms | 463ms | **1.01** | 0.99 | 1.13 | 0.99 |
+| 6 | 484ms | 464ms | 0.96 | 0.93 | 1.08 | 0.94 |
+| 8 | 526ms | 470ms | 0.89 | 0.87 | 1.00 | 0.87 |
+| 10 | 568ms | 493ms | **0.87** | 0.84 | 0.96 | 0.85 |
+
+Level 5 is deliberately pinned at a ratio of 1.0 — a dead heat for a player
+tapping around 450ms. Level 10 asks you to beat the model by 13%. Nothing is
+allowed below 0.84, which is the fairness floor: past that a level stops being
+hard and starts being impossible.
+
+Note the required column is **not** monotonic — it bottoms out around level 6 and
+rises again. That's the box eating your reaction budget, and it's why `decayMult`
+in `difficulty.js` is a solved table that peaks mid-scale instead of a clean lerp.
+Stacking harsher decay *and* a meaner box at the top made levels 9 and 10
+unwinnable; the ratio column is the thing that stays honest.
+
+Idling always loses on every track and level, so there's a reason to tap at every
+setting.
 
 ## Records
 
@@ -128,17 +159,28 @@ just a pointer event and the pop/shake animations come from CSS.
 halt, and the race ends as soon as every rival has finished — last place is
 locked in at that point, so there's no long crawl to the line.
 
-To rebalance, change `AICar.ROSTER` speeds in `ai-car.js` (level-10 reference)
-or the scaling functions in `difficulty.js`. The win-threshold table above is
-produced by simulating the real speed model, not by guesswork — worth
-re-checking after any change to pace, decay or track length.
+To rebalance, change `AICar.ROSTER` speeds in `ai-car.js` (they apply at every
+level) or the curves in `difficulty.js`. The tables above are produced by
+simulating the real speed model, not by guesswork — worth re-checking after any
+change to rival speed, decay, track length, box size or box travel. Changing the
+box changes the *achievable* column, which moves every ratio.
 
 The simulation runs in the browser console against the live `Difficulty`,
-`Physics` and `AICar.ROSTER`: race the model at a fixed tap interval, bisect for
-the slowest interval that still wins, and assert four things across all 11 levels
-× 4 tracks — every level winnable, thresholds monotonic, level 10 hardest, and
-idling always loses. There's no Node in this project, so the console is the test
-runner.
+`Physics`, `Target` and `AICar.ROSTER`. There's no Node in this project, so the
+console is the test runner. It:
+
+1. samples `Target.spawn` a few thousand times per level to get the real mean jump
+   distance, and feeds that plus the box size through Fitts' law → **achievable**;
+2. races the speed model at a fixed tap interval and bisects for the slowest
+   interval that still wins → **required**;
+3. asserts, across all 11 levels × 4 tracks: every level winnable, the demand
+   ratio monotonically falling, no ratio below the 0.84 fairness floor, and idling
+   always losing.
+
+One caveat when comparing the sim against real play: rivals get a random surge
+phase (`AICar.phase`), so a race near a ratio of 1.0 swings ±0.2–0.3s on luck. The
+sim zeroes the phase for repeatability, which is why it reports a tighter margin
+than you'll feel. Near a photo finish, the lead genuinely changes hands.
 
 ## Installing on iPhone
 

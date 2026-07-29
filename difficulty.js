@@ -1,8 +1,10 @@
 // Difficulty 0-10. Level 10 is the reference tuning everything scales down from:
-// full-speed rivals, the smallest and furthest-jumping tap target, the longest
-// track and the harshest speed decay. Lower levels pull all five levers at once
-// so the drop in challenge is felt immediately rather than being buried in one
-// number.
+// the smallest and furthest-jumping tap target on the longest track. Lower levels
+// pull every lever at once so the drop in challenge is felt immediately rather
+// than being buried in one number.
+//
+// The rivals run the same speed at every level. What a level actually controls is
+// how hard it is for *you* to keep up with them.
 const Difficulty = {
     MIN: 0,
     MAX: 10,
@@ -27,16 +29,24 @@ const Difficulty = {
 
     clamp(level) { return Math.max(this.MIN, Math.min(this.MAX, Math.round(level))); },
 
-    // How fast the rivals run, as a fraction of their level-10 pace.
-    paceMult(level) { return this.lerp(0.52, 1, level / this.MAX); },
+    // Every race is about 8 seconds, so the track only stretches a little as the
+    // levels climb. The rivals' speed is NOT a difficulty lever any more — see
+    // AICar.ROSTER — because the tap target already sets the pace you have to
+    // keep, and stacking faster rivals on top of a meaner box just made the top
+    // levels impossible.
+    trackLength(level) { return Math.round(this.lerp(3700, 4400, level / this.MAX)); },
 
-    // Shorter tracks at low levels keep every race roughly 13-15s long even
-    // though the rivals are much slower.
-    trackLength(level) { return Math.round(this.lerp(3000, 6200, level / this.MAX)); },
+    // How quickly your speed bleeds away between taps.
+    //
+    // Solved by simulation rather than written by hand, which is why it isn't a
+    // clean lerp: it peaks in the middle of the scale and eases off at the top.
+    // That's deliberate. Past level 6 the box itself is eating so much of your
+    // reaction budget that harsh decay on top would push the level past what a
+    // thumb can physically do. Difficulty still rises the whole way — see the
+    // "demand ratio" table in README.md — it just changes which lever carries it.
+    DECAY_BY_LEVEL: [0.12, 0.20, 0.36, 0.51, 0.57, 0.60, 0.61, 0.60, 0.57, 0.53, 0.47],
 
-    // How quickly your speed bleeds away between taps. The single biggest
-    // factor in how forgiving a slow tapper finds the game.
-    decayMult(level) { return this.lerp(0.38, 1, level / this.MAX); },
+    decayMult(level) { return this.DECAY_BY_LEVEL[this.clamp(level)]; },
 
     // The speed you coast down to if you stop tapping entirely. Kept close to
     // the rivals' pace at low levels so a beginner is never hopelessly adrift.

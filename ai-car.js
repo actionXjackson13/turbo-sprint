@@ -34,11 +34,14 @@ class AICar {
 }
 
 // Three rivals: a steady pacer, a fast-but-streaky one, and a strong closer.
-// These are the difficulty-10 speeds. At level 10 a relaxed tap rate (~500ms)
-// is a photo finish and a brisk one (~350ms) wins clearly; lower levels scale
-// these down via Difficulty.paceMult(). See the balance notes in README.md.
+// These speeds apply at *every* difficulty — the rivals always run the same
+// pace, and what changes with the level is how hard it is for you to match it
+// (box size, box travel, speed decay). See the balance notes in README.md.
+//
+// Vortex at 506 is the one to beat, so every race is a fight to average ~506
+// px/s. That works out to roughly an 8-second race.
 AICar.ROSTER = [
-    { name: 'Blaze',   lane: 0, baseSpeed: 405, surgeAmp: 40, surgeFreq: 0.55, number: 7,  colors: { light: '#ff7d6b', dark: '#c02a1c' } },
-    { name: 'Vortex',  lane: 2, baseSpeed: 425, surgeAmp: 55, surgeFreq: 0.85, number: 12, colors: { light: '#a97dff', dark: '#5a2ec0' } },
-    { name: 'Comet',   lane: 3, baseSpeed: 415, surgeAmp: 30, surgeFreq: 0.35, number: 4,  colors: { light: '#7dffb0', dark: '#1f9a55' } }
+    { name: 'Blaze',   lane: 0, baseSpeed: 482, surgeAmp: 48, surgeFreq: 0.55, number: 7,  colors: { light: '#ff7d6b', dark: '#c02a1c' } },
+    { name: 'Vortex',  lane: 2, baseSpeed: 506, surgeAmp: 65, surgeFreq: 0.85, number: 12, colors: { light: '#a97dff', dark: '#5a2ec0' } },
+    { name: 'Comet',   lane: 3, baseSpeed: 494, surgeAmp: 36, surgeFreq: 0.35, number: 4,  colors: { light: '#7dffb0', dark: '#1f9a55' } }
 ];

@@ -1,7 +1,12 @@
 // Tracks the player can race on. Each map is a visual theme plus two gameplay
-// modifiers: how long the track is and how fast speed bleeds away. Rival pace
-// is deliberately NOT touched here — difficulty owns that, so a level means the
-// same kind of challenge everywhere and only the character of the race changes.
+// modifiers: how long the track is and how fast speed bleeds away. Rival pace is
+// deliberately NOT touched here, so a level means the same kind of challenge
+// everywhere and only the character of the race changes.
+//
+// The modifiers are deliberately mild. The difficulty curve now runs close to the
+// limit of what a thumb can physically do, so a map that swung length or decay by
+// 20-30% would shove its top levels past that limit — Neon at the old ×0.78
+// length made levels 9 and 10 unwinnable.
 const Maps = {
     DEFAULT: 'speedway',
     STORAGE_KEY: 'turboSprint.map',
@@ -32,8 +37,8 @@ const Maps = {
             name: 'Neon City',
             blurb: 'A short downtown sprint. Blink and it is over.',
             icon: '🌃',
-            lengthMult: 0.78,
-            decayMult: 1.0,
+            lengthMult: 0.94,
+            decayMult: 0.96,
             scenery: 'city',
             palette: {
                 skyTop: '#0a0620', skyMid: '#2a1055', skyLow: '#7b2a8c',
@@ -52,8 +57,8 @@ const Maps = {
             name: 'Desert Dash',
             blurb: 'A long haul. Pace yourself or fade in the heat.',
             icon: '🏜️',
-            lengthMult: 1.3,
-            decayMult: 0.92,
+            lengthMult: 1.15,
+            decayMult: 0.94,
             scenery: 'dunes',
             palette: {
                 skyTop: '#7a3b12', skyMid: '#d9762c', skyLow: '#f6c177',
@@ -73,7 +78,7 @@ const Maps = {
             blurb: 'Cold asphalt. Your speed drains faster up here.',
             icon: '🏔️',
             lengthMult: 1.0,
-            decayMult: 1.18,
+            decayMult: 1.08,
             scenery: 'pines',
             palette: {
                 skyTop: '#25406b', skyMid: '#6d9ac4', skyLow: '#cfe4f2',

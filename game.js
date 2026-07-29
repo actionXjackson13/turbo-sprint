@@ -92,7 +92,7 @@ function applySettings() {
     Physics.minSpeed = Difficulty.minSpeed(level);
 
     player = new PlayerCar(1);
-    aiCars = AICar.ROSTER.map(cfg => new AICar(cfg, Difficulty.paceMult(level)));
+    aiCars = AICar.ROSTER.map(cfg => new AICar(cfg));   // rivals run one pace at every level
     allCars = [player, ...aiCars];
 
     camera = cameraTarget();
@@ -356,7 +356,7 @@ function render_howto() {
 
 function render_select() {
     const map = Maps.byId(mapId);
-    const fastest = Math.max(...AICar.ROSTER.map(c => c.baseSpeed)) * Difficulty.paceMult(level);
+    const fastest = Math.max(...AICar.ROSTER.map(c => c.baseSpeed));
     const rivalTime = (Track.LENGTH / fastest).toFixed(1);
     const pr = Records.get(mapId, level);
 
@@ -369,8 +369,8 @@ function render_select() {
             <div class="map-tags">
                 <span class="tag">${len}m</span>
                 ${m.decayMult > 1 ? '<span class="tag">slippery</span>' : ''}
-                ${m.lengthMult < 0.9 ? '<span class="tag">sprint</span>' : ''}
-                ${m.lengthMult > 1.15 ? '<span class="tag">endurance</span>' : ''}
+                ${m.lengthMult < 0.97 ? '<span class="tag">sprint</span>' : ''}
+                ${m.lengthMult > 1.1 ? '<span class="tag">endurance</span>' : ''}
                 ${done ? `<span class="tag pr">${done} PR${done > 1 ? 's' : ''}</span>` : ''}
             </div>
         </div>`;
