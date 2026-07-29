@@ -6,15 +6,18 @@
 // "reaction" here includes finding the box and moving your thumb to it, not just
 // twitching a finger that is already resting on the key.
 const Physics = {
-    MIN_SPEED_BASE: 150, // px/s floor at difficulty 10
-    minSpeed: 150,       // live value; a higher floor at low levels is what
+    // The whole speed system was scaled up 15% so the cars visibly move faster.
+    // That part is balance-neutral: rival speeds and track lengths scaled with it,
+    // so the difficulty came from raising the rivals a further 5% on top.
+    MIN_SPEED_BASE: 173, // px/s floor at difficulty 10
+    minSpeed: 173,       // live value; a higher floor at low levels is what
                          // keeps a slow tapper from spiralling out of the race
-    MAX_SPEED: 620,      // hard cap on player speed
-    DECAY_BASE: 135,     // px/s lost per second at difficulty 10
-    decay: 135,          // live value; Difficulty scales it per level
+    MAX_SPEED: 713,      // hard cap on player speed
+    DECAY_BASE: 155,     // px/s lost per second at difficulty 10
+    decay: 155,          // live value; Difficulty scales it per level
 
-    BOOST_FAST: 112,    // px/s gained for a tap inside FAST_TIME
-    BOOST_SLOW: 44,     // px/s gained for a tap at (or past) SLOW_TIME
+    BOOST_FAST: 129,    // px/s gained for a tap inside FAST_TIME
+    BOOST_SLOW: 51,     // px/s gained for a tap at (or past) SLOW_TIME
     FAST_TIME: 0.42,    // s — anything quicker than this is a "perfect" tap
     SLOW_TIME: 1.55,    // s — beyond this you get the floor boost
 

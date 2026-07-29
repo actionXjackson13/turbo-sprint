@@ -34,7 +34,7 @@ const Difficulty = {
     // AICar.ROSTER — because the tap target already sets the pace you have to
     // keep, and stacking faster rivals on top of a meaner box just made the top
     // levels impossible.
-    trackLength(level) { return Math.round(this.lerp(3700, 4400, level / this.MAX)); },
+    trackLength(level) { return Math.round(this.lerp(4255, 5060, level / this.MAX)); },
 
     // How quickly your speed bleeds away between taps.
     //
@@ -50,7 +50,7 @@ const Difficulty = {
 
     // The speed you coast down to if you stop tapping entirely. Kept close to
     // the rivals' pace at low levels so a beginner is never hopelessly adrift.
-    minSpeed(level) { return Math.round(this.lerp(200, 150, level / this.MAX)); },
+    minSpeed(level) { return Math.round(this.lerp(230, 173, level / this.MAX)); },
 
     // Size of the tap box in CSS pixels. A big box is both easier to hit and
     // easier to spot. The viewport cap keeps it from swallowing a phone screen
