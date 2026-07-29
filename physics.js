@@ -2,9 +2,12 @@
 // The car always coasts downhill in speed; every correct key press shoves it
 // back up. How hard the shove is depends on how fast you reacted.
 const Physics = {
-    MIN_SPEED: 150,     // px/s the car never drops below — stops a death spiral
-    MAX_SPEED: 620,     // hard cap on player speed
-    DECAY: 135,         // px/s lost per second when you stop tapping
+    MIN_SPEED_BASE: 150, // px/s floor at difficulty 10
+    minSpeed: 150,       // live value; a higher floor at low levels is what
+                         // keeps a slow tapper from spiralling out of the race
+    MAX_SPEED: 620,      // hard cap on player speed
+    DECAY_BASE: 135,     // px/s lost per second at difficulty 10
+    decay: 135,          // live value; Difficulty scales it per level
 
     BOOST_FAST: 112,    // px/s gained for a press inside FAST_TIME
     BOOST_SLOW: 44,     // px/s gained for a press at (or past) SLOW_TIME
@@ -33,7 +36,7 @@ const Physics = {
     },
 
     coast(speed, dt) {
-        return Math.max(this.MIN_SPEED, speed - this.DECAY * dt);
+        return Math.max(this.minSpeed, speed - this.decay * dt);
     },
 
     applyBoost(speed, boost) {
@@ -41,6 +44,6 @@ const Physics = {
     },
 
     applyMiss(speed) {
-        return Math.max(this.MIN_SPEED, speed * this.MISS_FACTOR);
+        return Math.max(this.minSpeed, speed * this.MISS_FACTOR);
     }
 };

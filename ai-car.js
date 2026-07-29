@@ -1,13 +1,14 @@
 class AICar {
-    constructor(config) {
+    // `pace` scales the roster's level-10 speeds down for easier difficulties.
+    constructor(config, pace = 1) {
         this.name = config.name;
         this.lane = config.lane;
         this.x = 0;
-        this.baseSpeed = config.baseSpeed;
-        this.surgeAmp = config.surgeAmp;
+        this.baseSpeed = config.baseSpeed * pace;
+        this.surgeAmp = config.surgeAmp * pace;
         this.surgeFreq = config.surgeFreq;
         this.phase = Math.random() * Math.PI * 2;
-        this.speed = config.baseSpeed;
+        this.speed = this.baseSpeed;
         this.isPlayer = false;
         this.finishTime = null;
         this.colors = config.colors;
@@ -33,8 +34,9 @@ class AICar {
 }
 
 // Three rivals: a steady pacer, a fast-but-streaky one, and a strong closer.
-// Pace is tuned so a relaxed tap rate (~500ms) is a photo finish and a brisk
-// one (~350ms) wins clearly. See the balance notes in README.md.
+// These are the difficulty-10 speeds. At level 10 a relaxed tap rate (~500ms)
+// is a photo finish and a brisk one (~350ms) wins clearly; lower levels scale
+// these down via Difficulty.paceMult(). See the balance notes in README.md.
 AICar.ROSTER = [
     { name: 'Blaze',   lane: 0, baseSpeed: 405, surgeAmp: 40, surgeFreq: 0.55, number: 7,  colors: { light: '#ff7d6b', dark: '#c02a1c' } },
     { name: 'Vortex',  lane: 2, baseSpeed: 425, surgeAmp: 55, surgeFreq: 0.85, number: 12, colors: { light: '#a97dff', dark: '#5a2ec0' } },

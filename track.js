@@ -1,7 +1,7 @@
 // The track is a long straight strip in world coordinates. The camera scrolls
 // horizontally; cars only ever move along X, never between lanes.
 const Track = {
-    LENGTH: 6200,   // world px from start line to finish line
+    LENGTH: 6200,   // world px from start to finish; Difficulty sets this per level
     LANES: 4,
 
     // Vertical band of the screen occupied by the asphalt.

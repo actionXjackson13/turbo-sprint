@@ -9,17 +9,20 @@ const el = {
     progress: document.getElementById('progressTrack'),
     chips: document.getElementById('chips'),
     hint: document.getElementById('promptHint'),
+    promptBar: document.getElementById('promptBar'),
     overlay: document.getElementById('overlay'),
     overlayInner: document.getElementById('overlayInner')
 };
 
-const KEY_POOL = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'];
+const FULL_KEY_POOL = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'];
 const QUEUE_LENGTH = 4;
 const COUNTDOWN_FROM = 3;
 
 const view = { width: 0, height: 0 };
 
-let state = 'countdown';       // countdown | racing | finished
+let state = 'menu';            // menu | countdown | racing | finished
+let level = Difficulty.DEFAULT;
+let keyPool = FULL_KEY_POOL;
 let player, aiCars, allCars;
 let pips = new Map();
 let camera = 0;
@@ -42,23 +45,50 @@ function resize() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function init() {
+// Rebuilds the whole race to match `level`. Safe to call repeatedly while the
+// player is still flicking through difficulties on the menu.
+function applyDifficulty(newLevel) {
+    level = Difficulty.clamp(newLevel);
+    Physics.decay = Physics.DECAY_BASE * Difficulty.decayMult(level);
+    Physics.minSpeed = Difficulty.minSpeed(level);
+    Track.LENGTH = Difficulty.trackLength(level);
+    keyPool = FULL_KEY_POOL.slice(0, Difficulty.keyPoolSize(level));
+
     player = new PlayerCar(1);
-    aiCars = AICar.ROSTER.map(cfg => new AICar(cfg));
+    aiCars = AICar.ROSTER.map(cfg => new AICar(cfg, Difficulty.paceMult(level)));
     allCars = [player, ...aiCars];
 
     camera = cameraTarget();
+    buildPips();
+}
+
+function showMenu() {
+    state = 'menu';
+    applyDifficulty(level);
+    raceTime = 0;
+    streak = 0;
+    popups = [];
+    el.promptBar.style.display = 'none';
+    el.overlay.classList.add('dim');
+    renderMenu();
+    updateHud();
+}
+
+function startRace() {
+    applyDifficulty(level);
+    Difficulty.save(level);
+
+    state = 'countdown';
     countdown = COUNTDOWN_FROM;
     raceTime = 0;
     streak = 0;
     popups = [];
-    state = 'countdown';
 
     queue = [];
     for (let i = 0; i < QUEUE_LENGTH; i++) queue.push(randomKey(queue[queue.length - 1]));
     renderChips();
 
-    buildPips();
+    el.promptBar.style.display = '';
     el.hint.style.opacity = '1';
     el.overlay.classList.remove('dim');
 }
@@ -76,18 +106,31 @@ function buildPips() {
 }
 
 function randomKey(avoid) {
+    if (keyPool.length === 1) return keyPool[0];
     let key;
-    do { key = KEY_POOL[Math.floor(Math.random() * KEY_POOL.length)]; } while (key === avoid);
+    do { key = keyPool[Math.floor(Math.random() * keyPool.length)]; } while (key === avoid);
     return key;
 }
 
 /* ---------------------------------------------------------------- input -- */
 
 function onKey(key) {
-    if (state === 'finished') {
-        if (key === 'ENTER' || key === 'SPACE') init();
+    if (state === 'menu') {
+        if (key === 'ARROWLEFT')  { applyDifficulty(level - 1); renderMenu(); }
+        if (key === 'ARROWRIGHT') { applyDifficulty(level + 1); renderMenu(); }
+        if (/^[0-9]$/.test(key))  { applyDifficulty(parseInt(key, 10)); renderMenu(); }
+        if (key === 'ENTER' || key === 'SPACE') startRace();
         return;
     }
+
+    if (state === 'finished') {
+        if (key === 'ARROWLEFT')  { level = Difficulty.clamp(level - 1); renderResults(); }
+        if (key === 'ARROWRIGHT') { level = Difficulty.clamp(level + 1); renderResults(); }
+        if (/^[0-9]$/.test(key))  { level = Difficulty.clamp(parseInt(key, 10)); renderResults(); }
+        if (key === 'ENTER' || key === 'SPACE') startRace();
+        return;
+    }
+
     if (state !== 'racing') return;
 
     if (key === queue[0]) {
@@ -103,7 +146,7 @@ function onKey(key) {
         promptShownAt = performance.now();
         renderChips();
         el.hint.style.opacity = '0';
-    } else if (KEY_POOL.includes(key)) {
+    } else if (keyPool.includes(key)) {
         player.miss();
         streak = 0;
         popups.push({ text: 'MISS', color: '#ff7b7b', life: 0.6, rise: 0 });
@@ -131,9 +174,51 @@ function renderChips() {
     });
 }
 
+/* ------------------------------------------------------- difficulty UI -- */
+
+function levelBar() {
+    let segs = '';
+    for (let i = Difficulty.MIN; i <= Difficulty.MAX; i++) {
+        const on = i <= level;
+        segs += `<span class="seg${on ? ' on' : ''}" style="${on ? `background:${Difficulty.color(i)}` : ''}"></span>`;
+    }
+    return `<div class="level-bar">${segs}</div>`;
+}
+
+// Rough guide so the player knows what they're picking, not just a number.
+function levelFacts() {
+    const fastest = Math.max(...AICar.ROSTER.map(c => c.baseSpeed)) * Difficulty.paceMult(level);
+    const rivalTime = (Track.LENGTH / fastest).toFixed(1);
+    return `<div class="level-facts">
+        <span><b>${keyPool.length}</b> keys</span>
+        <span><b>${Track.LENGTH}</b>m track</span>
+        <span>rivals finish in <b>~${rivalTime}s</b></span>
+    </div>`;
+}
+
+function renderMenu() {
+    el.overlayInner.innerHTML = `
+        <div class="menu">
+            <div class="menu-title">TURBO SPRINT</div>
+            <div class="menu-sub">Tap the key prompts to build speed — no steering, just pace.</div>
+            <div class="level-head">
+                <span class="level-num" style="color:${Difficulty.color(level)}">${level}</span>
+                <span class="level-name">${Difficulty.name(level)}</span>
+            </div>
+            ${levelBar()}
+            ${levelFacts()}
+            <div class="menu-hint"><b>&larr;</b> <b>&rarr;</b> or <b>0-9</b> to set difficulty &nbsp;·&nbsp; <b>Enter</b> to race</div>
+        </div>`;
+}
+
 /* ---------------------------------------------------------------- update -- */
 
 function update(dt) {
+    if (state === 'menu') {
+        camera += (cameraTarget() - camera) * Math.min(1, dt * 8);
+        return;
+    }
+
     if (state === 'countdown') {
         countdown -= dt;
         if (countdown <= 0) {
@@ -158,7 +243,6 @@ function update(dt) {
         }
     }
 
-    // Camera keeps the player about a third of the way across the screen.
     camera += (cameraTarget() - camera) * Math.min(1, dt * 8);
 
     for (let i = popups.length - 1; i >= 0; i--) {
@@ -246,7 +330,12 @@ function drawOverlayCountdown() {
 
 function finishRace() {
     state = 'finished';
+    el.promptBar.style.display = 'none';
+    el.overlay.classList.add('dim');
+    renderResults();
+}
 
+function renderResults() {
     // Cars still running are ranked behind by their remaining distance.
     const standings = [...allCars].sort((a, b) => {
         if (a.finishTime !== null && b.finishTime !== null) return a.finishTime - b.finishTime;
@@ -270,12 +359,18 @@ function finishRace() {
                 </div>`;
     }).join('');
 
-    el.overlay.classList.add('dim');
     el.overlayInner.innerHTML = `
         <div class="result-title ${won ? 'win' : 'lose'}">${won ? 'YOU WIN!' : ordinal(rank) + ' PLACE'}</div>
-        <div class="result-sub">${won ? 'Blistering pace.' : 'Tap faster off the line to take the lead.'}</div>
+        <div class="result-sub">${won
+            ? (level === Difficulty.MAX ? 'Nothing left to beat. That was Legend.' : 'Try the next level up.')
+            : 'Tap faster off the line to take the lead.'}</div>
         <div class="standings">${rows}</div>
-        <div class="restart">Press <b>Enter</b> to race again</div>`;
+        <div class="next-level">
+            Difficulty <span class="level-num small" style="color:${Difficulty.color(level)}">${level}</span>
+            <span class="level-name">${Difficulty.name(level)}</span>
+        </div>
+        ${levelBar()}
+        <div class="menu-hint"><b>&larr;</b> <b>&rarr;</b> change difficulty &nbsp;·&nbsp; <b>Enter</b> to race again</div>`;
 }
 
 /* ------------------------------------------------------------------ loop -- */
@@ -295,5 +390,6 @@ function loop(now) {
 window.addEventListener('resize', resize);
 resize();
 InputHandler.init(onKey);
-init();
+level = Difficulty.load();
+showMenu();
 requestAnimationFrame(loop);
