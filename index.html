@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turbo Sprint</title>
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
     <div id="game">
@@ -28,10 +28,20 @@
                 <span class="label">Time</span>
                 <span class="value" id="timeValue">0.0</span>
             </div>
+            <div class="stat pr">
+                <span class="label">Best</span>
+                <span class="value" id="prValue">—</span>
+            </div>
             <div id="progressTrack">
                 <div class="progress-line"></div>
+                <div class="progress-ghost" id="progressGhost"></div>
                 <div class="progress-flag">🏁</div>
             </div>
+        </div>
+
+        <div id="topRight">
+            <button class="icon-btn" id="muteBtn" title="Sound on/off">🔊</button>
+            <button class="icon-btn" id="pauseBtn" title="Pause (Esc)">❚❚</button>
         </div>
 
         <div id="promptBar">
@@ -44,13 +54,17 @@
         </div>
     </div>
 
-    <script src="difficulty.js?v=9"></script>
-    <script src="physics.js?v=9"></script>
-    <script src="track.js?v=9"></script>
-    <script src="car-sprite.js?v=9"></script>
-    <script src="input.js?v=9"></script>
-    <script src="player.js?v=9"></script>
-    <script src="ai-car.js?v=9"></script>
-    <script src="game.js?v=9"></script>
+    <script src="maps.js?v=10"></script>
+    <script src="records.js?v=10"></script>
+    <script src="audio.js?v=10"></script>
+    <script src="particles.js?v=10"></script>
+    <script src="difficulty.js?v=10"></script>
+    <script src="physics.js?v=10"></script>
+    <script src="track.js?v=10"></script>
+    <script src="car-sprite.js?v=10"></script>
+    <script src="input.js?v=10"></script>
+    <script src="player.js?v=10"></script>
+    <script src="ai-car.js?v=10"></script>
+    <script src="game.js?v=10"></script>
 </body>
 </html>
