@@ -10,7 +10,8 @@ Open `index.html` in any browser. No build step, no dependencies.
 
 - Pick a difficulty on the start screen with **←/→** or the **0-9** keys, then **Enter**.
 - A big highlighted key appears at the bottom, with the next few queued behind it.
-- Press that key. The queue advances and your car surges forward.
+- Prompts only ever use **W A S D**, so your left hand never leaves the keys.
+- Press the highlighted key. The queue advances and your car surges forward.
 - **The faster you react, the bigger the surge.** Under 0.3s is a `PERFECT!`.
 - Your speed bleeds away constantly, so stopping means slowing down.
 - Wrong key = `MISS`: you lose a chunk of speed and your streak resets.
@@ -41,16 +42,16 @@ immediately rather than hidden in one number:
 - **Rival pace** — 52% of full speed at level 0
 - **Track length** — 3000m at level 0, 6200m at level 10 (keeps every race ~14s)
 - **Speed decay** — how fast you bleed speed between taps
-- **Key pool** — 3 keys at level 0, all 9 at level 10
+- **Key pool** — `W` `A` at level 0, growing to the full `W` `A` `S` `D` by level 8
 
 | Level | Name | Keys | Track | Rivals | You must tap at least every |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Training Wheels | 3 | 3000m | 13.5s | 1135ms |
-| 2 | Rookie | 4 | 3640m | 13.9s | 920ms |
-| 4 | Club Racer | 5 | 4280m | 14.1s | 800ms |
-| 6 | Pro | 7 | 4920m | 14.3s | 717ms |
-| 8 | Champion | 8 | 5560m | 14.5s | 634ms |
-| 10 | Legend | 9 | 6200m | 14.6s | 567ms |
+| 0 | Training Wheels | W A | 3000m | 13.5s | 1135ms |
+| 2 | Rookie | W A | 3640m | 13.9s | 920ms |
+| 4 | Club Racer | W A S | 4280m | 14.1s | 800ms |
+| 6 | Pro | W A S | 4920m | 14.3s | 717ms |
+| 8 | Champion | W A S D | 5560m | 14.5s | 634ms |
+| 10 | Legend | W A S D | 6200m | 14.6s | 567ms |
 
 Doing nothing loses at every level, so there's always a reason to tap. The
 chosen level is remembered in `localStorage`.

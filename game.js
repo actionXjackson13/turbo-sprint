@@ -14,7 +14,7 @@ const el = {
     overlayInner: document.getElementById('overlayInner')
 };
 
-const FULL_KEY_POOL = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'];
+const FULL_KEY_POOL = ['W', 'A', 'S', 'D'];
 const QUEUE_LENGTH = 4;
 const COUNTDOWN_FROM = 3;
 

@@ -41,8 +41,10 @@ const Difficulty = {
     // the rivals' pace at low levels so a beginner is never hopelessly adrift.
     minSpeed(level) { return Math.round(this.lerp(200, 150, level / this.MAX)); },
 
-    // Fewer distinct keys means less hunting for the right one.
-    keyPoolSize(level) { return Math.round(this.lerp(3, 9, level / this.MAX)); },
+    // Fewer distinct keys means less hunting for the right one. The pool is
+    // WASD, so this only ranges 2-4: at the bottom the prompts just alternate
+    // between two keys, which is the point of a training level.
+    keyPoolSize(level) { return Math.round(this.lerp(2, 4, level / this.MAX)); },
 
     name(level) { return this.NAMES[this.clamp(level)]; },
 
