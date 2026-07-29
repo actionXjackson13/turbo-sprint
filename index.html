@@ -2,9 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Turbo Sprint</title>
-    <link rel="stylesheet" href="styles.css?v=10">
+
+    <!-- Installed-app behaviour. iOS reads the apple-* tags rather than the
+         manifest for standalone launch and the home-screen icon. -->
+    <meta name="theme-color" content="#0b1020">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Turbo Sprint">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="game">
@@ -44,27 +56,49 @@
             <button class="icon-btn" id="pauseBtn" title="Pause (Esc)">❚❚</button>
         </div>
 
-        <div id="promptBar">
-            <div id="promptHint">Hit the keys in order — the faster you tap, the faster you go</div>
-            <div id="chips"></div>
+        <div id="tapTarget" class="hidden">
+            <span class="cap">TAP</span>
+            <div class="timer"></div>
+        </div>
+
+        <div id="raceHint">Tap the box — the faster you tap, the faster you go</div>
+
+        <div id="rotateHint">
+            <span>↻ Turn your phone sideways for a wider view</span>
+            <button class="rotate-close" id="rotateClose" aria-label="Dismiss">✕</button>
         </div>
 
         <div id="overlay">
             <div id="overlayInner"></div>
         </div>
+
+        <!-- Reads the iOS safe-area insets back out as plain pixel padding, so
+             the tap target can keep clear of the notch and home indicator. -->
+        <div id="safeProbe"></div>
     </div>
 
-    <script src="maps.js?v=10"></script>
-    <script src="records.js?v=10"></script>
-    <script src="audio.js?v=10"></script>
-    <script src="particles.js?v=10"></script>
-    <script src="difficulty.js?v=10"></script>
-    <script src="physics.js?v=10"></script>
-    <script src="track.js?v=10"></script>
-    <script src="car-sprite.js?v=10"></script>
-    <script src="input.js?v=10"></script>
-    <script src="player.js?v=10"></script>
-    <script src="ai-car.js?v=10"></script>
-    <script src="game.js?v=10"></script>
+    <script src="maps.js"></script>
+    <script src="records.js"></script>
+    <script src="audio.js"></script>
+    <script src="particles.js"></script>
+    <script src="difficulty.js"></script>
+    <script src="physics.js"></script>
+    <script src="track.js"></script>
+    <script src="car-sprite.js"></script>
+    <script src="input.js"></script>
+    <script src="target.js"></script>
+    <script src="player.js"></script>
+    <script src="ai-car.js"></script>
+    <script src="game.js"></script>
+
+    <script>
+        // Offline support. Skipped on file:// where service workers aren't
+        // allowed, so opening index.html directly still works.
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => { /* offline is a bonus, not a requirement */ });
+            });
+        }
+    </script>
 </body>
 </html>

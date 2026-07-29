@@ -10,34 +10,33 @@ const el = {
     pr: document.getElementById('prValue'),
     progress: document.getElementById('progressTrack'),
     ghost: document.getElementById('progressGhost'),
-    chips: document.getElementById('chips'),
-    hint: document.getElementById('promptHint'),
-    promptBar: document.getElementById('promptBar'),
+    hint: document.getElementById('raceHint'),
     overlay: document.getElementById('overlay'),
     overlayInner: document.getElementById('overlayInner'),
     muteBtn: document.getElementById('muteBtn'),
-    pauseBtn: document.getElementById('pauseBtn')
+    pauseBtn: document.getElementById('pauseBtn'),
+    game: document.getElementById('game'),
+    target: document.getElementById('tapTarget'),
+    rotateHint: document.getElementById('rotateHint'),
+    rotateClose: document.getElementById('rotateClose'),
+    safeProbe: document.getElementById('safeProbe')
 };
 
-const FULL_KEY_POOL = ['W', 'A', 'S', 'D'];
-const QUEUE_LENGTH = 4;
 const COUNTDOWN_FROM = 3;
+const ROTATE_HINT_KEY = 'turboSprint.rotateHintOff';
 
-const view = { width: 0, height: 0 };
+const view = { width: 0, height: 0, inset: { top: 0, right: 0, bottom: 0, left: 0 } };
 
 // title | howto | select | records | countdown | racing | paused | finished
 let screen = 'title';
 let level = Difficulty.DEFAULT;
 let mapId = Maps.DEFAULT;
-let keyPool = FULL_KEY_POOL;
 let player, aiCars, allCars;
 let pips = new Map();
 let camera = 0;
 let countdown = COUNTDOWN_FROM;
 let lastCountdownBeep = -1;
 let raceTime = 0;
-let queue = [];
-let promptShownAt = 0;
 let streak = 0;
 let bestStreak = 0;
 let popups = [];
@@ -45,6 +44,8 @@ let shake = 0;
 let prAtStart = null;
 let lastResult = null;
 let lastFrame = performance.now();
+let rotateHintOff = false;
+try { rotateHintOff = localStorage.getItem(ROTATE_HINT_KEY) === '1'; } catch (e) { /* ignore */ }
 
 /* ---------------------------------------------------------------- setup -- */
 
@@ -52,9 +53,33 @@ function resize() {
     const dpr = window.devicePixelRatio || 1;
     view.width = window.innerWidth;
     view.height = window.innerHeight;
+    view.inset = readSafeInsets();
     canvas.width = Math.round(view.width * dpr);
     canvas.height = Math.round(view.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    Target.refit(view, level);
+    updateRotateHint();
+}
+
+// The safe-area insets aren't readable as numbers directly, so #safeProbe turns
+// each env() value into a resolved padding we can parse.
+function readSafeInsets() {
+    const s = getComputedStyle(el.safeProbe);
+    return {
+        top: parseFloat(s.paddingTop) || 0,
+        right: parseFloat(s.paddingRight) || 0,
+        bottom: parseFloat(s.paddingBottom) || 0,
+        left: parseFloat(s.paddingLeft) || 0
+    };
+}
+
+// Suggested, not enforced: a portrait phone can still play, it just sees less
+// of the track ahead.
+function updateRotateHint() {
+    const wanted = view.height > view.width
+        && ['title', 'howto', 'select', 'records', 'finished'].includes(screen)
+        && !rotateHintOff;
+    el.rotateHint.classList.toggle('on', wanted);
 }
 
 // Rebuilds the race to match the current map + level. Safe to call repeatedly
@@ -65,7 +90,6 @@ function applySettings() {
     Track.LENGTH = Math.round(Difficulty.trackLength(level) * map.lengthMult);
     Physics.decay = Physics.DECAY_BASE * Difficulty.decayMult(level) * map.decayMult;
     Physics.minSpeed = Difficulty.minSpeed(level);
-    keyPool = FULL_KEY_POOL.slice(0, Difficulty.keyPoolSize(level));
 
     player = new PlayerCar(1);
     aiCars = AICar.ROSTER.map(cfg => new AICar(cfg, Difficulty.paceMult(level)));
@@ -87,13 +111,6 @@ function buildPips() {
     }
 }
 
-function randomKey(avoid) {
-    if (keyPool.length === 1) return keyPool[0];
-    let key;
-    do { key = keyPool[Math.floor(Math.random() * keyPool.length)]; } while (key === avoid);
-    return key;
-}
-
 /* --------------------------------------------------------- screen flow -- */
 
 function setScreen(next) {
@@ -102,8 +119,12 @@ function setScreen(next) {
     el.overlay.classList.toggle('dim', inMenu);
     el.overlay.classList.toggle('interactive', inMenu);
     el.hud.classList.toggle('hidden', ['title', 'howto', 'select', 'records'].includes(next));
-    el.promptBar.style.display = ['countdown', 'racing', 'paused'].includes(next) ? '' : 'none';
+    el.hint.classList.toggle('on', ['countdown', 'racing'].includes(next));
     el.pauseBtn.classList.toggle('on', ['racing', 'countdown'].includes(next));
+
+    // The box is only tappable while actually racing.
+    if (next === 'racing') Target.show(); else Target.hide();
+    updateRotateHint();
 }
 
 function showTitle() {
@@ -144,10 +165,7 @@ function startRace() {
     Particles.clear();
     prAtStart = Records.get(mapId, level);
 
-    queue = [];
-    for (let i = 0; i < QUEUE_LENGTH; i++) queue.push(randomKey(queue[queue.length - 1]));
-    renderChips();
-
+    Target.reset();
     el.hint.style.opacity = '1';
     el.ghost.style.display = prAtStart ? 'block' : 'none';
     el.pr.textContent = Records.format(prAtStart);
@@ -157,12 +175,12 @@ function startRace() {
 
 /* ---------------------------------------------------------------- input -- */
 
+// Keyboard is menus only now — speed comes from the tap target.
 function onKey(key) {
     Sfx.ensure();   // first gesture unlocks audio
 
     if (screen === 'racing') {
-        if (key === 'ESCAPE') { pauseRace(); return; }
-        handleRaceKey(key);
+        if (key === 'ESCAPE') pauseRace();
         return;
     }
 
@@ -214,37 +232,44 @@ function onKey(key) {
     }
 }
 
-function handleRaceKey(key) {
-    if (key === queue[0]) {
-        const reaction = (performance.now() - promptShownAt) / 1000;
-        const gain = player.boost(reaction, streak);
-        streak++;
-        bestStreak = Math.max(bestStreak, streak);
+// Hit the box: reaction time is measured from the moment it appeared, so the
+// sooner you find it and get your thumb there, the bigger the surge.
+function onTargetHit(e) {
+    if (e.button > 0) return;   // right / middle click isn't a tap
+    e.preventDefault();
+    e.stopPropagation();        // don't let this reach the miss handler on #game
+    Sfx.ensure();
+    if (screen !== 'racing' || !Target.live) return;
 
-        const rating = Physics.ratingFor(reaction);
-        popups.push({ text: rating.text, color: rating.color, life: 0.75, rise: 0 });
-        Particles.boost(player.x - camera, Track.laneY(player.lane, view), gain / Physics.BOOST_FAST);
-        Sfx.blip(streak);
+    const reaction = (performance.now() - Target.shownAt) / 1000;
+    const gain = player.boost(reaction, streak);
+    streak++;
+    bestStreak = Math.max(bestStreak, streak);
 
-        queue.shift();
-        queue.push(randomKey(queue[queue.length - 1]));
-        promptShownAt = performance.now();
-        renderChips();
-        el.hint.style.opacity = '0';
-    } else if (keyPool.includes(key)) {
-        player.miss();
-        streak = 0;
-        shake = 0.28;
-        popups.push({ text: 'MISS', color: '#ff7b7b', life: 0.6, rise: 0 });
-        Particles.miss(player.x - camera, Track.laneY(player.lane, view));
-        Sfx.miss();
-        const current = el.chips.querySelector('.chip.current');
-        if (current) {
-            current.classList.remove('miss');
-            void current.offsetWidth;   // restart the shake animation
-            current.classList.add('miss');
-        }
-    }
+    const rating = Physics.ratingFor(reaction);
+    popups.push({ text: rating.text, color: rating.color, life: 0.75, rise: 0 });
+    Particles.boost(player.x - camera, Track.laneY(player.lane, view), gain / Physics.BOOST_FAST);
+    Sfx.blip(streak);
+
+    Target.spawn(view, level);
+    el.hint.style.opacity = '0';
+}
+
+// Tap anywhere else on the track and you've fumbled it — same penalty the wrong
+// key used to carry. Taps on the UI don't count.
+function onFieldMiss(e) {
+    if (e.button > 0) return;
+    Sfx.ensure();
+    if (screen !== 'racing' || !Target.live) return;
+    if (e.target.closest('#tapTarget, #topRight, #overlay, #rotateHint')) return;
+
+    player.miss();
+    streak = 0;
+    shake = 0.28;
+    popups.push({ text: 'MISS', color: '#ff7b7b', life: 0.6, rise: 0 });
+    Particles.miss(player.x - camera, Track.laneY(player.lane, view));
+    Sfx.miss();
+    Target.flashMiss();
 }
 
 // Every clickable thing in the menus routes through here.
@@ -282,23 +307,8 @@ function pauseRace() {
 function resumeRace() {
     if (screen !== 'paused') return;
     setScreen('racing');
-    promptShownAt = performance.now();   // don't punish time spent paused
+    Target.resume();   // don't charge the player for time spent paused
     el.overlayInner.innerHTML = '';
-}
-
-function renderChips() {
-    el.chips.innerHTML = '';
-    queue.forEach((key, i) => {
-        const chip = document.createElement('div');
-        chip.className = 'chip' + (i === 0 ? ' current' : '');
-        chip.textContent = key;
-        if (i === 0) {
-            const timer = document.createElement('div');
-            timer.className = 'timer';
-            chip.appendChild(timer);
-        }
-        el.chips.appendChild(chip);
-    });
 }
 
 /* ------------------------------------------------------------- screens -- */
@@ -307,7 +317,9 @@ function levelBar(clickable) {
     let segs = '';
     for (let i = Difficulty.MIN; i <= Difficulty.MAX; i++) {
         const on = i <= level;
-        const style = on ? `background:${Difficulty.color(i)}` : '';
+        // background-color, not the shorthand: the shorthand would reset the
+        // background-clip that keeps the segment's tap area bigger than its bar.
+        const style = on ? `background-color:${Difficulty.color(i)}` : '';
         const attrs = clickable ? ` data-action="level" data-value="${i}" title="Level ${i} — ${Difficulty.name(i)}"` : '';
         segs += `<span class="seg${on ? ' on' : ''}" style="${style}"${attrs}></span>`;
     }
@@ -331,12 +343,13 @@ function render_howto() {
         <div class="section-title">How to Play</div>
         <div class="section-sub">You never steer. You only control speed.</div>
         <div class="how-list">
-            <div class="how-item"><span class="num">1</span><span>A key appears in the big gold box, with the next few queued behind it. Press it.</span></div>
-            <div class="how-item"><span class="num">2</span><span>Only <span class="kbd">W</span> <span class="kbd">A</span> <span class="kbd">S</span> <span class="kbd">D</span> are ever used, so your left hand stays put.</span></div>
-            <div class="how-item"><span class="num">3</span><span>The faster you react, the bigger the speed boost. Under 0.3s is a <b>PERFECT!</b></span></div>
+            <div class="how-item"><span class="num">1</span><span>A gold box pops up somewhere on the screen. Tap it.</span></div>
+            <div class="how-item"><span class="num">2</span><span>The moment you hit it, it reappears somewhere else. Keep chasing it.</span></div>
+            <div class="how-item"><span class="num">3</span><span>The faster you get to it, the bigger the speed boost. Under 0.5s is a <b>PERFECT!</b></span></div>
             <div class="how-item"><span class="num">4</span><span>Your speed constantly bleeds away — stop tapping and you slow down.</span></div>
-            <div class="how-item"><span class="num">5</span><span>Wrong key costs you speed and resets your streak. A clean streak adds up to +25% per boost.</span></div>
-            <div class="how-item"><span class="num">6</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
+            <div class="how-item"><span class="num">5</span><span>Tapping anywhere else costs you speed and resets your streak. A clean streak adds up to +25% per boost.</span></div>
+            <div class="how-item"><span class="num">6</span><span>Higher levels shrink the box and fling it further across the screen.</span></div>
+            <div class="how-item"><span class="num">7</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
         </div>
         <div class="btn-row"><button class="btn" data-action="title">← Back</button></div>`;
 }
@@ -373,7 +386,7 @@ function render_select() {
         </div>
         ${levelBar(true)}
         <div class="level-facts">
-            <span><b>${keyPool.join(' ')}</b></span>
+            <span><b>${Difficulty.targetLabel(level)}</b></span>
             <span><b>${Track.LENGTH}</b>m</span>
             <span>rivals finish in <b>~${rivalTime}s</b></span>
             <span class="pr-fact">your best <b>${Records.format(pr)}</b></span>
@@ -473,8 +486,8 @@ function update(dt) {
         const n = Math.ceil(countdown);
         if (n !== lastCountdownBeep) { Sfx.countdown(n); lastCountdownBeep = n; }
         if (countdown <= 0) {
+            Target.spawn(view, level);   // place the first box before it's shown
             setScreen('racing');
-            promptShownAt = performance.now();
             el.overlayInner.innerHTML = '';
         } else {
             el.overlayInner.innerHTML = n > 0
@@ -538,14 +551,9 @@ function updateHud() {
         el.ghost.style.left = (Math.min(1, raceTime / prAtStart) * usable) + 'px';
     }
 
-    if (screen === 'racing') {
-        const elapsed = (performance.now() - promptShownAt) / 1000;
-        const timer = el.chips.querySelector('.chip.current .timer');
-        if (timer) {
-            const remaining = Math.max(0, 1 - elapsed / Physics.SLOW_TIME);
-            timer.style.width = (remaining * 100) + '%';
-            timer.style.background = remaining > 0.55 ? '#6dff8f' : remaining > 0.25 ? '#ffd24a' : '#ff5f5f';
-        }
+    if (screen === 'racing' && Target.live) {
+        const elapsed = (performance.now() - Target.shownAt) / 1000;
+        Target.setTimer(Math.max(0, 1 - elapsed / Physics.SLOW_TIME));
     }
 }
 
@@ -618,6 +626,7 @@ function finishRace() {
         }))
     };
 
+    Target.reset();
     setScreen('finished');
     render_results();
 
@@ -644,7 +653,23 @@ el.overlayInner.addEventListener('click', (e) => {
 el.muteBtn.addEventListener('click', () => { Sfx.ensure(); toggleMute(); });
 el.pauseBtn.addEventListener('click', () => { Sfx.ensure(); pauseRace(); });
 
+// pointerdown, not click: on a touch screen `click` lands ~100ms late, and here
+// that delay would be indistinguishable from a slow reaction.
+el.target.addEventListener('pointerdown', onTargetHit);
+el.game.addEventListener('pointerdown', onFieldMiss);
+el.game.addEventListener('contextmenu', (e) => e.preventDefault());   // no long-press menu mid-race
+
+el.rotateClose.addEventListener('click', () => {
+    rotateHintOff = true;
+    try { localStorage.setItem(ROTATE_HINT_KEY, '1'); } catch (e) { /* ignore */ }
+    updateRotateHint();
+});
+
 window.addEventListener('resize', resize);
+// iOS can report the old viewport size during the rotation itself.
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+
+Target.init(el.target);
 resize();
 Sfx.init();
 if (Sfx.muted) { el.muteBtn.textContent = '🔇'; el.muteBtn.classList.add('off'); }

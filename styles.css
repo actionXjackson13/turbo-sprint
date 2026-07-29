@@ -8,16 +8,22 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    overscroll-behavior: none;   /* a mistimed tap must not rubber-band the page */
     background: #0b1020;
     font-family: "Segoe UI", Tahoma, Arial, sans-serif;
     color: #fff;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-text-size-adjust: 100%;
 }
 
 #game {
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;             /* Safari's URL bar shouldn't crop the track */
+    touch-action: manipulation; /* no double-tap zoom, so no 300ms tap delay */
+    -webkit-tap-highlight-color: transparent;
 }
 
 #gameCanvas {
@@ -35,7 +41,8 @@ html, body {
     top: 0;
     left: 0;
     right: 0;
-    padding: 14px clamp(10px, 1.8vw, 22px) 18px;
+    padding: calc(14px + env(safe-area-inset-top)) calc(clamp(10px, 1.8vw, 22px) + env(safe-area-inset-right))
+             18px calc(clamp(10px, 1.8vw, 22px) + env(safe-area-inset-left));
     display: flex;
     align-items: center;
     gap: clamp(8px, 2.2vw, 30px);
@@ -145,16 +152,16 @@ html, body {
 
 #topRight {
     position: absolute;
-    top: 12px;
-    right: 14px;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(14px + env(safe-area-inset-right));
     display: flex;
     gap: 8px;
     z-index: 5;
 }
 
 .icon-btn {
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.22);
     background: rgba(10, 16, 34, 0.72);
@@ -174,22 +181,57 @@ html, body {
 #pauseBtn { display: none; }
 #pauseBtn.on { display: block; }
 
-/* ------------------------------------------------------- key prompts -- */
+/* ------------------------------------------------------- tap target -- */
 
-#promptBar {
+/* The one thing you interact with during a race. Position and size are set
+   from target.js; everything here is how it looks. */
+#tapTarget {
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 0 20px 32px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
+    background: linear-gradient(180deg, #ffe98a 0%, #ffc93c 100%);
+    border: 2px solid #fff3c4;
+    color: #0b1020;
+    box-shadow: 0 0 34px rgba(255, 201, 60, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 4;
+}
+
+#tapTarget.hidden { display: none; }
+#tapTarget.pop { animation: pop 0.18s ease; }
+
+#tapTarget .cap {
+    font-size: clamp(15px, 3.6vmin, 26px);
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    opacity: 0.55;
     pointer-events: none;
 }
 
-#promptHint {
+#tapTarget .timer {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 7px;
+    background: #6dff8f;
+    width: 100%;
+    pointer-events: none;
+}
+
+#tapTarget.miss {
+    animation: shake 0.22s ease;
+    background: linear-gradient(180deg, #ff8a8a 0%, #e03b3b 100%);
+    border-color: #ffc9c9;
+}
+
+#raceHint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    padding: 0 20px;
     font-size: clamp(11px, 1.3vw, 13px);
     letter-spacing: 1.5px;
     text-transform: uppercase;
@@ -197,62 +239,59 @@ html, body {
     text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
     transition: opacity 0.3s;
     text-align: center;
+    pointer-events: none;
+    display: none;
 }
 
-#chips {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    height: 118px;
-}
+#raceHint.on { display: block; }
 
-.chip {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    background: rgba(14, 22, 44, 0.82);
-    border: 2px solid rgba(255, 255, 255, 0.18);
-    font-size: 26px;
-    font-weight: 800;
-    color: rgba(255, 255, 255, 0.55);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-    opacity: 0.65;
-    transform: scale(0.82);
-    transition: transform 0.16s ease, opacity 0.16s ease;
-}
+/* ------------------------------------------------------- rotate nudge -- */
 
-.chip.current {
-    width: 104px;
-    height: 104px;
-    border-radius: 22px;
-    font-size: 46px;
-    color: #0b1020;
-    background: linear-gradient(180deg, #ffe98a 0%, #ffc93c 100%);
-    border-color: #fff3c4;
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 0 34px rgba(255, 201, 60, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
-    animation: pop 0.18s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.chip.current .timer {
+/* iOS honours neither the manifest's orientation field nor the Screen
+   Orientation lock API, so portrait can't be prevented — only suggested. */
+#rotateHint {
     position: absolute;
-    left: 0;
-    bottom: 0;
-    height: 7px;
-    background: #ff5f5f;
-    width: 100%;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 32px);
+    padding: 9px 10px 9px 16px;
+    border-radius: 30px;
+    background: rgba(10, 16, 34, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-size: 13px;
+    color: #cfe0f5;
+    z-index: 7;
 }
 
-.chip.miss {
-    animation: shake 0.22s ease;
-    background: linear-gradient(180deg, #ff8a8a 0%, #e03b3b 100%);
-    border-color: #ffc9c9;
+#rotateHint.on { display: flex; }
+
+.rotate-close {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#safeProbe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    visibility: hidden;
+    pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 @keyframes pop {
@@ -276,8 +315,10 @@ html, body {
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    padding: 70px 20px 20px;
+    padding: calc(70px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+             calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #overlay.dim {
@@ -499,16 +540,21 @@ html, body {
     margin-bottom: 16px;
 }
 
+/* Each segment carries a transparent 44px-tall hit area via its border so a
+   thumb can land on it, while the coloured strip itself stays slim. */
 .level-bar .seg {
-    width: clamp(18px, 2.8vw, 34px);
-    height: 16px;
+    width: clamp(22px, 2.8vw, 34px);
+    height: 44px;
     border-radius: 4px;
+    border-top: 14px solid transparent;
+    border-bottom: 14px solid transparent;
     background: rgba(255, 255, 255, 0.14);
+    background-clip: padding-box;
     cursor: pointer;
     transition: transform 0.12s, opacity 0.15s;
 }
 
-.level-bar .seg:hover { transform: scaleY(1.35); }
+.level-bar .seg:hover { transform: scaleY(1.2); }
 
 .level-facts {
     display: flex;
@@ -527,6 +573,11 @@ html, body {
     font-size: clamp(11px, 1.5vw, 15px);
     color: #8fa3c8;
     margin-top: 14px;
+}
+
+/* Keyboard shortcuts are just noise on a touch device. */
+@media (hover: none) {
+    .menu-hint { display: none; }
 }
 
 .menu-hint b {
