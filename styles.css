@@ -226,6 +226,62 @@ html, body {
     border-color: #ffc9c9;
 }
 
+/* The rarer bonus box. Same shape language as #tapTarget but blue, smaller, and
+   it takes two taps — the pip row is the only thing that says how many. */
+#bonusTarget {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: linear-gradient(180deg, #7fd4ff 0%, #1f7fe0 100%);
+    border: 2px solid #cdeeff;
+    color: #06172c;
+    box-shadow: 0 0 34px rgba(45, 140, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 4;
+}
+
+#bonusTarget.hidden { display: none; }
+#bonusTarget.pop { animation: pop 0.18s ease; }
+
+#bonusTarget .cap {
+    font-size: clamp(12px, 2.6vmin, 19px);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+#bonusTarget .tap-pips {
+    display: flex;
+    gap: 6px;
+    pointer-events: none;
+}
+
+#bonusTarget .tap-pip {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: rgba(6, 23, 44, 0.25);
+    border: 1.5px solid rgba(6, 23, 44, 0.55);
+}
+
+#bonusTarget .tap-pip.filled {
+    background: #06172c;
+    border-color: #06172c;
+}
+
+/* First tap landed, one more to go — pulses so it reads as "still live", not new. */
+#bonusTarget.armed { animation: bonusPulse 0.5s ease infinite; }
+
+@keyframes bonusPulse {
+    0%, 100% { box-shadow: 0 0 34px rgba(45, 140, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5); }
+    50%      { box-shadow: 0 0 52px rgba(140, 215, 255, 0.95), 0 10px 26px rgba(0, 0, 0, 0.5); }
+}
+
 #raceHint {
     position: absolute;
     left: 0;

@@ -17,6 +17,7 @@ const el = {
     pauseBtn: document.getElementById('pauseBtn'),
     game: document.getElementById('game'),
     target: document.getElementById('tapTarget'),
+    bonus: document.getElementById('bonusTarget'),
     rotateHint: document.getElementById('rotateHint'),
     rotateClose: document.getElementById('rotateClose'),
     safeProbe: document.getElementById('safeProbe')
@@ -63,6 +64,7 @@ function resize() {
     canvas.height = Math.round(view.height * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     Target.refit(view, level);
+    BonusTarget.refit(view, level);
     updateRotateHint();
 }
 
@@ -141,8 +143,8 @@ function setScreen(next) {
     el.hint.classList.toggle('on', ['countdown', 'racing'].includes(next));
     el.pauseBtn.classList.toggle('on', !mp && ['racing', 'countdown'].includes(next));
 
-    // The box is only tappable while actually racing.
-    if (next === 'racing') Target.show(); else Target.hide();
+    // The boxes are only tappable while actually racing.
+    if (next === 'racing') { Target.show(); BonusTarget.show(); } else { Target.hide(); BonusTarget.hide(); }
     updateRotateHint();
 }
 
@@ -218,6 +220,7 @@ function startRace() {
     prAtStart = mp ? null : Records.get(mapId, level);
 
     Target.reset();
+    BonusTarget.armForRace(raceTime);
     el.hint.style.opacity = '1';
     // No personal-best pace car in multiplayer — you're chasing people, not a ghost.
     el.ghost.style.display = (!mp && prAtStart) ? 'block' : 'none';
@@ -327,13 +330,37 @@ function onTargetHit(e) {
     el.hint.style.opacity = '0';
 }
 
+// The blue "DOUBLE" box: rarer than the regular one, and it takes two taps to
+// clear. The wait between those two taps counts against you the same way it
+// would on the regular box, so the payout runs through the same reaction curve
+// — just nudged up a little, since going for it costs a tap the regular box
+// never asks for.
+function onBonusHit(e) {
+    if (e.button > 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    Sfx.ensure();
+    if (screen !== 'racing' || !BonusTarget.live) return;
+
+    const reaction = BonusTarget.tap(raceTime);
+    if (reaction === null) {
+        Sfx.bonusTap();
+        return;
+    }
+
+    const gain = player.boostRaw(Physics.boostFor(reaction, 0) * (1 + BonusTarget.BOOST_BONUS));
+    popups.push({ text: 'DOUBLE!', color: '#7fd4ff', life: 0.75, rise: 0 });
+    Particles.boost(player.x - camera, Track.laneY(player.lane, view), gain / Physics.BOOST_FAST);
+    Sfx.bonusComplete();
+}
+
 // Tap anywhere else on the track and you've fumbled it — same penalty the wrong
 // key used to carry. Taps on the UI don't count.
 function onFieldMiss(e) {
     if (e.button > 0) return;
     Sfx.ensure();
     if (screen !== 'racing' || !Target.live) return;
-    if (e.target.closest('#tapTarget, #topRight, #overlay, #rotateHint')) return;
+    if (e.target.closest('#tapTarget, #bonusTarget, #topRight, #overlay, #rotateHint')) return;
 
     player.miss();
     streak = 0;
@@ -465,6 +492,7 @@ Net.handlers = {
         mp = false;
         if (['racing', 'countdown', 'paused', 'finished'].includes(screen)) {
             Target.reset();
+            BonusTarget.reset();
             showMpMenu();
         } else {
             showMpMenu();
@@ -490,7 +518,8 @@ function pauseRace() {
 function resumeRace() {
     if (screen !== 'paused') return;
     setScreen('racing');
-    Target.resume();   // don't charge the player for time spent paused
+    Target.resume();       // don't charge the player for time spent paused
+    BonusTarget.resume();
     el.overlayInner.innerHTML = '';
 }
 
@@ -533,7 +562,8 @@ function render_howto() {
             <div class="how-item"><span class="num">4</span><span>Your speed constantly bleeds away — stop tapping and you slow down.</span></div>
             <div class="how-item"><span class="num">5</span><span>Tapping anywhere else costs you speed and resets your streak. A clean streak adds up to +25% per boost.</span></div>
             <div class="how-item"><span class="num">6</span><span>Higher levels shrink the box and fling it further across the screen.</span></div>
-            <div class="how-item"><span class="num">7</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
+            <div class="how-item"><span class="num">7</span><span>A blue <b>DOUBLE</b> box shows up now and then. It needs two taps, and pays a little more than a regular one for the trouble.</span></div>
+            <div class="how-item"><span class="num">8</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
         </div>
         <div class="btn-row"><button class="btn" data-action="title">← Back</button></div>`;
 }
@@ -827,6 +857,12 @@ function update(dt) {
         } else if (player.finishTime !== null || aiCars.every(c => c.finishTime !== null)) {
             finishRace();
         }
+
+        // finishRace() may have just changed screen this same tick — the check
+        // above keeps a bonus box from popping in right as the race ends.
+        if (!BonusTarget.live && screen === 'racing' && raceTime >= BonusTarget.dueAt) {
+            BonusTarget.spawn(view, level);
+        }
     }
 
     if (screen !== 'paused') {
@@ -951,6 +987,7 @@ function finishRace() {
     };
 
     Target.reset();
+    BonusTarget.reset();
     setScreen('finished');
     render_results();
 
@@ -963,6 +1000,7 @@ function finishRace() {
 // park on a "waiting" screen until the standings land.
 function finishMultiplayerRace() {
     Target.reset();
+    BonusTarget.reset();
     setScreen('finished');
     render_results();
 }
@@ -970,7 +1008,7 @@ function finishMultiplayerRace() {
 // The standings arrived (or we're the host and just computed them).
 function onMpResults(standings) {
     mpStandings = standings;
-    if (screen !== 'finished') { Target.reset(); setScreen('finished'); }
+    if (screen !== 'finished') { Target.reset(); BonusTarget.reset(); setScreen('finished'); }
     render_results();
 
     const mine = standings.findIndex(s => s.id === Net.myId);
@@ -999,6 +1037,7 @@ el.pauseBtn.addEventListener('click', () => { Sfx.ensure(); pauseRace(); });
 // pointerdown, not click: on a touch screen `click` lands ~100ms late, and here
 // that delay would be indistinguishable from a slow reaction.
 el.target.addEventListener('pointerdown', onTargetHit);
+el.bonus.addEventListener('pointerdown', onBonusHit);
 el.game.addEventListener('pointerdown', onFieldMiss);
 el.game.addEventListener('contextmenu', (e) => e.preventDefault());   // no long-press menu mid-race
 
@@ -1013,6 +1052,7 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 
 Target.init(el.target);
+BonusTarget.init(el.bonus);
 resize();
 Sfx.init();
 if (Sfx.muted) { el.muteBtn.textContent = '🔇'; el.muteBtn.classList.add('off'); }

@@ -19,7 +19,12 @@ class PlayerCar {
     }
 
     boost(reaction, streak) {
-        const gain = Physics.boostFor(reaction, streak);
+        return this.boostRaw(Physics.boostFor(reaction, streak));
+    }
+
+    // For boosts computed outside the normal reaction curve — the bonus target
+    // applies its own small multiplier before handing off a raw gain.
+    boostRaw(gain) {
         this.speed = Physics.applyBoost(this.speed, gain);
         return gain;
     }

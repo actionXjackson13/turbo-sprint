@@ -56,6 +56,18 @@ const Sfx = {
         this.tone({ freq: 200, slideTo: 70, dur: 0.22, type: 'sawtooth', gain: 0.07 });
     },
 
+    // The blue bonus box: a soft chime for the first tap, a two-note "ding-ding"
+    // for the second — distinct from the regular blip so a tap on it doesn't get
+    // mistaken for a normal one.
+    bonusTap() {
+        this.tone({ freq: 520, dur: 0.08, type: 'sine', gain: 0.05 });
+    },
+
+    bonusComplete() {
+        [660, 990].forEach((f, i) =>
+            this.tone({ freq: f, dur: 0.14, type: 'sine', gain: 0.07, delay: i * 0.07 }));
+    },
+
     countdown(n) {
         this.tone({ freq: n > 0 ? 440 : 760, dur: n > 0 ? 0.14 : 0.32, type: 'triangle', gain: 0.08 });
     },

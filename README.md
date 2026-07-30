@@ -18,6 +18,11 @@ no asset files beyond the app icons; even the sound is synthesised at runtime.
 - Your speed bleeds away constantly, so stopping means slowing down.
 - Tapping anywhere else = `MISS`: you lose speed and your streak resets.
 - A clean streak adds up to +25% on every boost.
+- A rarer **blue box** shows up now and then, labelled `DOUBLE`. It needs two
+  taps to clear instead of one — the pip row under the label shows how many
+  you've landed — and pays a little more than a regular box for the extra tap.
+  It's optional: it sits there until you get to it, and ignoring it costs
+  nothing.
 - Beat the three rivals to the line. Your best time is saved per track and level.
 
 Races last about **8 seconds**. Level 5 is tuned as a dead heat for a player
@@ -192,6 +197,7 @@ ahead of your own pace.
 | `track.js` | World geometry, lanes, parallax scenery, start/finish |
 | `car-sprite.js` | Shared side-view car drawing |
 | `target.js` | The tap box — where it lands, how big, how long it's been there |
+| `bonus-target.js` | The rarer blue two-tap box and its own spawn timer |
 | `input.js` | Keyboard handling, for the menus only |
 | `player.js` | Your car — coasts down, boosted by taps |
 | `ai-car.js` | Rival cars and their (level-independent) speeds |

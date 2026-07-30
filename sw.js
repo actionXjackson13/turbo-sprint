@@ -21,6 +21,7 @@ const ASSETS = [
     './car-sprite.js',
     './input.js',
     './target.js',
+    './bonus-target.js',
     './player.js',
     './ai-car.js',
     './net.js',
