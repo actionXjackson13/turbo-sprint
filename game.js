@@ -305,7 +305,9 @@ function onKey(key) {
 }
 
 // Hit the box: reaction time is measured from the moment it appeared, so the
-// sooner you find it and get your thumb there, the bigger the surge.
+// sooner you find it and get your thumb there, the bigger the surge. A blue box
+// wants two taps and only moves on after the second; each of them scores in full,
+// so taking two taps to clear one box costs you nothing.
 function onTargetHit(e) {
     if (e.button > 0) return;   // right / middle click isn't a tap
     e.preventDefault();
@@ -323,7 +325,7 @@ function onTargetHit(e) {
     Particles.boost(player.x - camera, Track.laneY(player.lane, view), gain / Physics.BOOST_FAST);
     Sfx.blip(streak);
 
-    Target.spawn(view, level);
+    if (Target.registerHit()) Target.spawn(view, level);
     el.hint.style.opacity = '0';
 }
 
@@ -529,11 +531,12 @@ function render_howto() {
         <div class="how-list">
             <div class="how-item"><span class="num">1</span><span>A gold box pops up somewhere on the screen. Tap it.</span></div>
             <div class="how-item"><span class="num">2</span><span>The moment you hit it, it reappears somewhere else. Keep chasing it.</span></div>
-            <div class="how-item"><span class="num">3</span><span>The faster you get to it, the bigger the speed boost. Under 0.5s is a <b>PERFECT!</b></span></div>
-            <div class="how-item"><span class="num">4</span><span>Your speed constantly bleeds away — stop tapping and you slow down.</span></div>
-            <div class="how-item"><span class="num">5</span><span>Tapping anywhere else costs you speed and resets your streak. A clean streak adds up to +25% per boost.</span></div>
-            <div class="how-item"><span class="num">6</span><span>Higher levels shrink the box and fling it further across the screen.</span></div>
-            <div class="how-item"><span class="num">7</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
+            <div class="how-item"><span class="num">3</span><span>A <b>blue</b> box takes two taps and stays put until the second one. Both taps boost you in full, so it never costs you speed.</span></div>
+            <div class="how-item"><span class="num">4</span><span>The faster you get to it, the bigger the speed boost. Under 0.5s is a <b>PERFECT!</b></span></div>
+            <div class="how-item"><span class="num">5</span><span>Your speed constantly bleeds away — stop tapping and you slow down.</span></div>
+            <div class="how-item"><span class="num">6</span><span>Tapping anywhere else costs you speed and resets your streak. A clean streak adds up to +25% per boost.</span></div>
+            <div class="how-item"><span class="num">7</span><span>Higher levels shrink the box and fling it further across the screen.</span></div>
+            <div class="how-item"><span class="num">8</span><span>Beat the three rivals to the line. Your best time per map and level is saved.</span></div>
         </div>
         <div class="btn-row"><button class="btn" data-action="title">← Back</button></div>`;
 }

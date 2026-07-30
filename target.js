@@ -8,12 +8,21 @@
 const Target = {
     el: null,
     timerEl: null,
+    capEl: null,
 
     x: 0,          // centre, in CSS pixels
     y: 0,
     size: 110,
-    shownAt: 0,    // performance.now() when this box appeared
+    shownAt: 0,    // performance.now() when this box appeared, or when its last
+                   // hit landed — either way, what the next tap is timed against
     live: false,   // false = nothing to hit (menus, countdown, pause, finish)
+
+    // Some boxes are blue and take two taps instead of one. The box doesn't move
+    // between them, so the second tap is a short one — and it pays a full boost
+    // like any other tap, which is the point: two taps, two boosts, no loss.
+    DOUBLE_CHANCE: 0.25,
+    needed: 1,     // taps this box wants
+    taken: 0,      // taps it has had
 
     // Keep-out margins. The top one clears the HUD strip, the bottom one keeps
     // the box out of the iOS home-indicator / edge-swipe gutter, and the corner
@@ -29,6 +38,7 @@ const Target = {
     init(el) {
         this.el = el;
         this.timerEl = el.querySelector('.timer');
+        this.capEl = el.querySelector('.cap');
     },
 
     // The rectangle the box's *centre* may land in, in screen coordinates.
@@ -83,9 +93,32 @@ const Target = {
         this.y = y;
         this.live = true;
         this.shownAt = performance.now();
+        this.needed = Math.random() < this.DOUBLE_CHANCE ? 2 : 1;
+        this.taken = 0;
+        this.dress();
         this.place();
         this.show();
         this.pop();
+    },
+
+    // Colour and caption for the current box and how far through it you are.
+    dress() {
+        const double = this.needed > 1;
+        this.el.classList.toggle('double', double);
+        this.el.classList.toggle('struck', this.taken > 0);
+        this.capEl.textContent = !double ? 'TAP' : this.taken > 0 ? 'AGAIN' : 'TAP ×2';
+    },
+
+    // Counts a tap on the box. Returns true once the box is spent and the caller
+    // should spawn the next one; false means it stays put waiting for another
+    // tap. Either way the clock restarts, so every tap is timed on its own.
+    registerHit() {
+        this.taken++;
+        if (this.taken >= this.needed) return true;
+        this.shownAt = performance.now();
+        this.dress();
+        this.pop();
+        return false;
     },
 
     place() {

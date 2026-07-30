@@ -14,6 +14,9 @@ no asset files beyond the app icons; even the sound is synthesised at runtime.
 - Pick a **track** and a **difficulty**, then start.
 - A gold box pops up somewhere on the screen. **Tap it.**
 - The instant you hit it, it reappears somewhere else. Keep chasing it.
+- Some boxes come up **blue**: those take two taps and don't move until the
+  second one lands. Each tap pays a full boost and counts toward your streak, so
+  a blue box is worth two — clearing it costs you nothing.
 - **The faster you get to it, the bigger the surge.** Under 0.5s is a `PERFECT!`.
 - Your speed bleeds away constantly, so stopping means slowing down.
 - Tapping anywhere else = `MISS`: you lose speed and your streak resets.

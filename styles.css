@@ -202,6 +202,22 @@ html, body {
 #tapTarget.hidden { display: none; }
 #tapTarget.pop { animation: pop 0.18s ease; }
 
+/* The two-tap box. Blue so it reads as "different" at a glance from across the
+   screen, before you've had time to read the caption. `struck` is the same box
+   after its first tap: brighter, ringed, still sitting there. Both stay above
+   .miss in source order so a fumbled tap can still flash the box red. */
+#tapTarget.double {
+    background: linear-gradient(180deg, #9ad4ff 0%, #2b7fe0 100%);
+    border-color: #d5ecff;
+    box-shadow: 0 0 34px rgba(59, 141, 232, 0.6), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+#tapTarget.struck {
+    background: linear-gradient(180deg, #d3ecff 0%, #59a9f2 100%);
+    border-color: #ffffff;
+    box-shadow: 0 0 40px rgba(120, 190, 255, 0.75), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
 #tapTarget .cap {
     font-size: clamp(15px, 3.6vmin, 26px);
     font-weight: 900;
