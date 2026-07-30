@@ -70,7 +70,8 @@ export interface EventGuest {
 export interface SongRequest {
   id: string
   eventId: string
-  guestId: string
+  /** null when the DJ promoted a voting-round winner rather than a guest asking. */
+  guestId: string | null
   /** Snapshot of the requester's name at submit time. */
   guestDisplayName: string
   title: string
@@ -78,6 +79,11 @@ export interface SongRequest {
   /** Server-maintained. Never written by the client. */
   voteCount: number
   status: RequestStatus
+  /**
+   * Manual ordering within the queue. Only meaningful when status is 'queued';
+   * null otherwise. Lower sorts first.
+   */
+  queuePosition: number | null
   /** Set when this row was created by promoting a voting-round winner. */
   sourceRoundId: string | null
   createdAt: string
