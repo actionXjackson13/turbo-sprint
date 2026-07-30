@@ -1,49 +1,47 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastProvider } from './contexts/ToastProvider'
-import { RootLayout } from './layouts/RootLayout'
-import { AppButton } from './components'
-
-/**
- * Placeholder shown until the real screens land in the next phase. Routing,
- * providers and the shell are wired now so each screen can be dropped in.
- */
-function Placeholder({ name }: { name: string }) {
-  return (
-    <RootLayout>
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        <h1 className="text-2xl font-bold text-fg">{name}</h1>
-        <p className="text-sm text-fg-muted">This screen is coming next.</p>
-      </div>
-    </RootLayout>
-  )
-}
+import { ServiceProvider } from './contexts/ServiceProvider'
+import { GuestLayout } from './layouts/GuestLayout'
+import { WelcomePage } from './pages/guest/WelcomePage'
+import { JoinEventPage } from './pages/guest/JoinEventPage'
+import { DisplayNamePage } from './pages/guest/DisplayNamePage'
+import { EventHomePage } from './pages/guest/EventHomePage'
+import { RequestSongPage } from './pages/guest/RequestSongPage'
+import { RequestDetailsPage } from './pages/guest/RequestDetailsPage'
+import { MyRequestsPage } from './pages/guest/MyRequestsPage'
+import { VotingRoundPage } from './pages/guest/VotingRoundPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Placeholder name="Welcome" />} />
-            <Route
-              path="*"
-              element={
-                <RootLayout>
-                  <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-                    <h1 className="text-2xl font-bold text-fg">
-                      Page not found
-                    </h1>
-                    <AppButton onClick={() => window.location.assign('/')}>
-                      Go home
-                    </AppButton>
-                  </div>
-                </RootLayout>
-              }
-            />
-          </Routes>
-        </BrowserRouter>
-      </ToastProvider>
+      <ServiceProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Guest entry */}
+              <Route path="/" element={<WelcomePage />} />
+              <Route path="/join" element={<JoinEventPage />} />
+              <Route path="/join/name" element={<DisplayNamePage />} />
+
+              {/* In-event guest screens share the session provider and nav */}
+              <Route path="/e/:eventId" element={<GuestLayout />}>
+                <Route index element={<EventHomePage />} />
+                <Route path="request" element={<RequestSongPage />} />
+                <Route
+                  path="request/:requestId"
+                  element={<RequestDetailsPage />}
+                />
+                <Route path="mine" element={<MyRequestsPage />} />
+                <Route path="vote" element={<VotingRoundPage />} />
+              </Route>
+
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </ServiceProvider>
     </ErrorBoundary>
   )
 }
