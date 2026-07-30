@@ -56,17 +56,15 @@
             <button class="icon-btn" id="pauseBtn" title="Pause (Esc)">❚❚</button>
         </div>
 
+        <!-- One box, two flavours: gold TAP, or blue DOUBLE (adds .double, which
+             is what reveals the pip row). -->
         <div id="tapTarget" class="hidden">
             <span class="cap">TAP</span>
-            <div class="timer"></div>
-        </div>
-
-        <div id="bonusTarget" class="hidden">
-            <span class="cap">DOUBLE</span>
             <div class="tap-pips">
                 <span class="tap-pip"></span>
                 <span class="tap-pip"></span>
             </div>
+            <div class="timer"></div>
         </div>
 
         <div id="raceHint">Tap the box — the faster you tap, the faster you go</div>
@@ -95,7 +93,6 @@
     <script src="car-sprite.js"></script>
     <script src="input.js"></script>
     <script src="target.js"></script>
-    <script src="bonus-target.js"></script>
     <script src="player.js"></script>
     <script src="ai-car.js"></script>
     <script src="net.js"></script>

@@ -220,48 +220,14 @@ html, body {
     pointer-events: none;
 }
 
-#tapTarget.miss {
-    animation: shake 0.22s ease;
-    background: linear-gradient(180deg, #ff8a8a 0%, #e03b3b 100%);
-    border-color: #ffc9c9;
-}
-
-/* The rarer bonus box. Same shape language as #tapTarget but blue, smaller, and
-   it takes two taps — the pip row is the only thing that says how many. */
-#bonusTarget {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    background: linear-gradient(180deg, #7fd4ff 0%, #1f7fe0 100%);
-    border: 2px solid #cdeeff;
-    color: #06172c;
-    box-shadow: 0 0 34px rgba(45, 140, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
-    cursor: pointer;
-    z-index: 4;
-}
-
-#bonusTarget.hidden { display: none; }
-#bonusTarget.pop { animation: pop 0.18s ease; }
-
-#bonusTarget .cap {
-    font-size: clamp(12px, 2.6vmin, 19px);
-    font-weight: 900;
-    letter-spacing: 0.1em;
-    opacity: 0.8;
-    pointer-events: none;
-}
-
-#bonusTarget .tap-pips {
-    display: flex;
+/* The pip row only means anything on a DOUBLE, so it's hidden otherwise. */
+#tapTarget .tap-pips {
+    display: none;
     gap: 6px;
     pointer-events: none;
 }
 
-#bonusTarget .tap-pip {
+#tapTarget .tap-pip {
     width: 9px;
     height: 9px;
     border-radius: 50%;
@@ -269,18 +235,53 @@ html, body {
     border: 1.5px solid rgba(6, 23, 44, 0.55);
 }
 
-#bonusTarget .tap-pip.filled {
+#tapTarget .tap-pip.filled {
     background: #06172c;
     border-color: #06172c;
 }
 
-/* First tap landed, one more to go — pulses so it reads as "still live", not new. */
-#bonusTarget.armed { animation: bonusPulse 0.5s ease infinite; }
+/* The occasional DOUBLE: same box, same slot, same spawn rules — just blue, and
+   it wants two taps. Stacks the label over the pips instead of centring one cap. */
+#tapTarget.double {
+    flex-direction: column;
+    gap: 5px;
+    background: linear-gradient(180deg, #7fd4ff 0%, #1f7fe0 100%);
+    border-color: #cdeeff;
+    color: #06172c;
+    box-shadow: 0 0 34px rgba(45, 140, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+#tapTarget.double .tap-pips { display: flex; }
+
+/* "DOUBLE" is six characters where "TAP" is three, and the box gets down to
+   64px at the top levels, so the label needs to be smaller here. */
+#tapTarget.double .cap {
+    font-size: clamp(11px, 2.4vmin, 18px);
+    letter-spacing: 0.08em;
+    opacity: 0.8;
+}
+
+/* First tap landed, one more to go: one bump to acknowledge the tap, then a
+   steady pulse so it reads as "still live" rather than newly spawned. */
+#tapTarget.double.armed {
+    animation: pop 0.18s ease, bonusPulse 0.5s ease 0.18s infinite;
+}
 
 @keyframes bonusPulse {
     0%, 100% { box-shadow: 0 0 34px rgba(45, 140, 255, 0.55), 0 10px 26px rgba(0, 0, 0, 0.5); }
     50%      { box-shadow: 0 0 52px rgba(140, 215, 255, 0.95), 0 10px 26px rgba(0, 0, 0, 0.5); }
 }
+
+/* After .double so a miss flash still turns the box red, whichever kind it is. */
+#tapTarget.miss {
+    animation: shake 0.22s ease;
+    background: linear-gradient(180deg, #ff8a8a 0%, #e03b3b 100%);
+    border-color: #ffc9c9;
+}
+
+/* Needs to out-specify .double.armed above, or a miss during a half-finished
+   DOUBLE would keep pulsing instead of shaking. */
+#tapTarget.double.armed.miss { animation: shake 0.22s ease; }
 
 #raceHint {
     position: absolute;

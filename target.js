@@ -2,18 +2,39 @@
 // accelerate. This module owns where the box is and how long it has been
 // there; game.js owns what hitting it means.
 //
+// There is only ever one box live. Most of them are the ordinary gold TAP box,
+// but every so often the box that appears is a blue DOUBLE instead, which needs
+// two taps to clear rather than one. It's the same slot in the same rotation —
+// clear one and the next appears immediately, whichever kind it is.
+//
 // It's a DOM element rather than something drawn on the canvas so that hit
 // testing is just a pointer event, and so the pop/shake animations come from
 // CSS for free.
 const Target = {
     el: null,
     timerEl: null,
+    capEl: null,
+    pipEls: null,
 
     x: 0,          // centre, in CSS pixels
     y: 0,
     size: 110,
     shownAt: 0,    // performance.now() when this box appeared
     live: false,   // false = nothing to hit (menus, countdown, pause, finish)
+
+    kind: 'normal',   // 'normal' | 'double'
+    taps: 0,          // taps landed on the current box
+    sinceDouble: 0,   // ordinary boxes cleared since the last DOUBLE
+
+    // How often a spawn is a DOUBLE. The minimum gap keeps them from clumping
+    // together; with these two the run works out to roughly one box in six.
+    DOUBLE_CHANCE: 0.28,
+    DOUBLE_MIN_GAP: 2,
+
+    // A DOUBLE costs you the time of a second tap, so it pays a little over what
+    // that same (longer) reaction would earn on an ordinary box. Deliberately
+    // small — it's a nudge, not a second income stream.
+    BOOST_BONUS: 0.12,
 
     // Keep-out margins. The top one clears the HUD strip, the bottom one keeps
     // the box out of the iOS home-indicator / edge-swipe gutter, and the corner
@@ -29,6 +50,51 @@ const Target = {
     init(el) {
         this.el = el;
         this.timerEl = el.querySelector('.timer');
+        this.capEl = el.querySelector('.cap');
+        this.pipEls = [...el.querySelectorAll('.tap-pip')];
+    },
+
+    isDouble() { return this.kind === 'double'; },
+
+    tapsNeeded() { return this.kind === 'double' ? 2 : 1; },
+
+    // Start of a race: the first couple of boxes are always ordinary ones, so
+    // nobody's opening move is a DOUBLE.
+    resetRotation() {
+        this.sinceDouble = 0;
+    },
+
+    pickKind() {
+        if (this.sinceDouble < this.DOUBLE_MIN_GAP || Math.random() >= this.DOUBLE_CHANCE) {
+            this.sinceDouble++;
+            return 'normal';
+        }
+        this.sinceDouble = 0;
+        return 'double';
+    },
+
+    // Registers a tap. Returns false while a DOUBLE still needs another one,
+    // true once the box is cleared.
+    registerTap() {
+        this.taps++;
+        if (this.taps < this.tapsNeeded()) {
+            // Adding .armed is what plays the acknowledging bump, so there's no
+            // pop() call here; clearing .miss stops a previous fumble's red from
+            // sticking to a box that's still in play.
+            this.el.classList.remove('miss');
+            this.renderKind();
+            return false;
+        }
+        return true;
+    },
+
+    // Paints the current kind and tap progress onto the element.
+    renderKind() {
+        const dbl = this.isDouble();
+        this.el.classList.toggle('double', dbl);
+        this.el.classList.toggle('armed', dbl && this.taps > 0);
+        this.capEl.textContent = dbl ? 'DOUBLE' : 'TAP';
+        this.pipEls.forEach((p, i) => p.classList.toggle('filled', i < this.taps));
     },
 
     // The rectangle the box's *centre* may land in, in screen coordinates.
@@ -83,6 +149,9 @@ const Target = {
         this.y = y;
         this.live = true;
         this.shownAt = performance.now();
+        this.kind = this.pickKind();
+        this.taps = 0;
+        this.renderKind();
         this.place();
         this.show();
         this.pop();
@@ -135,6 +204,9 @@ const Target = {
 
     reset() {
         this.live = false;
+        this.kind = 'normal';
+        this.taps = 0;
+        this.renderKind();
         this.hide();
     },
 
