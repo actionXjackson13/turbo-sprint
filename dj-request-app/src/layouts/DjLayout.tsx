@@ -1,7 +1,17 @@
-import { Outlet, useParams } from 'react-router-dom'
+import { Navigate, Outlet, useParams } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { RootLayout } from './RootLayout'
-import { BottomNavigation, NavIcons, type NavItem } from '../components'
+import {
+  BottomNavigation,
+  EmptyState,
+  LoadingSkeleton,
+  NavIcons,
+  type NavItem,
+} from '../components'
 import { routes } from '../lib/router'
+import { DjEventProvider } from '../contexts/DjEventProvider'
+import { useDjEvent } from '../hooks/useDjEvent'
+import { useDjAuth } from '../hooks/useDjAuth'
 
 /**
  * Shell for the DJ's per-event screens. The dashboard and create-event screens
@@ -9,8 +19,21 @@ import { routes } from '../lib/router'
  */
 export function DjLayout() {
   const { eventId } = useParams<{ eventId: string }>()
+  const { profile, loading } = useDjAuth()
 
-  if (!eventId) return null
+  if (loading) {
+    return (
+      <RootLayout>
+        <div className="flex-1 space-y-3 p-4 pt-safe">
+          <LoadingSkeleton className="h-8 w-1/2" />
+          <LoadingSkeleton className="h-32" />
+        </div>
+      </RootLayout>
+    )
+  }
+
+  if (!profile) return <Navigate to={routes.dj.signIn} replace />
+  if (!eventId) return <Navigate to={routes.dj.dashboard} replace />
 
   const items: NavItem[] = [
     {
@@ -19,21 +42,9 @@ export function DjLayout() {
       icon: NavIcons.dashboard,
       end: true,
     },
-    {
-      to: routes.dj.requests(eventId),
-      label: 'Requests',
-      icon: NavIcons.list,
-    },
-    {
-      to: routes.dj.queue(eventId),
-      label: 'Queue',
-      icon: NavIcons.queue,
-    },
-    {
-      to: routes.dj.activeVote(eventId),
-      label: 'Vote',
-      icon: NavIcons.vote,
-    },
+    { to: routes.dj.requests(eventId), label: 'Requests', icon: NavIcons.list },
+    { to: routes.dj.queue(eventId), label: 'Queue', icon: NavIcons.queue },
+    { to: routes.dj.activeVote(eventId), label: 'Vote', icon: NavIcons.vote },
     {
       to: routes.dj.settings(eventId),
       label: 'Settings',
@@ -42,9 +53,44 @@ export function DjLayout() {
   ]
 
   return (
-    <RootLayout hasBottomNav>
-      <Outlet />
-      <BottomNavigation items={items} />
-    </RootLayout>
+    <DjEventProvider eventId={eventId}>
+      <RootLayout hasBottomNav>
+        <DjEventGate>
+          <Outlet />
+        </DjEventGate>
+        <BottomNavigation items={items} />
+      </RootLayout>
+    </DjEventProvider>
   )
+}
+
+/**
+ * Shows a clear message when the event is missing or not this DJ's. Ownership
+ * is enforced server-side; this only avoids rendering an empty control panel.
+ */
+function DjEventGate({ children }: { children: ReactNode }) {
+  const { event, loading } = useDjEvent()
+
+  if (loading && !event) {
+    return (
+      <div className="flex-1 space-y-3 p-4 pt-safe">
+        <LoadingSkeleton className="h-8 w-1/2" />
+        <LoadingSkeleton className="h-24" />
+        <LoadingSkeleton className="h-24" />
+      </div>
+    )
+  }
+
+  if (!event) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState
+          title="Event unavailable"
+          description="It may have been removed, or it belongs to another DJ."
+        />
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }

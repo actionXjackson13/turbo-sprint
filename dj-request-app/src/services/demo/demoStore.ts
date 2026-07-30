@@ -124,6 +124,26 @@ export function mutate<T>(fn: (db: DemoDb) => T, ...notify: string[]): T {
   return result
 }
 
+/**
+ * Cross-tab sync for demo mode.
+ *
+ * Supabase realtime propagates changes between devices; localStorage's
+ * `storage` event is the equivalent between tabs of the same browser. Without
+ * this you could not demonstrate a DJ accepting a request and the guest's
+ * screen updating live, because demo mode has no server to push from.
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== STORAGE_KEY || !event.newValue) return
+    try {
+      db = JSON.parse(event.newValue) as DemoDb
+    } catch {
+      return
+    }
+    for (const name of [...listeners.keys()]) emit(name)
+  })
+}
+
 /** Restores the original sample data. Exposed via the demo settings screen. */
 export function resetDemoDb(): void {
   db = buildSeed()
