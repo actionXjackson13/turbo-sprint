@@ -17,6 +17,9 @@ const el = {
     pauseBtn: document.getElementById('pauseBtn'),
     game: document.getElementById('game'),
     target: document.getElementById('tapTarget'),
+    loserShot: document.getElementById('loserShot'),
+    loserPhoto: document.getElementById('loserPhoto'),
+    loserText: document.getElementById('loserText'),
     rotateHint: document.getElementById('rotateHint'),
     rotateClose: document.getElementById('rotateClose'),
     safeProbe: document.getElementById('safeProbe')
@@ -24,6 +27,10 @@ const el = {
 
 const COUNTDOWN_FROM = 3;
 const ROTATE_HINT_KEY = 'turboSprint.rotateHintOff';
+
+// How long the loser photo gets the screen to itself before the results fade in
+// over it. Roughly the length of the sad trombone.
+const LOSER_HOLD_MS = 1600;
 
 const view = { width: 0, height: 0, inset: { top: 0, right: 0, bottom: 0, left: 0 } };
 
@@ -49,6 +56,8 @@ let shake = 0;
 let prAtStart = null;
 let lastResult = null;
 let lastFrame = performance.now();
+let loserTimer = null;
+let loserPhotoReady = false;
 let rotateHintOff = false;
 try { rotateHintOff = localStorage.getItem(ROTATE_HINT_KEY) === '1'; } catch (e) { /* ignore */ }
 
@@ -133,6 +142,8 @@ function buildPips() {
 /* --------------------------------------------------------- screen flow -- */
 
 function setScreen(next) {
+    // The photo only belongs to the results screen — leaving it clears it.
+    if (next !== 'finished') hideLoserShot();
     screen = next;
     const inMenu = ['title', 'howto', 'select', 'records', 'mpMenu', 'lobby', 'finished', 'paused'].includes(next);
     el.overlay.classList.toggle('dim', inMenu);
@@ -490,6 +501,44 @@ Net.handlers = {
         render_mpMenu();
     }
 };
+
+/* -------------------------------------------------------- loser photo -- */
+
+// Slams the photo up, holds it alone for a beat, then fades the caption out and
+// the results in over it. Returns false if the photo isn't available, so the
+// caller can fall back to the ordinary losing sound.
+function showLoserShot() {
+    if (!loserPhotoReady) return false;
+    clearTimeout(loserTimer);
+
+    el.loserShot.classList.remove('hidden');
+    el.loserText.classList.remove('gone');
+    el.overlay.classList.add('held');       // menu waits its turn
+    el.overlay.classList.add('photo-bg');   // lighter scrim so the photo shows through
+
+    // Replay the animation even if we're coming straight off another loss.
+    el.loserShot.classList.remove('pop');
+    void el.loserShot.offsetWidth;
+    el.loserShot.classList.add('pop');
+
+    Sfx.sadTrombone();
+
+    loserTimer = setTimeout(() => {
+        loserTimer = null;
+        el.loserText.classList.add('gone');
+        el.overlay.classList.remove('held');
+    }, LOSER_HOLD_MS);
+    return true;
+}
+
+function hideLoserShot() {
+    clearTimeout(loserTimer);
+    loserTimer = null;
+    el.loserShot.classList.add('hidden');
+    el.loserShot.classList.remove('pop');
+    el.loserText.classList.remove('gone');
+    el.overlay.classList.remove('held', 'photo-bg');
+}
 
 function toggleMute() {
     const muted = Sfx.toggle();
@@ -972,9 +1021,12 @@ function finishRace() {
     setScreen('finished');
     render_results();
 
-    if (isRecord) { Sfx.record(); Particles.confetti(view.width, view.height); }
-    else if (won) { Sfx.win(); Particles.confetti(view.width, view.height); }
-    else Sfx.lose();
+    if (won) {
+        if (isRecord) Sfx.record(); else Sfx.win();
+        Particles.confetti(view.width, view.height);
+    } else if (!showLoserShot()) {
+        Sfx.lose();   // the photo brings its own sound; this is the fallback
+    }
 }
 
 // You've crossed the line but the race isn't decided until the host says so, so
@@ -993,7 +1045,7 @@ function onMpResults(standings) {
 
     const mine = standings.findIndex(s => s.id === Net.myId);
     if (mine === 0) { Sfx.win(); Particles.confetti(view.width, view.height); }
-    else Sfx.lose();
+    else if (!showLoserShot()) Sfx.lose();
 }
 
 /* ------------------------------------------------------------------ loop -- */
@@ -1029,6 +1081,12 @@ el.rotateClose.addEventListener('click', () => {
 window.addEventListener('resize', resize);
 // iOS can report the old viewport size during the rotation itself.
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+
+// Only use the loser photo if it actually loaded — otherwise a missing file
+// would slam a black rectangle over the results.
+el.loserPhoto.addEventListener('load', () => { loserPhotoReady = true; });
+el.loserPhoto.addEventListener('error', () => { loserPhotoReady = false; });
+if (el.loserPhoto.complete && el.loserPhoto.naturalWidth > 0) loserPhotoReady = true;
 
 Target.init(el.target);
 resize();

@@ -82,6 +82,20 @@ const Sfx = {
             this.tone({ freq: f, dur: 0.3, type: 'triangle', gain: 0.07, delay: i * 0.13 }));
     },
 
+    // Womp-womp-womp-waaah. Three descending notes and a long drooping fourth,
+    // sawtooth for the brassy buzz. Plays under the loser photo.
+    sadTrombone() {
+        const notes = [
+            [233, 220, 0.26],
+            [220, 208, 0.26],
+            [208, 196, 0.26],
+            [196, 116, 0.9]   // the droop
+        ];
+        notes.forEach(([freq, slideTo, dur], i) => {
+            this.tone({ freq, slideTo, dur, type: 'sawtooth', gain: 0.085, delay: i * 0.28 });
+        });
+    },
+
     record() {
         [784, 988, 1319, 1568, 1976].forEach((f, i) =>
             this.tone({ freq: f, dur: 0.22, type: 'square', gain: 0.06, delay: i * 0.075 }));

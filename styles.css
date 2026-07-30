@@ -363,6 +363,76 @@ html, body {
     75%      { transform: scale(1) translateX(9px); }
 }
 
+/* ------------------------------------------------------ loser photo -- */
+
+/* Slams in when you lose, then stays put as the backdrop behind the results.
+   Deliberately has no z-index and sits just before #overlay in the markup, so
+   the menu paints over it while the corner buttons (z-index 5) stay reachable. */
+#loserShot {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #05070f;
+}
+
+#loserShot.hidden { display: none; }
+
+#loserPhoto {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#loserText {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(-6deg);
+    width: 92%;
+    text-align: center;
+    font-size: clamp(32px, 8vw, 104px);
+    font-weight: 900;
+    line-height: 1.02;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 6px #000, 0 0 18px rgba(0, 0, 0, 0.95), 0 10px 34px rgba(0, 0, 0, 0.9);
+    -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
+    pointer-events: none;
+    transition: opacity 0.7s ease;
+}
+
+/* Fades out as the menu takes over; the photo stays. */
+#loserText.gone { opacity: 0; }
+
+#loserShot.pop { animation: loserIn 0.45s ease-out; }
+#loserShot.pop #loserPhoto { animation: loserZoom 0.6s cubic-bezier(0.15, 0.9, 0.3, 1); }
+#loserShot.pop #loserText {
+    animation: loserTextIn 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) 0.12s backwards;
+}
+
+@keyframes loserIn {
+    0%  { opacity: 0; }
+    22% { opacity: 1; }
+}
+
+@keyframes loserZoom {
+    from { transform: scale(1.4); }
+    to   { transform: scale(1); }
+}
+
+@keyframes loserTextIn {
+    from { opacity: 0; transform: translate(-50%, -50%) rotate(-6deg) scale(0.4); }
+    to   { opacity: 1; transform: translate(-50%, -50%) rotate(-6deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #loserShot.pop,
+    #loserShot.pop #loserPhoto,
+    #loserShot.pop #loserText { animation: none; }
+}
+
 /* ---------------------------------------------------------- overlay -- */
 
 #overlay {
@@ -372,6 +442,7 @@ html, body {
     align-items: center;
     justify-content: center;
     pointer-events: none;
+    transition: opacity 0.6s ease;
     padding: calc(70px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
              calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
     overflow-y: auto;
@@ -384,6 +455,20 @@ html, body {
 }
 
 #overlay.interactive { pointer-events: auto; }
+
+/* Holds the results menu back while the loser photo has its moment. After
+   .interactive so it wins the pointer-events fight — an invisible menu must not
+   be clickable. */
+#overlay.held {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Lighter scrim than .dim so the photo still reads through behind the results. */
+#overlay.photo-bg {
+    background: rgba(6, 10, 24, 0.62);
+    backdrop-filter: blur(2px);
+}
 
 #overlayInner {
     text-align: center;

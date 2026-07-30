@@ -26,6 +26,7 @@ const ASSETS = [
     './net.js',
     './remote-car.js',
     './game.js',
+    './images/loser.jpg',
     './manifest.webmanifest',
     './icons/apple-touch-icon.png',
     './icons/icon-192.png',

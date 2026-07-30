@@ -24,6 +24,10 @@ no asset files beyond the app icons; even the sound is synthesised at runtime.
   reaction time runs from the spawn to the *second* tap, so it earns a little
   more than an ordinary box to cover the extra tap.
 - Beat the three rivals to the line. Your best time is saved per track and level.
+- Lose and you get the photo, a sad trombone and `YOU ARE A LOSER` across the
+  screen. After a beat the caption fades out and the results fade in over it, so
+  the photo stays as the backdrop while you line up a rematch. Winning is the
+  only way to avoid it — a personal best on a losing run doesn't get you out of it.
 
 Races last about **8 seconds**. Level 5 is tuned as a dead heat for a player
 tapping around 450ms, so if you're winning it comfortably, move up.
@@ -196,6 +200,7 @@ ahead of your own pace.
 | `physics.js` | The speed model — decay, reaction-time boosts, miss penalty |
 | `track.js` | World geometry, lanes, parallax scenery, start/finish |
 | `car-sprite.js` | Shared side-view car drawing |
+| `images/loser.jpg` | The photo that takes over the screen when you lose |
 | `target.js` | The tap box — where it lands, how big, which kind it is, how long it's been there |
 | `input.js` | Keyboard handling, for the menus only |
 | `player.js` | Your car — coasts down, boosted by taps |

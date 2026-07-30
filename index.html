@@ -74,6 +74,13 @@
             <button class="rotate-close" id="rotateClose" aria-label="Dismiss">✕</button>
         </div>
 
+        <!-- Lose a race and this takes over the screen, then stays as the backdrop
+             behind the results. Sits before #overlay so the menu paints on top. -->
+        <div id="loserShot" class="hidden">
+            <img id="loserPhoto" src="images/loser.jpg" alt="">
+            <div id="loserText">YOU ARE A LOSER</div>
+        </div>
+
         <div id="overlay">
             <div id="overlayInner"></div>
         </div>
