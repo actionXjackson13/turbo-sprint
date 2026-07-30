@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Design tokens. This app is always dark (party environment) — there is no
+   light theme, so these are plain values rather than a `dark:` variant scheme.
+   --------------------------------------------------------------------------- */
+@theme {
+  /* Surfaces, darkest to lightest */
+  --color-ink-950: #07070d;
+  --color-ink-900: #0b0b12;
+  --color-ink-800: #13131d;
+  --color-ink-700: #1c1c2a;
+  --color-ink-600: #272739;
+  --color-ink-500: #3a3a52;
+
+  /* Text */
+  --color-fg: #f6f5ff;
+  --color-fg-muted: #a6a4c0;
+  --color-fg-subtle: #6f6d8a;
+
+  /* Brand — neon party accents */
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #7c3aed;
+  --color-accent-400: #22d3ee;
+  --color-accent-500: #06b6d4;
+
+  /* Status */
+  --color-status-pending: #fbbf24;
+  --color-status-accepted: #34d399;
+  --color-status-queued: #60a5fa;
+  --color-status-played: #a6a4c0;
+  --color-status-declined: #f87171;
+
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-success-500: #10b981;
+
+  /* Mobile-app shell width — the centered column on tablet/desktop */
+  --spacing-shell: 30rem;
+
+  --radius-card: 1.25rem;
+
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+}
+
+@layer base {
+  html {
+    /* Prevent iOS text auto-inflation in landscape */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ink-950);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    /* Avoid the rubber-band scroll revealing white behind the app shell */
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Remove the 300ms tap delay and the grey tap flash on mobile Safari/Chrome */
+  button,
+  a,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* A single, consistent focus ring across every interactive element. Visible
+     for keyboard users, suppressed for pointer users via :focus-visible. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-400);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  /* Inputs inherit the dark palette rather than the UA's light defaults */
+  input,
+  textarea,
+  select {
+    color-scheme: dark;
+    font-family: inherit;
+  }
+}
+
+@layer utilities {
+  /* Safe-area helpers for notched phones. Used by layouts and bottom nav. */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-safe-nav {
+    /* Bottom nav height + the home-indicator inset */
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* Hide scrollbars on horizontal card rails without disabling scrolling */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Respect users who have asked for less motion — the spec limits animation
+   anyway, so this simply turns the remaining transitions off. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

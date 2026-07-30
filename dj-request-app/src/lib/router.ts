@@ -1,0 +1,32 @@
+/**
+ * Centralised route paths. Keeping these here means a rename touches one file
+ * and never leaves a dangling <Link> behind.
+ */
+
+export const routes = {
+  welcome: '/',
+
+  guest: {
+    join: '/join',
+    displayName: '/join/name',
+    home: (eventId = ':eventId') => `/e/${eventId}`,
+    request: (eventId = ':eventId') => `/e/${eventId}/request`,
+    requestDetails: (eventId = ':eventId', requestId = ':requestId') =>
+      `/e/${eventId}/request/${requestId}`,
+    myRequests: (eventId = ':eventId') => `/e/${eventId}/mine`,
+    voting: (eventId = ':eventId') => `/e/${eventId}/vote`,
+  },
+
+  dj: {
+    signIn: '/dj/sign-in',
+    signUp: '/dj/sign-up',
+    dashboard: '/dj',
+    createEvent: '/dj/events/new',
+    event: (eventId = ':eventId') => `/dj/events/${eventId}`,
+    requests: (eventId = ':eventId') => `/dj/events/${eventId}/requests`,
+    queue: (eventId = ':eventId') => `/dj/events/${eventId}/queue`,
+    createVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote/new`,
+    activeVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote`,
+    settings: (eventId = ':eventId') => `/dj/events/${eventId}/settings`,
+  },
+} as const
