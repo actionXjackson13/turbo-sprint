@@ -4,8 +4,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * Where the built app will be served from.
+ *
+ * Defaults to the domain root (dev, and any host that serves the app at "/").
+ * The GitHub Pages deploy sets DEPLOY_BASE=/turbo-sprint/dj/ because that site
+ * root is already taken by an unrelated project.
+ */
+const base = process.env.DEPLOY_BASE ?? '/'
+
 // https://vite.dev/config/
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -13,6 +23,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/apple-touch-icon.png'],
       manifest: {
+        // Must match `base`, or the installed app opens on a blank page.
+        start_url: base,
+        scope: base,
         name: 'SoundBoard — DJ Song Requests',
         short_name: 'SoundBoard',
         description: 'Request songs from the DJ at your event.',
@@ -20,8 +33,6 @@ export default defineConfig({
         background_color: '#0b0b12',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },

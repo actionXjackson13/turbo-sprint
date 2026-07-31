@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LoadingSkeleton } from './components'
@@ -60,7 +60,14 @@ export default function App() {
     <ErrorBoundary>
       <ServiceProvider>
         <ToastProvider>
-          <BrowserRouter>
+          {/*
+            HashRouter rather than BrowserRouter: the production build is
+            served from a subdirectory on GitHub Pages, which has no SPA
+            rewrite, so a deep link like /dj/e/<id> would 404 on reload.
+            Hash routing needs no server cooperation. Guests share an event
+            *code* rather than a URL, so the "#" costs nothing here.
+          */}
+          <HashRouter>
             <DjAuthProvider>
               <Routes>
                 {/* Guest entry */}
@@ -115,7 +122,7 @@ export default function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </DjAuthProvider>
-          </BrowserRouter>
+          </HashRouter>
         </ToastProvider>
       </ServiceProvider>
     </ErrorBoundary>
