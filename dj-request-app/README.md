@@ -7,6 +7,9 @@ panel to moderate requests, run the queue, and start voting rounds.
 The app never plays or streams audio. It manages requests, votes and the
 visible queue only.
 
+**Live: <https://actionxjackson13.github.io/turbo-sprint/dj/>** — running in
+demo mode, installable to a phone home screen.
+
 ---
 
 ## Quick start
@@ -29,6 +32,23 @@ sample event. See [Demo mode](#demo-mode).
 | `npm run type-check` | TypeScript only |
 | `npm run lint` | Oxlint |
 | `npm run test` | Vitest (unit + migration suites) |
+| `npm run deploy` | Build for GitHub Pages into `../dj/` (then commit & push) |
+
+### Deploying
+
+GitHub Pages serves this repo from the master branch root, which an unrelated
+project already occupies, so the app is published into a `dj/` subdirectory:
+
+```bash
+npm run deploy
+cd .. && git add dj && git commit -m "Redeploy SoundBoard" && git push
+```
+
+Because it is served from a subdirectory, the app uses **hash routing** — Pages
+provides no SPA rewrite there, so `/dj/e/<id>` would 404 on reload. Guests
+share an event *code* rather than a URL, so this costs nothing. `DEPLOY_BASE`
+controls the base path; unset (the default) builds for a domain root, which is
+what you want on Vercel, Netlify or any host serving the app at `/`.
 
 ---
 

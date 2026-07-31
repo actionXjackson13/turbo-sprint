@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "node scripts/deploy-pages.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",
