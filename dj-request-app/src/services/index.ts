@@ -1,5 +1,6 @@
 import { isDemoMode } from '../lib/env'
 import { DemoService } from './demo/DemoService'
+import { SupabaseService } from './supabase/SupabaseService'
 import type { DataService } from './types'
 
 let instance: DataService | null = null
@@ -13,14 +14,7 @@ let instance: DataService | null = null
  */
 export function getDataService(): DataService {
   if (!instance) {
-    if (!isDemoMode()) {
-      // Replaced with `new SupabaseService()` once the Supabase backend lands.
-      throw new Error(
-        'Supabase backend is not wired up yet. Unset VITE_SUPABASE_URL / ' +
-          'VITE_SUPABASE_ANON_KEY, or set VITE_DEMO_MODE=true, to use demo mode.',
-      )
-    }
-    instance = new DemoService()
+    instance = isDemoMode() ? new DemoService() : new SupabaseService()
   }
   return instance
 }

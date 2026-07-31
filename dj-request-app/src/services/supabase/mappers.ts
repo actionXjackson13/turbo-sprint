@@ -1,0 +1,110 @@
+import type {
+  EventGuest,
+  EventRecord,
+  Profile,
+  SongRequest,
+  VotingOption,
+  VotingRound,
+} from '../../types/domain'
+
+/**
+ * Row-to-domain mapping. Kept in one place so the snake_case/camelCase seam
+ * exists exactly once, and so the rest of the app never sees database shapes.
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type Row = Record<string, any>
+
+/**
+ * Narrows a PostgREST/RPC payload, which is typed `unknown` because the schema
+ * is not generated. Mapping functions below are the only consumers, so the
+ * cast is contained to this seam.
+ */
+export function asRow(value: unknown): Row {
+  return value as Row
+}
+
+export function toProfile(row: Row): Profile {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    createdAt: row.created_at,
+  }
+}
+
+export function toEvent(row: Row, djDisplayName?: string): EventRecord {
+  return {
+    id: row.id,
+    djId: row.dj_id,
+    // The join is only present on queries that ask for it; fall back rather
+    // than rendering "undefined" next to the event name.
+    djDisplayName:
+      djDisplayName ?? row.profiles?.display_name ?? 'The DJ',
+    name: row.name,
+    code: row.code,
+    status: row.status,
+    requestStatus: row.request_status,
+    nowPlaying: row.now_playing_title
+      ? {
+          title: row.now_playing_title,
+          artist: row.now_playing_artist ?? '',
+          sourceRequestId: row.now_playing_request_id ?? null,
+        }
+      : null,
+    createdAt: row.created_at,
+    endedAt: row.ended_at ?? null,
+  }
+}
+
+export function toEventGuest(row: Row): EventGuest {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    guestUserId: row.guest_user_id,
+    displayName: row.display_name,
+    isBlocked: row.is_blocked,
+    joinedAt: row.joined_at,
+  }
+}
+
+export function toSongRequest(row: Row): SongRequest {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    guestId: row.guest_id ?? null,
+    guestDisplayName: row.guest_display_name,
+    title: row.title,
+    artist: row.artist,
+    voteCount: row.vote_count ?? 0,
+    status: row.status,
+    queuePosition: row.queue_position ?? null,
+    sourceRoundId: row.source_round_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function toVotingOption(row: Row): VotingOption {
+  return {
+    id: row.id,
+    roundId: row.round_id,
+    title: row.title,
+    artist: row.artist,
+    displayOrder: row.display_order,
+  }
+}
+
+export function toVotingRound(row: Row, options: VotingOption[]): VotingRound {
+  return {
+    id: row.id,
+    eventId: row.event_id,
+    status: row.status,
+    durationSeconds: row.duration_seconds ?? null,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at ?? null,
+    winnerOptionId: row.winner_option_id ?? null,
+    endedAt: row.ended_at ?? null,
+    createdAt: row.created_at,
+    options: [...options].sort((a, b) => a.displayOrder - b.displayOrder),
+  }
+}

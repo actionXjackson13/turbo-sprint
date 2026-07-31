@@ -4,7 +4,15 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "esnext",
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    // "node" is here for the test suite (which reads migration files from
+    // disk). Application code importing a Node built-in would still fail the
+    // Vite build, so this does not loosen the browser bundle.
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom",
+      "node"
+    ],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
