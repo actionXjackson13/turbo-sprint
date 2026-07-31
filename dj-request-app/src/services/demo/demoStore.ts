@@ -8,7 +8,7 @@ import type {
   VotingResponse,
   VotingRound,
 } from '../../types/domain'
-import { buildSeed } from './seed'
+import { buildSeed, DEMO_GUEST_USER_ID } from './seed'
 
 /**
  * In-memory database for demo mode, mirrored into localStorage.
@@ -34,11 +34,20 @@ export interface DemoDb {
   votingResponses: VotingResponse[]
   /** Signed-in DJ, persisted so a refresh keeps the demo DJ logged in. */
   currentDjId: string | null
-  /** The demo guest's stable identity. */
-  guestUserId: string
 }
 
-const STORAGE_KEY = 'soundboard.demoDb.v1'
+const STORAGE_KEY = 'soundboard.demoDb.v2'
+
+/**
+ * Which guest the demo is currently acting as.
+ *
+ * Deliberately *not* part of DemoDb: the database is mirrored into
+ * localStorage and synced across tabs, so storing the active guest there would
+ * make every open tab switch together. Keeping it in sessionStorage instead
+ * gives each tab its own identity — open three tabs and be three different
+ * guests — while still surviving a refresh.
+ */
+const ACTIVE_GUEST_KEY = 'soundboard.demoActiveGuest'
 
 // ---------------------------------------------------------------------------
 // Persistence
@@ -60,7 +69,16 @@ function load(): DemoDb {
   return buildSeed()
 }
 
+function loadActiveGuest(): string {
+  try {
+    return sessionStorage.getItem(ACTIVE_GUEST_KEY) ?? DEMO_GUEST_USER_ID
+  } catch {
+    return DEMO_GUEST_USER_ID
+  }
+}
+
 let db: DemoDb = load()
+let activeGuestUserId: string = loadActiveGuest()
 
 function persist(): void {
   try {
@@ -83,6 +101,11 @@ export const channels = {
   requests: (eventId: string) => `requests:${eventId}`,
   rounds: (eventId: string) => `rounds:${eventId}`,
   event: (eventId: string) => `event:${eventId}`,
+  /**
+   * Demo-only: the acting guest changed, or the roster gained a member. Has no
+   * Supabase counterpart because a real client is only ever one person.
+   */
+  identity: 'demo:identity',
 }
 
 export function subscribe(channel: string, listener: Listener): () => void {
@@ -104,12 +127,42 @@ function emit(...channelNames: string[]): void {
   }
 }
 
+/**
+ * Wakes every listener. Used for changes that aren't scoped to one channel —
+ * a reset, a cross-tab sync, or switching which guest the demo is acting as
+ * (which re-scopes "my requests" and "my votes" on every screen at once).
+ */
+function emitAll(): void {
+  emit(...listeners.keys())
+}
+
 // ---------------------------------------------------------------------------
 // Access
 // ---------------------------------------------------------------------------
 
 export function getDb(): DemoDb {
   return db
+}
+
+/**
+ * The guest identity every "is this mine?" lookup in DemoService resolves
+ * against. Against Supabase the equivalent is the anonymous auth uid, which
+ * the client cannot choose — being able to swap it is precisely what makes the
+ * demo able to act as more than one person.
+ */
+export function getActiveGuestUserId(): string {
+  return activeGuestUserId
+}
+
+export function setActiveGuestUserId(guestUserId: string): void {
+  if (guestUserId === activeGuestUserId) return
+  activeGuestUserId = guestUserId
+  try {
+    sessionStorage.setItem(ACTIVE_GUEST_KEY, guestUserId)
+  } catch {
+    // Storage unavailable — the switch still holds for this page view.
+  }
+  emitAll()
 }
 
 /**
@@ -140,7 +193,7 @@ if (typeof window !== 'undefined') {
     } catch {
       return
     }
-    for (const name of [...listeners.keys()]) emit(name)
+    emitAll()
   })
 }
 
@@ -148,8 +201,18 @@ if (typeof window !== 'undefined') {
 export function resetDemoDb(): void {
   db = buildSeed()
   persist()
+
+  // The roster is rebuilt, so any guest added during the session no longer
+  // exists — drop back to the seeded identity rather than a dangling one.
+  activeGuestUserId = DEMO_GUEST_USER_ID
+  try {
+    sessionStorage.removeItem(ACTIVE_GUEST_KEY)
+  } catch {
+    /* no-op */
+  }
+
   // Wake every listener — the whole world just changed.
-  for (const name of [...listeners.keys()]) emit(name)
+  emitAll()
 }
 
 /**

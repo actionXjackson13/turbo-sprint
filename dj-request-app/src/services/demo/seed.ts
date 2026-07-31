@@ -21,9 +21,10 @@ const DJ_ID = 'demo-dj-0001'
 const EVENT_ID = 'demo-event-0001'
 const ROUND_ID = 'demo-round-0001'
 
-/** The identity the person trying the demo takes on as a guest. */
+/** The identity the person trying the demo takes on as a guest by default. */
 export const DEMO_GUEST_USER_ID = 'demo-guest-you'
 export const DEMO_GUEST_ID = 'demo-guest-row-you'
+export const DEMO_GUEST_DISPLAY_NAME = 'You'
 export const DEMO_DJ_EMAIL = 'dj@demo.local'
 export const DEMO_DJ_PASSWORD = 'demo1234'
 export const DEMO_EVENT_CODE = 'PLAY'
@@ -44,7 +45,7 @@ export function buildSeed(): DemoDb {
       id: DEMO_GUEST_ID,
       eventId: EVENT_ID,
       guestUserId: DEMO_GUEST_USER_ID,
-      displayName: 'You',
+      displayName: DEMO_GUEST_DISPLAY_NAME,
       isBlocked: false,
       joinedAt: minutesAgo(28),
     },
@@ -79,7 +80,7 @@ export function buildSeed(): DemoDb {
     req({
       id: 'demo-req-3',
       guestId: DEMO_GUEST_ID,
-      guestDisplayName: 'You',
+      guestDisplayName: DEMO_GUEST_DISPLAY_NAME,
       title: 'Dancing Queen',
       artist: 'ABBA',
       status: 'accepted',
@@ -231,7 +232,6 @@ export function buildSeed(): DemoDb {
     votingOptions,
     votingResponses,
     currentDjId: null,
-    guestUserId: DEMO_GUEST_USER_ID,
   }
 }
 

@@ -119,7 +119,7 @@ export function SignInPage() {
                 void submit(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
               }}
             >
-              Sign in as the sample DJ
+              Use the demo DJ account
             </AppButton>
           </div>
         )}

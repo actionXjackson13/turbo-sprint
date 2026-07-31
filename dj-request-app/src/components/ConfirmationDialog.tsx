@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AppButton } from './AppButton'
+import { useDialogBehavior } from '../hooks/useDialogBehavior'
 
 export interface ConfirmationDialogProps {
   open: boolean
@@ -15,11 +16,7 @@ export interface ConfirmationDialogProps {
   onCancel: () => void
 }
 
-/**
- * Mobile bottom-sheet style confirmation. Implements the modal essentials by
- * hand (no dialog dependency): focus is moved in on open, restored on close,
- * kept inside while open, and Escape cancels.
- */
+/** Mobile bottom-sheet style confirmation. */
 export function ConfirmationDialog({
   open,
   title,
@@ -33,50 +30,13 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
-  const previouslyFocused = useRef<HTMLElement | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-
-    previouslyFocused.current = document.activeElement as HTMLElement | null
-    confirmRef.current?.focus()
-
-    // Prevent the page behind the sheet from scrolling on mobile.
-    const originalOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
-        return
-      }
-      if (e.key !== 'Tab') return
-
-      // Cycle focus within the panel.
-      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )
-      if (!focusables || focusables.length === 0) return
-      const first = focusables[0]!
-      const last = focusables[focusables.length - 1]!
-
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = originalOverflow
-      previouslyFocused.current?.focus()
-    }
-  }, [open, onCancel])
+  useDialogBehavior({
+    open,
+    panelRef,
+    initialFocusRef: confirmRef,
+    onDismiss: onCancel,
+  })
 
   if (!open || typeof document === 'undefined') return null
 

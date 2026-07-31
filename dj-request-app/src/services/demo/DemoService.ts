@@ -22,6 +22,7 @@ import {
 import {
   channels,
   demoDelay,
+  getActiveGuestUserId,
   getDb,
   mutate,
   nowIso,
@@ -121,7 +122,7 @@ export class DemoService implements DataService {
   // ---- Guest identity ----------------------------------------------------
 
   async getOrCreateGuestIdentity(): Promise<GuestIdentity> {
-    return { guestUserId: getDb().guestUserId }
+    return { guestUserId: getActiveGuestUserId() }
   }
 
   // ---- Events ------------------------------------------------------------
@@ -271,9 +272,10 @@ export class DemoService implements DataService {
     return mutate(
       (db) => {
         const event = db.events.find((e) => e.id === target.id)!
+        const me = getActiveGuestUserId()
 
         const existing = db.guests.find(
-          (g) => g.eventId === event.id && g.guestUserId === db.guestUserId,
+          (g) => g.eventId === event.id && g.guestUserId === me,
         )
         if (existing) {
           // Rejoining updates the name rather than adding a second membership.
@@ -284,7 +286,7 @@ export class DemoService implements DataService {
         const guest: EventGuest = {
           id: `demo-guest-row-${crypto.randomUUID().slice(0, 8)}`,
           eventId: event.id,
-          guestUserId: db.guestUserId,
+          guestUserId: me,
           displayName: displayName.trim(),
           isBlocked: false,
           joinedAt: nowIso(),
@@ -299,7 +301,7 @@ export class DemoService implements DataService {
   async getGuestSession(eventId: string): Promise<EventGuest | null> {
     const db = getDb()
     const guest = db.guests.find(
-      (g) => g.eventId === eventId && g.guestUserId === db.guestUserId,
+      (g) => g.eventId === eventId && g.guestUserId === getActiveGuestUserId(),
     )
     return guest ? clone(guest) : null
   }
@@ -347,7 +349,7 @@ export class DemoService implements DataService {
   async getMyRequests(eventId: string): Promise<SongRequest[]> {
     const db = getDb()
     const guest = db.guests.find(
-      (g) => g.eventId === eventId && g.guestUserId === db.guestUserId,
+      (g) => g.eventId === eventId && g.guestUserId === getActiveGuestUserId(),
     )
     if (!guest) return []
     return sortRequests(
@@ -391,7 +393,9 @@ export class DemoService implements DataService {
         }
 
         const guest = db.guests.find(
-          (g) => g.eventId === input.eventId && g.guestUserId === db.guestUserId,
+          (g) =>
+            g.eventId === input.eventId &&
+            g.guestUserId === getActiveGuestUserId(),
         )
         if (!guest) {
           throw new ServiceError('forbidden', 'Join the event before requesting.')
@@ -526,7 +530,7 @@ export class DemoService implements DataService {
   async getMyRequestVotes(eventId: string): Promise<string[]> {
     const db = getDb()
     const guest = db.guests.find(
-      (g) => g.eventId === eventId && g.guestUserId === db.guestUserId,
+      (g) => g.eventId === eventId && g.guestUserId === getActiveGuestUserId(),
     )
     if (!guest) return []
     const eventRequestIds = new Set(
@@ -690,7 +694,9 @@ export class DemoService implements DataService {
     const responses = db.votingResponses.filter((r) => r.roundId === roundId)
 
     const guest = db.guests.find(
-      (g) => g.eventId === round.eventId && g.guestUserId === db.guestUserId,
+      (g) =>
+        g.eventId === round.eventId &&
+        g.guestUserId === getActiveGuestUserId(),
     )
     const mine = guest
       ? responses.find((r) => r.guestId === guest.id)
@@ -914,7 +920,7 @@ export class DemoService implements DataService {
     eventId: string,
   ): EventGuest {
     const guest = db.guests.find(
-      (g) => g.eventId === eventId && g.guestUserId === db.guestUserId,
+      (g) => g.eventId === eventId && g.guestUserId === getActiveGuestUserId(),
     )
     if (!guest) {
       throw new ServiceError('forbidden', 'Join the event first.')

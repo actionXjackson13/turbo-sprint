@@ -3,12 +3,14 @@ import type { ReactNode } from 'react'
 import { RootLayout } from './RootLayout'
 import {
   BottomNavigation,
+  DemoSwitcher,
   EmptyState,
   LoadingSkeleton,
   NavIcons,
   type NavItem,
 } from '../components'
 import { routes } from '../lib/router'
+import { isDemoMode } from '../lib/env'
 import { DjEventProvider } from '../contexts/DjEventProvider'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
@@ -59,6 +61,7 @@ export function DjLayout() {
           <Outlet />
         </DjEventGate>
         <BottomNavigation items={items} />
+        {isDemoMode() && <DemoSwitcher eventId={eventId} view="dj" />}
       </RootLayout>
     </DjEventProvider>
   )

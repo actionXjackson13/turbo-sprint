@@ -6,7 +6,13 @@ import { routes } from '../../lib/router'
 import { showDemoShortcuts } from '../../lib/env'
 import { getLastEventId } from '../../utils/guestId'
 import { useService } from '../../hooks/useService'
-import { DEMO_EVENT_CODE } from '../../services/demo/seed'
+import { useDjAuth } from '../../hooks/useDjAuth'
+import {
+  DEMO_DJ_EMAIL,
+  DEMO_DJ_PASSWORD,
+  DEMO_EVENT_CODE,
+  DEMO_GUEST_DISPLAY_NAME,
+} from '../../services/demo/seed'
 import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
 
@@ -14,6 +20,7 @@ export function WelcomePage() {
   const navigate = useNavigate()
   const service = useService()
   const toast = useToast()
+  const { signIn } = useDjAuth()
   const [resuming, setResuming] = useState<string | null>(null)
   const [demoBusy, setDemoBusy] = useState(false)
 
@@ -37,11 +44,28 @@ export function WelcomePage() {
     }
   }, [service])
 
-  const enterDemoAsGuest = async () => {
+  /**
+   * There is one demo mode, and it holds both sides at once: the sample DJ is
+   * signed in and you also hold a guest identity, so the in-event switcher can
+   * move you between them without another sign-in. It opens on the guest view
+   * because that is what most people came to see.
+   */
+  const enterDemo = async () => {
     setDemoBusy(true)
     try {
-      const event = await service.joinEvent(DEMO_EVENT_CODE, 'You')
-      navigate(routes.guest.home(event.event.id))
+      const event = await service.getEventByCode(DEMO_EVENT_CODE)
+      if (!event) throw new Error('The sample event is missing.')
+
+      await signIn(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
+
+      // Only join if this identity is not already a member — re-entering the
+      // demo as, say, Priya must not rename her back to "You".
+      const existing = await service.getGuestSession(event.id)
+      if (!existing) {
+        await service.joinEvent(event.code, DEMO_GUEST_DISPLAY_NAME)
+      }
+
+      navigate(routes.guest.home(event.id))
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -106,25 +130,17 @@ export function WelcomePage() {
               <p className="mb-2 text-center text-xs font-semibold tracking-wide text-fg-subtle uppercase">
                 Demo mode — no account needed
               </p>
-              <div className="flex gap-2">
-                <AppButton
-                  variant="secondary"
-                  size="sm"
-                  fullWidth
-                  loading={demoBusy}
-                  onClick={enterDemoAsGuest}
-                >
-                  Enter as guest
-                </AppButton>
-                <AppButton
-                  variant="secondary"
-                  size="sm"
-                  fullWidth
-                  onClick={() => navigate(routes.dj.signIn)}
-                >
-                  Enter as DJ
-                </AppButton>
-              </div>
+              <AppButton
+                variant="secondary"
+                fullWidth
+                loading={demoBusy}
+                onClick={() => void enterDemo()}
+              >
+                Enter demo mode
+              </AppButton>
+              <p className="mt-2 text-center text-xs text-fg-subtle">
+                Switch between the DJ and any guest once you're inside.
+              </p>
             </div>
           )}
         </div>

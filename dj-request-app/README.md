@@ -55,22 +55,42 @@ what you want on Vercel, Netlify or any host serving the app at `/`.
 ## Demo mode
 
 Demo mode is the default whenever Supabase credentials are absent. On the
-welcome screen you'll see a dashed **Demo mode** panel with two entry points:
-
-- **Enter as guest** — joins the sample event immediately as "You".
-- **Enter as DJ** — goes to sign-in; use the *Sign in as the sample DJ* button
-  (`dj@demo.local` / `demo1234`).
+welcome screen you'll see a dashed **Demo mode** panel with a single
+**Enter demo mode** button. There is one demo mode and it holds both sides at
+once: the sample DJ is signed in for you *and* you hold a guest identity, so
+you never pick a side up front.
 
 The seeded event is **Summer Rooftop Party**, join code **`PLAY`**, with one
 DJ, six guests, requests spread across every status, a now-playing track, a
 short queue, and an active voting round.
 
+### Switching who you are
+
+Every in-event screen carries a dashed **Demo** pill above the bottom
+navigation showing who you currently are. Tap it to open the switcher:
+
+- **The DJ** — jumps to the control panel, signing the sample DJ in if needed.
+- **Any guest** — become Priya, Marcus, or anyone else at the event. "My
+  requests", your votes and your response to the running round all follow you.
+- **Add another guest** — creates a new guest and switches to them, so you can
+  fill the queue from several people, stack up votes on one song, or get past
+  the five-active-requests-per-guest cap while trying things out.
+
+This is demo-only by construction. A real guest's identity is a Supabase
+anonymous auth uid the client cannot choose, so the switcher talks to
+`services/demo/demoIdentity.ts` directly rather than through `DataService` —
+adding it to the shared interface would oblige `SupabaseService` to implement
+something it must never allow.
+
 Demo data is stored in `localStorage`, so it survives refresh — which is what
 makes the "guest session persists" behaviour real rather than simulated. It
 also syncs across browser tabs, so you can open the DJ in one tab and a guest
-in another and watch changes propagate live without a server.
+in another and watch changes propagate live without a server. The *acting
+guest* is kept in `sessionStorage` instead, precisely so that each tab can be a
+different person rather than all tabs switching together.
 
-**Reset demo data** from the DJ's *Event settings* screen.
+**Reset demo data** from the DJ's *Event settings* screen. This also drops you
+back to the seeded "You" identity, since any guest you added no longer exists.
 
 ---
 
@@ -249,7 +269,7 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 61 tests:
+`npm run test` runs 70 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
@@ -257,6 +277,9 @@ imports, so that layer could be lifted into a React Native app unchanged.
   ownership, queue ordering, and the full voting-round lifecycle. Demo mode
   enforces the same rules the database does, so behaviour verified here is the
   behaviour you get against Supabase.
+- **Demo personas** — that switching guest genuinely re-scopes identity rather
+  than relabelling the UI: "my requests", the per-guest request cap and
+  one-vote-each all follow whoever you are currently being.
 - **Migrations** — the real `.sql` files are executed against an in-process
   Postgres (PGlite) with `auth.uid()` stubbed, then exercised as four different
   users through a non-superuser role so RLS actually applies. This checks the

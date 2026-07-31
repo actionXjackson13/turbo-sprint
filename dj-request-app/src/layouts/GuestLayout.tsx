@@ -3,11 +3,13 @@ import type { ReactNode } from 'react'
 import { RootLayout } from './RootLayout'
 import {
   BottomNavigation,
+  DemoSwitcher,
   LoadingSkeleton,
   NavIcons,
   type NavItem,
 } from '../components'
 import { routes } from '../lib/router'
+import { isDemoMode } from '../lib/env'
 import { GuestSessionProvider } from '../contexts/GuestSessionProvider'
 import { useGuestSession } from '../hooks/useGuestSession'
 
@@ -39,6 +41,7 @@ export function GuestLayout() {
           <Outlet />
         </GuestGate>
         <BottomNavigation items={items} />
+        {isDemoMode() && <DemoSwitcher eventId={eventId} view="guest" />}
       </RootLayout>
     </GuestSessionProvider>
   )
