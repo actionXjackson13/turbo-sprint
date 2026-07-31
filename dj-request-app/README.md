@@ -162,8 +162,9 @@ back to demo mode.
    existing request instead.
 6. Tap the vote pill on any request to add or remove your vote. Your own
    request's founding vote is locked.
-7. **Mine** shows your requests and their live status.
-8. **Vote** shows the active round; pick a song, then pick another to change
+7. **Most wanted** re-ranks as votes land. See [Most wanted](#most-wanted).
+8. **Mine** shows your requests and their live status.
+9. **Vote** shows the active round; pick a song, then pick another to change
    your vote — the total does not increase.
 
 ### DJ
@@ -172,19 +173,57 @@ back to demo mode.
 2. Open an event, or **Create an event**.
 3. Copy the event code from the control panel.
 4. Toggle requests **Open / Pause / Close**.
-5. **Requests** tab: filter by status, sort newest or top-voted, and
-   accept / queue / decline / mark played / remove, or block a guest.
-6. **Queue** tab: reorder with the up/down controls, **Play now** to set the
+5. Control panel: **Most wanted** shows the same ranking the guests are
+   looking at, with the moves that fit each request's status. See
+   [Most wanted](#most-wanted).
+6. **Requests** tab: filter by status, sort newest or top-voted, and
+   accept / queue / decline / mark played / remove, or block a guest. Vote
+   tallies show on every card.
+7. **Queue** tab: reorder with the up/down controls, **Play now** to set the
    current track.
-7. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
+8. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
    end it early, then **Add to queue** for the winner.
-8. **Settings**: rename, end the event, reset demo data.
+9. **Settings**: rename, end the event, reset demo data.
 
 ### Seeing live updates
 
 Open two browser tabs — DJ in one, guest in the other. Actions in one appear in
 the other without a refresh (via Supabase Realtime, or the `storage` event in
 demo mode).
+
+---
+
+## Most wanted
+
+Both the guest event screen and the DJ control panel show a **Most wanted**
+list. It is the same list, from `features/requests/mostWanted.ts` — the DJ
+should never be reading a different room than the one in front of them.
+
+**Where the numbers come from.** Every request carries a `voteCount` derived
+from rows in `request_votes`, kept current by a Postgres trigger (`DemoService`
+mirrors the same maths). A request is never at zero: creating one writes the
+submitter's **founding vote** in the same transaction, so it starts at 1. Any
+guest can then add one vote, once — re-voting is idempotent rather than an
+error, so optimistic UI and realtime updates can't inflate a tally between
+them. A guest may withdraw a vote they added, but not the founding vote on
+their own request.
+
+**How the list is built.**
+
+1. Keep only *live* requests — `pending`, `accepted`, `queued`. Played and
+   declined ones are finished business; leaving them in would pin a song the DJ
+   already dealt with to the top all night.
+2. Sort by `voteCount`, highest first.
+3. Break ties towards the **newer** request, so a fresh ask with the same
+   support surfaces above one that has been sitting there.
+4. Take the top 5.
+
+Because the ranking spans three statuses, a song can sit in Most wanted while
+already queued. The DJ's copy accounts for this: the buttons follow the
+request's own status — *Queue / Accept / Decline* for a pending one,
+*Queue / Decline* once accepted, *Mark played* once queued. Destructive moves
+(remove, block guest) stay on the **Requests** screen behind a confirmation
+rather than one stray tap away.
 
 ---
 
@@ -269,7 +308,7 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 70 tests:
+`npm run test` runs 76 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
@@ -280,6 +319,9 @@ imports, so that layer could be lifted into a React Native app unchanged.
 - **Demo personas** — that switching guest genuinely re-scopes identity rather
   than relabelling the UI: "my requests", the per-guest request cap and
   one-vote-each all follow whoever you are currently being.
+- **Most wanted** — the ranking shared by the guest screen and the DJ control
+  panel: which statuses count, the tie-break, the cap, and that it does not
+  reorder the array it was given.
 - **Migrations** — the real `.sql` files are executed against an in-process
   Postgres (PGlite) with `auth.uid()` stubbed, then exercised as four different
   users through a non-superuser role so RLS actually applies. This checks the

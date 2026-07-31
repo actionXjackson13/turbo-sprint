@@ -8,6 +8,12 @@ export interface SongRequestCardProps {
   request: SongRequest
   /** Renders the vote pill. Omit for DJ views where voting is not applicable. */
   showVote?: boolean
+  /**
+   * Renders the tally without the control. DJ views want the number — it is
+   * how they read the room — but the DJ has no vote of their own to cast.
+   * Ignored when `showVote` is set.
+   */
+  showVoteCount?: boolean
   /** Whether the current guest has already voted for this request. */
   hasVoted?: boolean
   /** Guests cannot withdraw the founding vote on their own request. */
@@ -25,6 +31,7 @@ export interface SongRequestCardProps {
 export function SongRequestCard({
   request,
   showVote = false,
+  showVoteCount = false,
   hasVoted = false,
   voteLocked = false,
   votePending = false,
@@ -63,6 +70,20 @@ export function SongRequestCard({
           </div>
         )}
 
+        {!showVote && showVoteCount && (
+          <div
+            className="flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-ink-600 bg-ink-700 text-fg-muted"
+            aria-label={`${request.voteCount} ${
+              request.voteCount === 1 ? 'vote' : 'votes'
+            }`}
+          >
+            <VoteArrow />
+            <span className="text-sm font-bold tabular-nums">
+              {request.voteCount}
+            </span>
+          </div>
+        )}
+
         {showVote && (
           <button
             type="button"
@@ -79,18 +100,7 @@ export function SongRequestCard({
               voteLocked ? 'cursor-default' : 'disabled:cursor-not-allowed',
             )}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill={hasVoted ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-4"
-              aria-hidden="true"
-            >
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
+            <VoteArrow filled={hasVoted} />
             <span className="text-sm font-bold tabular-nums">
               {request.voteCount}
             </span>
@@ -104,6 +114,23 @@ export function SongRequestCard({
         </div>
       )}
     </article>
+  )
+}
+
+function VoteArrow({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+      aria-hidden="true"
+    >
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
   )
 }
 

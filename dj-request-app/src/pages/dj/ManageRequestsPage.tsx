@@ -143,6 +143,7 @@ export function ManageRequestsPage() {
               <SongRequestCard
                 key={request.id}
                 request={request}
+                showVoteCount
                 actions={
                   <RequestActions
                     request={request}

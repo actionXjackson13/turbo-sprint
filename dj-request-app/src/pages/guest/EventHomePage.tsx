@@ -12,6 +12,7 @@ import {
 import { routes } from '../../lib/router'
 import { useGuestSession } from '../../hooks/useGuestSession'
 import { useEventRequests } from '../../features/requests/useEventRequests'
+import { selectMostWanted } from '../../features/requests/mostWanted'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { formatCountdown } from '../../utils/formatRelativeTime'
@@ -26,15 +27,7 @@ export function EventHomePage() {
     useEventRequests(eventId)
   const { results, secondsRemaining } = useVotingRound(eventId)
 
-  // "Popular" excludes finished business so the list stays actionable.
-  const popular = useMemo(
-    () =>
-      [...requests]
-        .filter((r) => ['pending', 'accepted', 'queued'].includes(r.status))
-        .sort((a, b) => b.voteCount - a.voteCount)
-        .slice(0, 5),
-    [requests],
-  )
+  const popular = useMemo(() => selectMostWanted(requests), [requests])
 
   const recent = useMemo(
     () => requests.filter((r) => r.status !== 'declined').slice(0, 5),

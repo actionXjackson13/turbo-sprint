@@ -14,11 +14,16 @@ import { useDjEvent } from '../../hooks/useDjEvent'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
+import { selectMostWanted } from '../../features/requests/mostWanted'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
 import { formatCountdown } from '../../utils/formatRelativeTime'
-import type { RequestIntakeStatus } from '../../types/domain'
+import type {
+  RequestIntakeStatus,
+  RequestStatus,
+  SongRequest,
+} from '../../types/domain'
 
 export function EventControlPanelPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -49,6 +54,8 @@ export function EventControlPanelPage() {
         .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0)),
     [requests],
   )
+  // Exactly what the guests see on their event screen, from the same helper.
+  const mostWanted = useMemo(() => selectMostWanted(requests), [requests])
 
   const activeRound =
     results && results.round.status === 'active' ? results : null
@@ -79,10 +86,7 @@ export function EventControlPanelPage() {
     }
   }
 
-  const quickAction = async (
-    requestId: string,
-    status: 'accepted' | 'queued' | 'declined',
-  ) => {
+  const quickAction = async (requestId: string, status: RequestStatus) => {
     try {
       await service.updateRequestStatus(requestId, status)
       await reload()
@@ -264,31 +268,10 @@ export function EventControlPanelPage() {
                 <SongRequestCard
                   key={request.id}
                   request={request}
+                  showVoteCount
                   showStatus={false}
                   actions={
-                    <>
-                      <AppButton
-                        size="sm"
-                        variant="success"
-                        onClick={() => quickAction(request.id, 'queued')}
-                      >
-                        Queue
-                      </AppButton>
-                      <AppButton
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => quickAction(request.id, 'accepted')}
-                      >
-                        Accept
-                      </AppButton>
-                      <AppButton
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => quickAction(request.id, 'declined')}
-                      >
-                        Decline
-                      </AppButton>
-                    </>
+                    <QuickActions request={request} onAction={quickAction} />
                   }
                 />
               ))}
@@ -301,6 +284,43 @@ export function EventControlPanelPage() {
                   See all {pending.length} new requests
                 </AppButton>
               )}
+            </div>
+          )}
+        </section>
+
+        {/* Most wanted — the same ranking the guests are looking at */}
+        <section aria-labelledby="wanted-heading">
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h2
+              id="wanted-heading"
+              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+            >
+              Most wanted
+            </h2>
+            <span className="text-xs text-fg-subtle">
+              What the crowd is voting for
+            </span>
+          </div>
+
+          {loading && requests.length === 0 ? (
+            <SongRequestListSkeleton count={2} />
+          ) : mostWanted.length === 0 ? (
+            <EmptyState
+              title="No votes yet"
+              description="Requests rank here as guests upvote them."
+            />
+          ) : (
+            <div className="space-y-3">
+              {mostWanted.map((request) => (
+                <SongRequestCard
+                  key={request.id}
+                  request={request}
+                  showVoteCount
+                  actions={
+                    <QuickActions request={request} onAction={quickAction} />
+                  }
+                />
+              ))}
             </div>
           )}
         </section>
@@ -321,6 +341,82 @@ export function EventControlPanelPage() {
           </AppCard>
         </div>
       </main>
+    </>
+  )
+}
+
+/**
+ * The moves that make sense for a request's current status. The control panel
+ * shows requests at every stage — "New requests" is pending-only, but "Most
+ * wanted" ranks by votes across pending, accepted and queued — so the buttons
+ * have to follow the request rather than the list it appears in.
+ *
+ * Destructive moves (remove, block) live on the Requests screen, behind a
+ * confirmation, rather than one stray tap away here.
+ */
+function QuickActions({
+  request,
+  onAction,
+}: {
+  request: SongRequest
+  onAction: (id: string, status: RequestStatus) => void
+}) {
+  return (
+    <>
+      {request.status === 'pending' && (
+        <>
+          <AppButton
+            size="sm"
+            variant="success"
+            onClick={() => onAction(request.id, 'queued')}
+          >
+            Queue
+          </AppButton>
+          <AppButton
+            size="sm"
+            variant="secondary"
+            onClick={() => onAction(request.id, 'accepted')}
+          >
+            Accept
+          </AppButton>
+          <AppButton
+            size="sm"
+            variant="ghost"
+            onClick={() => onAction(request.id, 'declined')}
+          >
+            Decline
+          </AppButton>
+        </>
+      )}
+
+      {request.status === 'accepted' && (
+        <>
+          <AppButton
+            size="sm"
+            variant="success"
+            onClick={() => onAction(request.id, 'queued')}
+          >
+            Queue
+          </AppButton>
+          <AppButton
+            size="sm"
+            variant="ghost"
+            onClick={() => onAction(request.id, 'declined')}
+          >
+            Decline
+          </AppButton>
+        </>
+      )}
+
+      {request.status === 'queued' && (
+        <AppButton
+          size="sm"
+          variant="success"
+          onClick={() => onAction(request.id, 'played')}
+        >
+          Mark played
+        </AppButton>
+      )}
     </>
   )
 }
