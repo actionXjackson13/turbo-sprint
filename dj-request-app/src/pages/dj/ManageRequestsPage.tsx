@@ -6,6 +6,7 @@ import {
   ConfirmationDialog,
   EmptyState,
   PageHeader,
+  SegmentedControl,
   SongRequestCard,
   SongRequestListSkeleton,
 } from '../../components'
@@ -89,13 +90,15 @@ export function ManageRequestsPage() {
       <PageHeader
         title="Requests"
         action={
-          <AppButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setSort(sort === 'newest' ? 'votes' : 'newest')}
-          >
-            {sort === 'newest' ? 'Newest' : 'Top voted'}
-          </AppButton>
+          <SegmentedControl
+            label="Order requests by"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: 'newest', label: 'Newest' },
+              { value: 'votes', label: 'Top voted' },
+            ]}
+          />
         }
       />
 

@@ -1,10 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AppButton,
   AppCard,
   EmptyState,
+  NowPlayingCard,
   PageHeader,
+  Section,
+  SegmentedControl,
   SongRequestListSkeleton,
   SongRequestCard,
   StatusBadge,
@@ -12,10 +15,15 @@ import {
 import { routes } from '../../lib/router'
 import { useGuestSession } from '../../hooks/useGuestSession'
 import { useEventRequests } from '../../features/requests/useEventRequests'
-import { selectMostWanted } from '../../features/requests/mostWanted'
+import {
+  selectMostWanted,
+  selectRecent,
+} from '../../features/requests/requestLists'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { formatCountdown } from '../../utils/formatRelativeTime'
+
+type RequestView = 'wanted' | 'recent'
 
 export function EventHomePage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -27,21 +35,32 @@ export function EventHomePage() {
     useEventRequests(eventId)
   const { results, secondsRemaining } = useVotingRound(eventId)
 
-  const popular = useMemo(() => selectMostWanted(requests), [requests])
-
-  const recent = useMemo(
-    () => requests.filter((r) => r.status !== 'declined').slice(0, 5),
-    [requests],
+  // One list, two orderings. Showing "most wanted" and "just requested" as
+  // separate sections meant the same handful of songs appeared twice.
+  const [view, setView] = useState<RequestView>('wanted')
+  const visible = useMemo(
+    () => (view === 'wanted' ? selectMostWanted(requests) : selectRecent(requests)),
+    [requests, view],
   )
 
   const activeRound =
     results && results.round.status === 'active' ? results : null
+  const canRequest = event?.requestStatus === 'open' && !guest?.isBlocked
 
   return (
     <>
+      {/* Intake state rides in the subtitle rather than the trailing action,
+          so a long event name still gets the full width of the title row. */}
       <PageHeader
         title={event?.name ?? 'Event'}
-        subtitle={event ? `with ${event.djDisplayName}` : undefined}
+        subtitle={
+          event && (
+            <span className="flex items-center gap-2">
+              <span className="truncate">with {event.djDisplayName}</span>
+              <StatusBadge kind="intake" status={event.requestStatus} />
+            </span>
+          )
+        }
       />
 
       <main className="flex-1 space-y-5 px-4 py-4">
@@ -54,75 +73,24 @@ export function EventHomePage() {
           </div>
         )}
 
-        {event && (
-          <div className="flex items-center justify-between gap-3">
-            <StatusBadge kind="intake" status={event.requestStatus} />
-            {guest?.isBlocked && (
-              <span className="text-xs font-semibold text-danger-500">
-                Requests disabled by the DJ
-              </span>
-            )}
-          </div>
-        )}
+        <Section title="Now playing">
+          <NowPlayingCard
+            nowPlaying={event?.nowPlaying ?? null}
+            emptyHint="The DJ hasn't set a track yet."
+          />
+        </Section>
 
-        {/* Now playing */}
-        <section aria-labelledby="now-playing-heading">
-          <h2
-            id="now-playing-heading"
-            className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-          >
-            Now playing
-          </h2>
-          {event?.nowPlaying ? (
-            <AppCard emphasis>
-              <div className="flex items-center gap-3">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-brand-400">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="size-5"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-fg">
-                    {event.nowPlaying.title}
-                  </p>
-                  <p className="truncate text-sm text-fg-muted">
-                    {event.nowPlaying.artist}
-                  </p>
-                </div>
-              </div>
-            </AppCard>
-          ) : (
-            <AppCard>
-              <p className="text-sm text-fg-muted">
-                The DJ hasn't set a track yet.
-              </p>
-            </AppCard>
-          )}
-        </section>
-
-        {/* Active vote */}
         {activeRound && (
-          <section aria-labelledby="vote-heading">
-            <div className="mb-2 flex items-baseline justify-between">
-              <h2
-                id="vote-heading"
-                className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-              >
-                Vote for the next song
-              </h2>
-              {secondsRemaining !== null && (
+          <Section
+            title="Vote for the next song"
+            action={
+              secondsRemaining !== null && (
                 <span className="text-xs font-bold tabular-nums text-brand-400">
                   {formatCountdown(secondsRemaining)}
                 </span>
-              )}
-            </div>
+              )
+            }
+          >
             <AppCard emphasis>
               <p className="text-sm text-fg-muted">
                 {activeRound.totalVotes}{' '}
@@ -139,45 +107,55 @@ export function EventHomePage() {
                 {activeRound.myOptionId ? 'Change your vote' : 'Vote now'}
               </AppButton>
             </AppCard>
-          </section>
+          </Section>
         )}
 
-        {/* Primary actions */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* "My requests" lives in the bottom navigation, so the one action
+            worth a button here is the one that starts something. */}
+        <div>
           <AppButton
             size="lg"
+            fullWidth
             onClick={() => navigate(routes.guest.request(eventId))}
-            disabled={event?.requestStatus !== 'open' || guest?.isBlocked}
+            disabled={!canRequest}
           >
             Request a song
           </AppButton>
-          <AppButton
-            variant="secondary"
-            size="lg"
-            onClick={() => navigate(routes.guest.myRequests(eventId))}
-          >
-            My requests
-          </AppButton>
+          {!canRequest && (
+            <p className="mt-2 text-center text-sm text-fg-muted">
+              {guest?.isBlocked
+                ? 'The DJ has turned off your requests.'
+                : event?.requestStatus === 'paused'
+                  ? 'The DJ has paused requests right now.'
+                  : 'Requests are closed for this event.'}
+            </p>
+          )}
         </div>
 
-        {/* Popular */}
-        <section aria-labelledby="popular-heading">
-          <h2
-            id="popular-heading"
-            className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-          >
-            Most wanted
-          </h2>
-          {loading ? (
-            <SongRequestListSkeleton count={2} />
-          ) : popular.length === 0 ? (
+        <Section
+          title="Requests"
+          action={
+            <SegmentedControl
+              label="Order requests by"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'wanted', label: 'Most wanted' },
+                { value: 'recent', label: 'Newest' },
+              ]}
+            />
+          }
+        >
+          {loading && requests.length === 0 ? (
+            <SongRequestListSkeleton count={3} />
+          ) : visible.length === 0 ? (
             <EmptyState
               title="No requests yet"
               description="Be the first to ask for a song."
             />
           ) : (
             <div className="space-y-3">
-              {popular.map((request) => (
+              {visible.map((request) => (
                 <SongRequestCard
                   key={request.id}
                   request={request}
@@ -199,41 +177,7 @@ export function EventHomePage() {
               ))}
             </div>
           )}
-        </section>
-
-        {/* Recent */}
-        {recent.length > 0 && (
-          <section aria-labelledby="recent-heading">
-            <h2
-              id="recent-heading"
-              className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-            >
-              Just requested
-            </h2>
-            <div className="space-y-3">
-              {recent.map((request) => (
-                <SongRequestCard
-                  key={request.id}
-                  request={request}
-                  showVote
-                  hasVoted={myVotes.has(request.id)}
-                  voteLocked={
-                    guest !== null &&
-                    request.guestId === guest.id &&
-                    myVotes.has(request.id)
-                  }
-                  votePending={pendingVotes.has(request.id)}
-                  onVoteToggle={() =>
-                    toggleVote(request, request.guestId === guest?.id)
-                  }
-                  onOpen={() =>
-                    navigate(routes.guest.requestDetails(eventId, request.id))
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        </Section>
       </main>
     </>
   )

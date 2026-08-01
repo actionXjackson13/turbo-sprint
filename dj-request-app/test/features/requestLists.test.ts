@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MOST_WANTED_LIMIT,
+  REQUEST_LIST_LIMIT,
   selectMostWanted,
-} from '../../src/features/requests/mostWanted'
+  selectRecent,
+} from '../../src/features/requests/requestLists'
 import type { RequestStatus, SongRequest } from '../../src/types/domain'
 
 /**
@@ -76,7 +77,7 @@ describe('selectMostWanted', () => {
 
   it('caps the list', () => {
     const many = Array.from({ length: 12 }, (_, i) => request(i))
-    expect(selectMostWanted(many)).toHaveLength(MOST_WANTED_LIMIT)
+    expect(selectMostWanted(many)).toHaveLength(REQUEST_LIST_LIMIT)
     expect(selectMostWanted(many, 3)).toHaveLength(3)
   })
 
@@ -85,5 +86,35 @@ describe('selectMostWanted', () => {
     const snapshot = input.map((r) => r.id)
     selectMostWanted(input)
     expect(input.map((r) => r.id)).toEqual(snapshot)
+  })
+})
+
+describe('selectRecent', () => {
+  it('orders newest first', () => {
+    const oldest = request(0, 'pending', 90)
+    const middle = request(0, 'pending', 40)
+    const newest = request(0, 'pending', 2)
+    expect(selectRecent([middle, oldest, newest])).toEqual([
+      newest,
+      middle,
+      oldest,
+    ])
+  })
+
+  it('keeps played requests but hides declined ones', () => {
+    const ranked = selectRecent([
+      request(1, 'played', 30),
+      request(1, 'declined', 20),
+      request(1, 'queued', 10),
+    ])
+    expect(ranked.map((r) => r.status)).toEqual(['queued', 'played'])
+  })
+
+  it('caps the list and leaves the input alone', () => {
+    const many = Array.from({ length: 9 }, (_, i) => request(0, 'pending', i))
+    const snapshot = many.map((r) => r.id)
+    expect(selectRecent(many)).toHaveLength(REQUEST_LIST_LIMIT)
+    expect(selectRecent(many, 2)).toHaveLength(2)
+    expect(many.map((r) => r.id)).toEqual(snapshot)
   })
 })

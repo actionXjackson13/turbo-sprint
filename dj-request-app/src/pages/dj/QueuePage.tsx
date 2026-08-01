@@ -4,9 +4,10 @@ import {
   AppButton,
   AppCard,
   EmptyState,
+  NowPlayingCard,
   PageHeader,
+  Section,
   SongRequestListSkeleton,
-  StatusBadge,
 } from '../../components'
 import { useDjEvent } from '../../hooks/useDjEvent'
 import { useService } from '../../hooks/useService'
@@ -93,49 +94,25 @@ export function QueuePage() {
       <PageHeader title="Queue" subtitle={`${queue.length} up next`} />
 
       <main className="flex-1 space-y-5 px-4 py-4">
-        <section aria-labelledby="np-heading">
-          <h2
-            id="np-heading"
-            className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+        <Section title="Now playing">
+          <NowPlayingCard
+            nowPlaying={event?.nowPlaying ?? null}
+            emptyHint="Tap “Play now” on a queued song to set it."
           >
-            Now playing
-          </h2>
-          <AppCard emphasis={Boolean(event?.nowPlaying)}>
-            {event?.nowPlaying ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-fg">
-                    {event.nowPlaying.title}
-                  </p>
-                  <p className="truncate text-sm text-fg-muted">
-                    {event.nowPlaying.artist}
-                  </p>
-                </div>
-                <AppButton
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={clearNowPlaying}
-                >
-                  Clear
-                </AppButton>
-              </div>
-            ) : (
-              <p className="text-sm text-fg-muted">
-                Tap “Play now” on a queued song to set it.
-              </p>
+            {event?.nowPlaying && (
+              <AppButton
+                variant="secondary"
+                fullWidth
+                disabled={busy}
+                onClick={clearNowPlaying}
+              >
+                Clear
+              </AppButton>
             )}
-          </AppCard>
-        </section>
+          </NowPlayingCard>
+        </Section>
 
-        <section aria-labelledby="queue-heading">
-          <h2
-            id="queue-heading"
-            className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-          >
-            Up next
-          </h2>
-
+        <Section title="Up next">
           {loading && requests.length === 0 ? (
             <SongRequestListSkeleton count={2} />
           ) : queue.length === 0 ? (
@@ -154,12 +131,9 @@ export function QueuePage() {
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="min-w-0 truncate text-base font-semibold text-fg">
-                            {request.title}
-                          </h3>
-                          <StatusBadge status={request.status} />
-                        </div>
+                        <h3 className="min-w-0 truncate text-base font-semibold text-fg">
+                          {request.title}
+                        </h3>
                         <p className="truncate text-sm text-fg-muted">
                           {request.artist}
                         </p>
@@ -247,7 +221,7 @@ export function QueuePage() {
               ))}
             </ol>
           )}
-        </section>
+        </Section>
       </main>
     </>
   )

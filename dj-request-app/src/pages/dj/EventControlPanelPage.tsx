@@ -4,7 +4,11 @@ import {
   AppButton,
   AppCard,
   EmptyState,
+  NowPlayingCard,
   PageHeader,
+  Section,
+  SectionLink,
+  SegmentedControl,
   SongRequestCard,
   SongRequestListSkeleton,
   StatusBadge,
@@ -14,7 +18,7 @@ import { useDjEvent } from '../../hooks/useDjEvent'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
-import { selectMostWanted } from '../../features/requests/mostWanted'
+import { selectMostWanted } from '../../features/requests/requestLists'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
@@ -24,6 +28,11 @@ import type {
   RequestStatus,
   SongRequest,
 } from '../../types/domain'
+
+type RequestView = 'new' | 'wanted'
+
+/** How many of the queue to preview before sending the DJ to the Queue tab. */
+const QUEUE_PREVIEW = 3
 
 export function EventControlPanelPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -38,15 +47,8 @@ export function EventControlPanelPage() {
   const { results, secondsRemaining } = useVotingRound(eventId)
 
   const [busy, setBusy] = useState(false)
+  const [view, setView] = useState<RequestView>('new')
 
-  const pending = useMemo(
-    () => requests.filter((r) => r.status === 'pending'),
-    [requests],
-  )
-  const accepted = useMemo(
-    () => requests.filter((r) => r.status === 'accepted'),
-    [requests],
-  )
   const queue = useMemo(
     () =>
       requests
@@ -54,9 +56,15 @@ export function EventControlPanelPage() {
         .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0)),
     [requests],
   )
+  const pending = useMemo(
+    () => requests.filter((r) => r.status === 'pending'),
+    [requests],
+  )
   // Exactly what the guests see on their event screen, from the same helper.
   const mostWanted = useMemo(() => selectMostWanted(requests), [requests])
+  const visible = view === 'new' ? pending.slice(0, 4) : mostWanted
 
+  const upNext = queue[0] ?? null
   const activeRound =
     results && results.round.status === 'active' ? results : null
 
@@ -86,6 +94,29 @@ export function EventControlPanelPage() {
     }
   }
 
+  /**
+   * Advance the night by one song. Promoting a queued request to now-playing
+   * also retires it from the queue, so this is the whole "next track" gesture
+   * in one tap instead of a trip to the Queue tab.
+   */
+  const playNext = async () => {
+    if (!upNext) return
+    setBusy(true)
+    try {
+      await service.setNowPlaying(eventId, {
+        title: upNext.title,
+        artist: upNext.artist,
+        sourceRequestId: upNext.id,
+      })
+      await Promise.all([refresh(), reload()])
+      toast.success(`Now playing ${upNext.title}`)
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const quickAction = async (requestId: string, status: RequestStatus) => {
     try {
       await service.updateRequestStatus(requestId, status)
@@ -101,255 +132,236 @@ export function EventControlPanelPage() {
     <>
       <PageHeader
         title={event.name}
-        subtitle={`${guestCount} ${guestCount === 1 ? 'guest' : 'guests'} joined`}
+        subtitle={
+          <span className="flex items-center gap-2">
+            <span className="truncate">
+              {guestCount} {guestCount === 1 ? 'guest' : 'guests'} joined
+            </span>
+            <StatusBadge kind="intake" status={event.requestStatus} />
+          </span>
+        }
       />
 
       <main className="flex-1 space-y-5 px-4 py-4">
-        {/* Event code */}
-        <AppCard emphasis>
-          <p className="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
-            Event code
-          </p>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="font-mono text-4xl font-bold tracking-[0.25em] text-brand-400">
-              {event.code}
-            </span>
-            <AppButton variant="secondary" onClick={copyCode}>
-              Copy
-            </AppButton>
-          </div>
-        </AppCard>
-
-        {/* Intake control */}
-        <section aria-labelledby="intake-heading">
-          <div className="mb-2 flex items-center justify-between">
-            <h2
-              id="intake-heading"
-              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-            >
-              Requests
-            </h2>
-            <StatusBadge kind="intake" status={event.requestStatus} />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <AppButton
-              variant={event.requestStatus === 'open' ? 'success' : 'secondary'}
-              disabled={busy || event.requestStatus === 'open'}
-              onClick={() => setIntake('open')}
-            >
-              Open
-            </AppButton>
-            <AppButton
-              variant={
-                event.requestStatus === 'paused' ? 'primary' : 'secondary'
-              }
-              disabled={busy || event.requestStatus === 'paused'}
-              onClick={() => setIntake('paused')}
-            >
-              Pause
-            </AppButton>
-            <AppButton
-              variant={
-                event.requestStatus === 'closed' ? 'danger' : 'secondary'
-              }
-              disabled={busy || event.requestStatus === 'closed'}
-              onClick={() => setIntake('closed')}
-            >
-              Close
-            </AppButton>
-          </div>
-        </section>
-
-        {/* Now playing */}
-        <section aria-labelledby="np-heading">
-          <h2
-            id="np-heading"
-            className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+        {/* The night, in one card: what is on, and what follows it. */}
+        <Section title="Now playing">
+          <NowPlayingCard
+            nowPlaying={event.nowPlaying}
+            headline
+            emptyHint="Nothing set yet."
           >
-            Now playing
-          </h2>
-          <AppCard>
-            {event.nowPlaying ? (
-              <>
-                <p className="truncate text-base font-bold text-fg">
-                  {event.nowPlaying.title}
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-ink-900/60 px-3 py-2">
+                <p className="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+                  Up next
                 </p>
-                <p className="truncate text-sm text-fg-muted">
-                  {event.nowPlaying.artist}
+                <p className="mt-0.5 truncate text-sm text-fg">
+                  {upNext ? (
+                    <>
+                      {upNext.title}{' '}
+                      <span className="text-fg-muted">— {upNext.artist}</span>
+                    </>
+                  ) : (
+                    <span className="text-fg-muted">
+                      Nothing queued. Queue a request below.
+                    </span>
+                  )}
                 </p>
-              </>
-            ) : (
-              <p className="text-sm text-fg-muted">Nothing set yet.</p>
-            )}
-            <AppButton
-              variant="secondary"
-              fullWidth
-              className="mt-3"
-              onClick={() => navigate(routes.dj.queue(eventId))}
-            >
-              {event.nowPlaying ? 'Change' : 'Set now playing'}
-            </AppButton>
-          </AppCard>
-        </section>
+              </div>
+              <AppButton
+                size="lg"
+                fullWidth
+                disabled={busy || !upNext}
+                onClick={() => void playNext()}
+              >
+                Play next
+              </AppButton>
+            </div>
+          </NowPlayingCard>
+        </Section>
 
-        {/* Voting */}
-        <section aria-labelledby="vote-heading">
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2
-              id="vote-heading"
-              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-            >
-              Next-song vote
-            </h2>
-            {activeRound && secondsRemaining !== null && (
+        <Section
+          title="Queue"
+          action={
+            queue.length > 0 && (
+              <SectionLink onClick={() => navigate(routes.dj.queue(eventId))}>
+                Reorder{queue.length > QUEUE_PREVIEW && ` all ${queue.length}`}
+              </SectionLink>
+            )
+          }
+        >
+          {loading && requests.length === 0 ? (
+            <SongRequestListSkeleton count={2} />
+          ) : queue.length === 0 ? (
+            <EmptyState
+              title="Queue is empty"
+              description="Queue a request below, or push a vote winner here."
+            />
+          ) : (
+            <ol className="space-y-2">
+              {queue.slice(0, QUEUE_PREVIEW).map((request, index) => (
+                <li key={request.id}>
+                  <AppCard className="flex items-center gap-3 !py-3">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink-600 text-xs font-bold tabular-nums text-fg-muted">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-fg">
+                        {request.title}
+                      </p>
+                      <p className="truncate text-xs text-fg-muted">
+                        {request.artist}
+                      </p>
+                    </div>
+                  </AppCard>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Section>
+
+        {/* One request list. "New" and "Most wanted" overlapped heavily as
+            separate sections — the same songs, under two headings. */}
+        <Section
+          title="Requests"
+          action={
+            <SegmentedControl
+              label="Which requests to show"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'new', label: `New${pending.length ? ` ${pending.length}` : ''}` },
+                { value: 'wanted', label: 'Most wanted' },
+              ]}
+            />
+          }
+        >
+          {loading && requests.length === 0 ? (
+            <SongRequestListSkeleton count={2} />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              title={view === 'new' ? 'All caught up' : 'No votes yet'}
+              description={
+                view === 'new'
+                  ? 'New requests land here as guests send them.'
+                  : 'Requests rank here as guests upvote them.'
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {visible.map((request) => (
+                <SongRequestCard
+                  key={request.id}
+                  request={request}
+                  showVoteCount
+                  showStatus={view === 'wanted'}
+                  actions={
+                    <QuickActions request={request} onAction={quickAction} />
+                  }
+                />
+              ))}
+              <AppButton
+                variant="secondary"
+                fullWidth
+                onClick={() => navigate(routes.dj.requests(eventId))}
+              >
+                Manage all requests
+              </AppButton>
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="Next-song vote"
+          action={
+            activeRound &&
+            secondsRemaining !== null && (
               <span className="text-xs font-bold tabular-nums text-brand-400">
                 {formatCountdown(secondsRemaining)}
               </span>
-            )}
-          </div>
+            )
+          }
+        >
           <AppCard emphasis={Boolean(activeRound)}>
-            {activeRound ? (
-              <>
-                <p className="text-sm text-fg-muted">
-                  Running · {activeRound.totalVotes}{' '}
-                  {activeRound.totalVotes === 1 ? 'vote' : 'votes'}
-                </p>
-                <AppButton
-                  fullWidth
-                  className="mt-3"
-                  onClick={() => navigate(routes.dj.activeVote(eventId))}
-                >
-                  Manage vote
-                </AppButton>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-fg-muted">
-                  Let the crowd pick what plays next.
-                </p>
-                <AppButton
-                  fullWidth
-                  className="mt-3"
-                  onClick={() => navigate(routes.dj.createVote(eventId))}
-                >
-                  Create a vote
-                </AppButton>
-              </>
-            )}
-          </AppCard>
-        </section>
-
-        {/* New requests */}
-        <section aria-labelledby="new-heading">
-          <div className="mb-2 flex items-center justify-between">
-            <h2
-              id="new-heading"
-              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-            >
-              New requests
-            </h2>
-            {pending.length > 0 && (
-              <span className="text-xs font-bold text-brand-400">
-                {pending.length}
-              </span>
-            )}
-          </div>
-
-          {loading && requests.length === 0 ? (
-            <SongRequestListSkeleton count={2} />
-          ) : pending.length === 0 ? (
-            <EmptyState
-              title="All caught up"
-              description="New requests land here as guests send them."
-            />
-          ) : (
-            <div className="space-y-3">
-              {pending.slice(0, 4).map((request) => (
-                <SongRequestCard
-                  key={request.id}
-                  request={request}
-                  showVoteCount
-                  showStatus={false}
-                  actions={
-                    <QuickActions request={request} onAction={quickAction} />
-                  }
-                />
-              ))}
-              {pending.length > 4 && (
-                <AppButton
-                  variant="secondary"
-                  fullWidth
-                  onClick={() => navigate(routes.dj.requests(eventId))}
-                >
-                  See all {pending.length} new requests
-                </AppButton>
-              )}
-            </div>
-          )}
-        </section>
-
-        {/* Most wanted — the same ranking the guests are looking at */}
-        <section aria-labelledby="wanted-heading">
-          <div className="mb-2 flex items-baseline justify-between gap-3">
-            <h2
-              id="wanted-heading"
-              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
-            >
-              Most wanted
-            </h2>
-            <span className="text-xs text-fg-subtle">
-              What the crowd is voting for
-            </span>
-          </div>
-
-          {loading && requests.length === 0 ? (
-            <SongRequestListSkeleton count={2} />
-          ) : mostWanted.length === 0 ? (
-            <EmptyState
-              title="No votes yet"
-              description="Requests rank here as guests upvote them."
-            />
-          ) : (
-            <div className="space-y-3">
-              {mostWanted.map((request) => (
-                <SongRequestCard
-                  key={request.id}
-                  request={request}
-                  showVoteCount
-                  actions={
-                    <QuickActions request={request} onAction={quickAction} />
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Summary counts */}
-        <div className="grid grid-cols-2 gap-3">
-          <AppCard>
-            <p className="text-2xl font-bold tabular-nums text-fg">
-              {accepted.length}
+            <p className="text-sm text-fg-muted">
+              {activeRound
+                ? `Running · ${activeRound.totalVotes} ${
+                    activeRound.totalVotes === 1 ? 'vote' : 'votes'
+                  }`
+                : 'Let the crowd pick what plays next.'}
             </p>
-            <p className="text-sm text-fg-muted">Accepted</p>
+            <AppButton
+              fullWidth
+              variant={activeRound ? 'primary' : 'secondary'}
+              className="mt-3"
+              onClick={() =>
+                navigate(
+                  activeRound
+                    ? routes.dj.activeVote(eventId)
+                    : routes.dj.createVote(eventId),
+                )
+              }
+            >
+              {activeRound ? 'Manage vote' : 'Create a vote'}
+            </AppButton>
           </AppCard>
+        </Section>
+
+        {/* Set-up details: needed once at the start, not all night. */}
+        <Section title="Event">
           <AppCard>
-            <p className="text-2xl font-bold tabular-nums text-fg">
-              {queue.length}
-            </p>
-            <p className="text-sm text-fg-muted">In queue</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+                  Join code
+                </p>
+                <span className="font-mono text-3xl font-bold tracking-[0.25em] text-brand-400">
+                  {event.code}
+                </span>
+              </div>
+              <AppButton variant="secondary" onClick={copyCode}>
+                Copy
+              </AppButton>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <AppButton
+                variant={event.requestStatus === 'open' ? 'success' : 'secondary'}
+                disabled={busy || event.requestStatus === 'open'}
+                onClick={() => setIntake('open')}
+              >
+                Open
+              </AppButton>
+              <AppButton
+                variant={
+                  event.requestStatus === 'paused' ? 'primary' : 'secondary'
+                }
+                disabled={busy || event.requestStatus === 'paused'}
+                onClick={() => setIntake('paused')}
+              >
+                Pause
+              </AppButton>
+              <AppButton
+                variant={
+                  event.requestStatus === 'closed' ? 'danger' : 'secondary'
+                }
+                disabled={busy || event.requestStatus === 'closed'}
+                onClick={() => setIntake('closed')}
+              >
+                Close
+              </AppButton>
+            </div>
           </AppCard>
-        </div>
+        </Section>
       </main>
     </>
   )
 }
 
 /**
- * The moves that make sense for a request's current status. The control panel
- * shows requests at every stage — "New requests" is pending-only, but "Most
- * wanted" ranks by votes across pending, accepted and queued — so the buttons
- * have to follow the request rather than the list it appears in.
+ * The moves that make sense for a request's current status. The list spans
+ * every stage when ordered by votes, so the buttons follow the request rather
+ * than the list it appears in.
  *
  * Destructive moves (remove, block) live on the Requests screen, behind a
  * confirmation, rather than one stray tap away here.
