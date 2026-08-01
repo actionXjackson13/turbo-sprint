@@ -1,5 +1,6 @@
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -71,7 +72,7 @@ let guestARowId: string
 
 describe('supabase migrations', () => {
   beforeAll(async () => {
-    db = new PGlite({ extensions: { pgcrypto } })
+    db = new PGlite({ extensions: { pgcrypto, pg_trgm } })
 
     // --- platform stubs -----------------------------------------------------
     await db.exec(`
@@ -102,6 +103,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0002_functions_triggers.sql'))
     await db.exec(read('0003_rls_policies.sql'))
     await db.exec(read('0004_realtime.sql'))
+    await db.exec(read('0005_fuzzy_dedupe.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -148,10 +150,14 @@ describe('supabase migrations', () => {
   })
 
   it('normalize_song_text matches the client implementation', async () => {
+    // Mirrors test/utils/normalizeText.test.ts. Both must agree, or a request
+    // stored by the database stops matching what the client predicts.
     const cases: [string, string][] = [
       ['Dancing Queen', 'dancing queen'],
       ['  Get   Lucky  ', 'get lucky'],
-      ["Don't Stop Believin'", 'don t stop believin'],
+      ["Don't Stop Believin'", 'dont stop believin'],
+      ['Don’t', 'dont'],
+      ['Donʼt', 'dont'],
       ['Hello, World! (Remix)', 'hello world remix'],
       ['99 Problems', '99 problems'],
       ['   ', ''],
@@ -623,6 +629,86 @@ describe('supabase migrations', () => {
           optionIds[0],
         ]),
       ).rejects.toThrow(/forbidden/)
+    })
+  })
+
+  /**
+   * Runs on its own event so the fixtures below cannot perturb the counts and
+   * `limit 1` lookups the tests above rely on.
+   *
+   * These mirror test/utils/similarity.test.ts. Both implementations have to
+   * reach the same verdict, or the duplicate nudge would differ between demo
+   * mode and Postgres.
+   */
+  describe('find_similar_request', () => {
+    let dedupeEventId: string
+
+    const seedRequest = (title: string, artist: string) =>
+      runAs(
+        GUEST_B,
+        `select * from public.create_song_request($1, $2, $3)`,
+        [dedupeEventId, title, artist],
+      )
+
+    const findSimilar = async (title: string, artist: string) => {
+      const res = await runAs<{ title: string }>(
+        GUEST_B,
+        `select title from public.find_similar_request($1, $2, $3)`,
+        [dedupeEventId, title, artist],
+      )
+      return res.rows[0]?.title ?? null
+    }
+
+    beforeAll(async () => {
+      const ev = await runAs<{ id: string; code: string }>(
+        DJ,
+        `select * from public.create_event('Dedupe Fixtures')`,
+      )
+      dedupeEventId = ev.rows[0]!.id
+
+      await runAs(GUEST_B, `select * from public.join_event($1, 'Bailey')`, [
+        ev.rows[0]!.code,
+      ])
+
+      await seedRequest('Blinding Lights', 'The Weeknd')
+      await seedRequest("Don't Stop Believing", 'Journey')
+      await seedRequest('Hello', 'Adele')
+    })
+
+    it('finds an exact match ignoring case and spacing', async () => {
+      expect(await findSimilar('  BLINDING   lights ', 'the weeknd')).toBe(
+        'Blinding Lights',
+      )
+    })
+
+    it('finds a match through a typo', async () => {
+      expect(await findSimilar('Blinding Light', 'The Weekend')).toBe(
+        'Blinding Lights',
+      )
+    })
+
+    it('matches across apostrophe spelling', async () => {
+      expect(await findSimilar('Dont Stop Believin', 'Journey')).toBe(
+        "Don't Stop Believing",
+      )
+    })
+
+    it('keeps the same title by a different artist apart', async () => {
+      expect(await findSimilar('Hello', 'Lionel Richie')).toBeNull()
+    })
+
+    it('returns nothing for a genuinely new song', async () => {
+      expect(await findSimilar('Padam Padam', 'Kylie Minogue')).toBeNull()
+    })
+
+    it('ignores a declined request so it can be asked for again', async () => {
+      await runAs(
+        DJ,
+        `update public.song_requests set status = 'declined'
+         where event_id = $1 and title = 'Hello'`,
+        [dedupeEventId],
+      )
+      expect(await findSimilar('Hello', 'Adele')).toBeNull()
     })
   })
 

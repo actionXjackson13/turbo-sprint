@@ -35,6 +35,10 @@ import {
 } from './seed'
 import { songMatchKey } from '../../utils/normalizeText'
 import {
+  SIMILAR_REQUEST_THRESHOLD,
+  trigramSimilarity,
+} from '../../utils/similarity'
+import {
   MAX_ACTIVE_REQUESTS_PER_GUEST,
   MAX_VOTING_OPTIONS,
   MIN_VOTING_OPTIONS,
@@ -364,14 +368,35 @@ export class DemoService implements DataService {
     artist: string,
   ): Promise<SongRequest | null> {
     const key = songMatchKey(title, artist)
-    const match = getDb().requests.find(
+
+    const candidates = getDb().requests.filter(
       (r) =>
         r.eventId === eventId &&
         // A previously declined song shouldn't block a fresh ask.
-        r.status !== 'declined' &&
-        songMatchKey(r.title, r.artist) === key,
+        r.status !== 'declined',
     )
-    return match ? clone(match) : null
+
+    // An exact match on the normalised key always wins, regardless of what the
+    // fuzzy scores say — mirrors the ordering in find_similar_request (0005).
+    const exact = candidates.find((r) => songMatchKey(r.title, r.artist) === key)
+    if (exact) return clone(exact)
+
+    // Otherwise the closest request above the threshold, so a typo lands on the
+    // song the room already asked for rather than creating a rival entry.
+    let best: SongRequest | null = null
+    let bestScore = 0
+    for (const request of candidates) {
+      const score = trigramSimilarity(
+        key,
+        songMatchKey(request.title, request.artist),
+      )
+      if (score >= SIMILAR_REQUEST_THRESHOLD && score > bestScore) {
+        best = request
+        bestScore = score
+      }
+    }
+
+    return best ? clone(best) : null
   }
 
   async createSongRequest(input: CreateRequestInput): Promise<SongRequest> {

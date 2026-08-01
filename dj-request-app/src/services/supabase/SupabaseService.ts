@@ -30,7 +30,6 @@ import {
   toVotingOption,
   toVotingRound,
 } from './mappers'
-import { normalizeSongText } from '../../utils/normalizeText'
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
 
 const EVENT_SELECT = '*, profiles!events_dj_id_fkey(display_name)'
@@ -380,21 +379,19 @@ export class SupabaseService implements DataService {
     title: string,
     artist: string,
   ): Promise<SongRequest | null> {
-    // Matching happens against the database's own generated columns, so the
-    // comparison uses the same normalisation that was applied on insert.
+    // Matching runs in the database: it owns the normalisation applied on
+    // insert, and the trigram scoring that catches typos. Doing it here would
+    // mean pulling every request down and re-deriving both.
     const { data, error } = await this.db
-      .from('song_requests')
-      .select('*')
-      .eq('event_id', eventId)
-      .eq('normalized_title', normalizeSongText(title))
-      .eq('normalized_artist', normalizeSongText(artist))
-      .neq('status', 'declined')
-      .order('created_at', { ascending: true })
-      .limit(1)
+      .rpc('find_similar_request', {
+        p_event_id: eventId,
+        p_title: title,
+        p_artist: artist,
+      })
       .maybeSingle()
 
     if (error) translateError(error, 'Could not check for duplicates.')
-    return data ? toSongRequest(data) : null
+    return data ? toSongRequest(asRow(data)) : null
   }
 
   async createSongRequest(input: CreateRequestInput): Promise<SongRequest> {

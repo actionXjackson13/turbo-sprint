@@ -118,7 +118,7 @@ shows a message saying so.
 
 ### 3. Apply the migrations
 
-Run the four files in `supabase/migrations/` **in order**. Either paste each
+Run the five files in `supabase/migrations/` **in order**. Either paste each
 into the dashboard SQL editor, or use the CLI:
 
 ```bash
@@ -131,6 +131,7 @@ supabase link --project-ref <your-project-ref> && supabase db push
 | `0002_functions_triggers.sql` | Triggers and the server-authoritative RPCs |
 | `0003_rls_policies.sql` | Row-level security policies and column grants |
 | `0004_realtime.sql` | Realtime publication |
+| `0005_fuzzy_dedupe.sql` | `pg_trgm`, rebuilt normalisation, similarity lookup |
 
 ### 4. Configure the app
 
@@ -157,9 +158,10 @@ back to demo mode.
 2. Enter a display name and join.
 3. **Refresh the page** — you stay in the event.
 4. Tap **Request a song**, enter a title and artist, send it.
-5. Request something already on the list (try `levitating` / `dua lipa`, with
-   different capitalisation and punctuation) — the app offers to upvote the
-   existing request instead.
+5. Request something already on the list — the app offers to upvote the
+   existing request instead. Try it with deliberate mistakes: `Blinding Light`
+   / `The Weekend` still finds `Blinding Lights` / `The Weeknd`. See
+   [Duplicate detection](#duplicate-detection).
 6. Tap the vote pill on any request to add or remove your vote. Your own
    request's founding vote is locked.
 7. **Requests** is one list — toggle it between **Most wanted** and
@@ -233,6 +235,42 @@ request's own status — *Queue / Accept / Decline* for a pending one,
 *Queue / Decline* once accepted, *Mark played* once queued. Destructive moves
 (remove, block guest) stay on the **Requests** screen behind a confirmation
 rather than one stray tap away.
+
+---
+
+## Duplicate detection
+
+Two guests asking for the same song should end up as one request with two
+votes, not two requests with one each — a split vote misrepresents what the
+room wants. Before a request is created, the app looks for a match and offers
+**Upvote this instead**, with **Request it anyway** always available. The nudge
+is advisory; nothing is blocked.
+
+Matching happens in two stages:
+
+1. **Normalise** — lowercase, delete apostrophes, reduce every other run of
+   punctuation to a single space, collapse whitespace. Deleting apostrophes
+   rather than replacing them is what makes `Don't` and `Dont` identical;
+   turning them into spaces produced `don t`, which matched neither.
+2. **Compare** — an exact match on the normalised title *and* artist always
+   wins. Otherwise the closest request scoring at least **0.55** trigram
+   similarity is offered.
+
+The artist is part of the key on purpose: "Hello" by Adele and "Hello" by
+Lionel Richie are different requests.
+
+The threshold was measured, not guessed. Across realistic pairs, true
+duplicates scored no lower than 0.74 (`Blinding Light`/`The Weekend` vs
+`Blinding Lights`/`The Weeknd`) and distinct songs no higher than 0.40
+(`Yesterday` vs `Let It Be`, both by The Beatles). 0.55 sits in that gap, and
+`test/utils/similarity.test.ts` fails if either class drifts within 0.1 of it.
+
+Against Postgres this is `find_similar_request`, using `pg_trgm`'s
+`similarity()` over a GIN index. In demo mode there is no database, so
+`src/utils/similarity.ts` reimplements pg_trgm's exact algorithm — padded
+3-grams compared as a Jaccard index — rather than substituting an easier
+metric, so both backends reach the same verdict. The migration test asserts
+the SQL agrees with the TypeScript on the same cases.
 
 ---
 
@@ -344,10 +382,13 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 86 tests:
+`npm run test` runs 121 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
+- **`similarity`** — pg_trgm's algorithm reimplemented for demo mode, plus the
+  duplicate/distinct song pairs the 0.55 threshold was chosen against, with a
+  guard that neither class drifts close to the boundary.
 - **`DemoService`** — vote maths, dedupe, intake rules, the request cap, DJ
   ownership, queue ordering, and the full voting-round lifecycle. Demo mode
   enforces the same rules the database does, so behaviour verified here is the
@@ -366,7 +407,8 @@ imports, so that layer could be lifted into a React Native app unchanged.
   Postgres (PGlite) with `auth.uid()` stubbed, then exercised as four different
   users through a non-superuser role so RLS actually applies. This checks the
   trigger, the cap, generated columns, founding-vote rules, cross-DJ and
-  cross-guest access, deadline enforcement, and winner resolution.
+  cross-guest access, deadline enforcement, winner resolution, and that
+  `find_similar_request` reaches the same verdicts as the client.
 
 Both guest and DJ flows were also driven end to end in a 390 px viewport, and
 layout was checked at 375 px, 768 px and 1280 px (centred phone-width column,
@@ -381,9 +423,11 @@ no horizontal overflow, every touch target ≥ 44 px).
   against the same contract as the verified demo backend, but no hosted
   Supabase project existed during development. Expect to smoke-test sign-up,
   realtime and RLS once yours is connected.
-- **Duplicate detection is exact-match** on normalised text. `Dont Stop
-  Believin` will not match `Don't Stop Believing`. Fuzzy matching via `pg_trgm`
-  and a similarity threshold is the natural next step.
+- **Duplicate detection can still be fooled.** It is typo-tolerant (see
+  [Duplicate detection](#duplicate-detection)), but it compares text only — it
+  has no idea that "Fatboy Slim" and "Norman Cook" are the same person, or that
+  a song has an alternate title. Catching those needs a music catalogue, which
+  the spec deliberately rules out.
 - **Timed rounds finalise opportunistically.** A round whose clock has run out
   is closed by the first client that notices. If nobody has the app open, the
   round stays "expired but not marked ended" until someone looks — though no

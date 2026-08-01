@@ -20,18 +20,24 @@ const DIST_DIR = join(APP_DIR, 'dist')
 /** Must match where Pages serves this directory from. */
 const BASE = '/turbo-sprint/dj/'
 
-const run = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, {
+/**
+ * Runs a package's own JS entry point with the current Node binary.
+ *
+ * Going through `npm run build` would mean spawning a shell (or npm.cmd, which
+ * recent Node refuses to spawn without one). Calling the tools directly keeps
+ * this shell-free and behaves the same on every platform.
+ */
+const runTool = (relativeBin, args, env = {}) =>
+  execFileSync(process.execPath, [join(APP_DIR, relativeBin), ...args], {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...opts,
+    cwd: APP_DIR,
+    env: { ...process.env, ...env },
   })
 
 console.log(`Building with base ${BASE} ...`)
-run('npm', ['run', 'build'], {
-  cwd: APP_DIR,
-  env: { ...process.env, DEPLOY_BASE: BASE },
-})
+// Mirrors the "build" script: type-check first, then bundle.
+runTool('node_modules/typescript/bin/tsc', ['-b'])
+runTool('node_modules/vite/bin/vite.js', ['build'], { DEPLOY_BASE: BASE })
 
 if (!existsSync(DIST_DIR)) {
   console.error('Build produced no dist/ directory.')

@@ -74,6 +74,66 @@ describe('DemoService', () => {
       expect(match?.title).toBe('Levitating')
     })
 
+    it('matches through a typo', async () => {
+      // The seed has "Blinding Lights" / "The Weeknd".
+      const match = await service.findSimilarRequest(
+        eventId,
+        'Blinding Light',
+        'The Weekend',
+      )
+      expect(match?.title).toBe('Blinding Lights')
+    })
+
+    it('matches across apostrophe spelling', async () => {
+      await service.createSongRequest({
+        eventId,
+        title: "Don't Stop Believing",
+        artist: 'Journey',
+      })
+
+      const match = await service.findSimilarRequest(
+        eventId,
+        'Dont Stop Believin',
+        'Journey',
+      )
+      expect(match?.title).toBe("Don't Stop Believing")
+    })
+
+    it('keeps the same title by a different artist apart', async () => {
+      await service.createSongRequest({
+        eventId,
+        title: 'Hello',
+        artist: 'Adele',
+      })
+
+      const match = await service.findSimilarRequest(
+        eventId,
+        'Hello',
+        'Lionel Richie',
+      )
+      expect(match).toBeNull()
+    })
+
+    it('prefers an exact match over a merely similar one', async () => {
+      await service.createSongRequest({
+        eventId,
+        title: 'Sweet Caroline',
+        artist: 'Neil Diamond',
+      })
+      await service.createSongRequest({
+        eventId,
+        title: 'Sweet Carolina',
+        artist: 'Neil Diamond',
+      })
+
+      const match = await service.findSimilarRequest(
+        eventId,
+        'sweet carolina',
+        'neil diamond',
+      )
+      expect(match?.title).toBe('Sweet Carolina')
+    })
+
     it('does not match a declined request', async () => {
       const match = await service.findSimilarRequest(
         eventId,

@@ -19,12 +19,23 @@ describe('normalizeSongText', () => {
   })
 
   it('strips punctuation', () => {
-    expect(normalizeSongText("Don't Stop Believin'")).toBe(
-      'don t stop believin',
-    )
     expect(normalizeSongText('Hello, World! (Remix)')).toBe(
       'hello world remix',
     )
+  })
+
+  it('deletes apostrophes rather than splitting the word', () => {
+    // "don t" would match neither "dont" nor "don't", so both spellings of a
+    // song would live as separate requests.
+    expect(normalizeSongText("Don't Stop Believin'")).toBe(
+      'dont stop believin',
+    )
+    expect(normalizeSongText("Don't")).toBe(normalizeSongText('Dont'))
+  })
+
+  it('treats typographic apostrophes like straight ones', () => {
+    expect(normalizeSongText('Don’t')).toBe('dont')
+    expect(normalizeSongText('Donʼt')).toBe('dont')
   })
 
   it('keeps digits', () => {
