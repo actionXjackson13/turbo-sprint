@@ -175,18 +175,20 @@ back to demo mode.
 3. The **Event** card at the foot of the control panel holds the join code and
    the **Open / Pause / Close** intake toggle — set-up details you need once,
    not all night.
-4. Control panel leads with **Now playing** — **Play next** promotes the top
-   of the queue in one tap. Below it, the queue preview, then one request
+4. Control panel leads with **Now playing** — **Start next song** promotes the
+   top of the queue in one tap. Below it, the queue preview, then one request
    list toggling between **New** and **Most wanted** (the same ranking the
    guests see). See [Request lists](#request-lists).
-5. **Requests** tab: filter by status, sort newest or top-voted, and
+5. **Play next** on any live request jumps it to the front of the queue. See
+   [Queue and Play next](#queue-and-play-next).
+6. **Requests** tab: filter by status, sort newest or top-voted, and
    accept / queue / decline / mark played / remove, or block a guest. Vote
    tallies show on every card.
-6. **Queue** tab: reorder with the up/down controls, **Play now** to set the
+7. **Queue** tab: reorder with the up/down controls, **Play now** to set the
    current track.
-7. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
+8. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
    end it early, then **Add to queue** for the winner.
-8. **Settings**: rename, end the event, reset demo data.
+9. **Settings**: rename, end the event, reset demo data.
 
 ### Seeing live updates
 
@@ -231,6 +233,33 @@ request's own status — *Queue / Accept / Decline* for a pending one,
 *Queue / Decline* once accepted, *Mark played* once queued. Destructive moves
 (remove, block guest) stay on the **Requests** screen behind a confirmation
 rather than one stray tap away.
+
+---
+
+## Queue and Play next
+
+Two different gestures, deliberately named apart:
+
+- **Start next song** sits on the DJ's Now playing card. It promotes whatever
+  is at the front of the queue to the current track — the transport control.
+  Promoting a request also retires it from the queue, so this is the whole
+  "next track" move in one tap.
+- **Play next** sits on a request, wherever that request is still live
+  (pending, accepted or queued), on both the control panel and the Requests
+  screen. It puts that song at the *front* of the queue. **Queue** joins the
+  back of it; Play next jumps it.
+
+Play next composes two existing operations — set the status to queued, then
+reorder — rather than adding a method to `DataService`. Nothing new has to be
+implemented against Postgres, and the reorder stays a single authoritative
+write. The queue is re-read first rather than taken from what the screen last
+rendered: another device may have queued something in the meantime, and
+writing a stale ordering back would silently drop it to the end.
+
+A request already queued shows Play next as its only action on the control
+panel — retiring a song is the Queue tab's job, or happens on its own when the
+next one starts. Played and declined requests get **Reopen** instead; they go
+back through the normal flow rather than jumping the queue from the dead.
 
 ---
 
@@ -315,7 +344,7 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 79 tests:
+`npm run test` runs 86 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
@@ -329,6 +358,10 @@ imports, so that layer could be lifted into a React Native app unchanged.
 - **Request lists** — the orderings shared by the guest screen and the DJ
   control panel: which statuses each keeps, the vote tie-break, the cap, and
   that neither reorders the array it was given.
+- **Play next** — that queueing appends to the back and the reorder puts the
+  chosen song in front without duplicating or dropping anything. Both are
+  pinned, because "Play next" silently becomes "play last" if the first ever
+  changes.
 - **Migrations** — the real `.sql` files are executed against an in-process
   Postgres (PGlite) with `auth.uid()` stubbed, then exercised as four different
   users through a non-superuser role so RLS actually applies. This checks the

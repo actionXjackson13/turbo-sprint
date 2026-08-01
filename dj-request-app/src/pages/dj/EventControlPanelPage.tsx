@@ -19,6 +19,7 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { selectMostWanted } from '../../features/requests/requestLists'
+import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
@@ -48,6 +49,7 @@ export function EventControlPanelPage() {
 
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<RequestView>('new')
+  const { playNext, pendingId } = usePlayNext(eventId, reload)
 
   const queue = useMemo(
     () =>
@@ -98,8 +100,11 @@ export function EventControlPanelPage() {
    * Advance the night by one song. Promoting a queued request to now-playing
    * also retires it from the queue, so this is the whole "next track" gesture
    * in one tap instead of a trip to the Queue tab.
+   *
+   * Distinct from the per-request **Play next**, which decides *what* comes
+   * next; this starts whatever that turned out to be.
    */
-  const playNext = async () => {
+  const startNextSong = async () => {
     if (!upNext) return
     setBusy(true)
     try {
@@ -172,9 +177,9 @@ export function EventControlPanelPage() {
                 size="lg"
                 fullWidth
                 disabled={busy || !upNext}
-                onClick={() => void playNext()}
+                onClick={() => void startNextSong()}
               >
-                Play next
+                Start next song
               </AppButton>
             </div>
           </NowPlayingCard>
@@ -256,7 +261,12 @@ export function EventControlPanelPage() {
                   showVoteCount
                   showStatus={view === 'wanted'}
                   actions={
-                    <QuickActions request={request} onAction={quickAction} />
+                    <QuickActions
+                      request={request}
+                      onAction={quickAction}
+                      onPlayNext={() => void playNext(request)}
+                      playNextPending={pendingId === request.id}
+                    />
                   }
                 />
               ))}
@@ -363,70 +373,59 @@ export function EventControlPanelPage() {
  * every stage when ordered by votes, so the buttons follow the request rather
  * than the list it appears in.
  *
+ * **Play next** is offered at every stage and leads, because it is the move a
+ * DJ reaches for when they spot the song the room wants — it jumps the queue
+ * rather than joining the back of it, which is all **Queue** does. For a
+ * request that is already queued it is the only action worth a tap here;
+ * retiring a song is the Queue tab's job, or happens on its own when it plays.
+ *
  * Destructive moves (remove, block) live on the Requests screen, behind a
  * confirmation, rather than one stray tap away here.
  */
 function QuickActions({
   request,
   onAction,
+  onPlayNext,
+  playNextPending,
 }: {
   request: SongRequest
   onAction: (id: string, status: RequestStatus) => void
+  onPlayNext: () => void
+  playNextPending: boolean
 }) {
   return (
     <>
-      {request.status === 'pending' && (
-        <>
-          <AppButton
-            size="sm"
-            variant="success"
-            onClick={() => onAction(request.id, 'queued')}
-          >
-            Queue
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="secondary"
-            onClick={() => onAction(request.id, 'accepted')}
-          >
-            Accept
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="ghost"
-            onClick={() => onAction(request.id, 'declined')}
-          >
-            Decline
-          </AppButton>
-        </>
-      )}
+      <AppButton size="sm" loading={playNextPending} onClick={onPlayNext}>
+        Play next
+      </AppButton>
 
-      {request.status === 'accepted' && (
-        <>
-          <AppButton
-            size="sm"
-            variant="success"
-            onClick={() => onAction(request.id, 'queued')}
-          >
-            Queue
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="ghost"
-            onClick={() => onAction(request.id, 'declined')}
-          >
-            Decline
-          </AppButton>
-        </>
-      )}
-
-      {request.status === 'queued' && (
+      {request.status !== 'queued' && (
         <AppButton
           size="sm"
           variant="success"
-          onClick={() => onAction(request.id, 'played')}
+          onClick={() => onAction(request.id, 'queued')}
         >
-          Mark played
+          Queue
+        </AppButton>
+      )}
+
+      {request.status === 'pending' && (
+        <AppButton
+          size="sm"
+          variant="secondary"
+          onClick={() => onAction(request.id, 'accepted')}
+        >
+          Accept
+        </AppButton>
+      )}
+
+      {request.status !== 'queued' && (
+        <AppButton
+          size="sm"
+          variant="ghost"
+          onClick={() => onAction(request.id, 'declined')}
+        >
+          Decline
         </AppButton>
       )}
     </>

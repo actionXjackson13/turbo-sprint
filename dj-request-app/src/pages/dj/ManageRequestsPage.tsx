@@ -13,6 +13,7 @@ import {
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
+import { usePlayNext } from '../../features/requests/usePlayNext'
 import { getErrorMessage } from '../../utils/errors'
 import type { RequestSort, RequestStatus, SongRequest } from '../../types/domain'
 
@@ -37,6 +38,7 @@ export function ManageRequestsPage() {
   // Load everything once and filter client-side so switching tabs is instant
   // and the counts stay accurate.
   const { requests, loading, reload } = useEventRequests(eventId, { sort })
+  const { playNext, pendingId } = usePlayNext(eventId, reload)
 
   const visible = useMemo(() => {
     const statuses = filters[filterIndex]!.statuses
@@ -151,6 +153,8 @@ export function ManageRequestsPage() {
                   <RequestActions
                     request={request}
                     onSetStatus={setStatus}
+                    onPlayNext={() => void playNext(request)}
+                    playNextPending={pendingId === request.id}
                     onRemove={() => setConfirmRemove(request)}
                     onBlock={() => setConfirmBlock(request)}
                   />
@@ -194,16 +198,34 @@ export function ManageRequestsPage() {
 function RequestActions({
   request,
   onSetStatus,
+  onPlayNext,
+  playNextPending,
   onRemove,
   onBlock,
 }: {
   request: SongRequest
   onSetStatus: (id: string, status: RequestStatus) => void
+  onPlayNext: () => void
+  playNextPending: boolean
   onRemove: () => void
   onBlock: () => void
 }) {
+  const live =
+    request.status === 'pending' ||
+    request.status === 'accepted' ||
+    request.status === 'queued'
+
   return (
     <>
+      {/* Jumps the queue, where Queue joins the back of it. Offered wherever
+          the request is still live — a song already played or turned down
+          goes through Reopen first. */}
+      {live && (
+        <AppButton size="sm" loading={playNextPending} onClick={onPlayNext}>
+          Play next
+        </AppButton>
+      )}
+
       {request.status === 'pending' && (
         <>
           <AppButton
