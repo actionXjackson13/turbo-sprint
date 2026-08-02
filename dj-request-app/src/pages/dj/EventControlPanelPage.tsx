@@ -20,12 +20,10 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { selectMostWanted } from '../../features/requests/requestLists'
 import { usePlayNext } from '../../features/requests/usePlayNext'
-import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
-import { formatCountdown } from '../../utils/formatRelativeTime'
 import type {
   RequestIntakeStatus,
   RequestStatus,
@@ -50,7 +48,6 @@ export function EventControlPanelPage() {
   const { requests, loading, reload } = useEventRequests(eventId, {
     sort: 'votes',
   })
-  const { results, secondsRemaining } = useVotingRound(eventId)
 
   const [busy, setBusy] = useState(false)
   const [sheetFor, setSheetFor] = useState<SongRequest | null>(null)
@@ -73,8 +70,6 @@ export function EventControlPanelPage() {
   const visible = view === 'new' ? pending.slice(0, 4) : mostWanted
 
   const upNext = queue[0] ?? null
-  const activeRound =
-    results && results.round.status === 'active' ? results : null
 
   const copyCode = async () => {
     if (!event) return
@@ -282,42 +277,6 @@ export function EventControlPanelPage() {
               ))}
             </div>
           )}
-        </Section>
-
-        <Section
-          title="Next-song vote"
-          action={
-            activeRound &&
-            secondsRemaining !== null && (
-              <span className="text-xs font-bold tabular-nums text-brand-400">
-                {formatCountdown(secondsRemaining)}
-              </span>
-            )
-          }
-        >
-          <AppCard emphasis={Boolean(activeRound)}>
-            <p className="text-sm text-fg-muted">
-              {activeRound
-                ? `Running · ${activeRound.totalVotes} ${
-                    activeRound.totalVotes === 1 ? 'vote' : 'votes'
-                  }`
-                : 'Let the crowd pick what plays next.'}
-            </p>
-            <AppButton
-              fullWidth
-              variant={activeRound ? 'primary' : 'secondary'}
-              className="mt-3"
-              onClick={() =>
-                navigate(
-                  activeRound
-                    ? routes.dj.activeVote(eventId)
-                    : routes.dj.createVote(eventId),
-                )
-              }
-            >
-              {activeRound ? 'Manage vote' : 'Create a vote'}
-            </AppButton>
-          </AppCard>
         </Section>
 
         {/* Set-up details: needed once at the start, not all night. */}

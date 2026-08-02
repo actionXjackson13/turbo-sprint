@@ -8,6 +8,8 @@ export interface NavItem {
   icon: ReactNode
   /** Small count bubble (e.g. new requests awaiting the DJ). */
   badge?: number
+  /** What the count is, for screen readers. "3 new" vs "3 votes". */
+  badgeLabel?: string
   /** Match only the exact path — used for index routes. */
   end?: boolean
   /**
@@ -51,7 +53,9 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
               </span>
               <span className="truncate">{item.label}</span>
               {item.badge !== undefined && item.badge > 0 && (
-                <span className="sr-only">{item.badge} new</span>
+                <span className="sr-only">
+                  {item.badge} {item.badgeLabel ?? 'new'}
+                </span>
               )}
             </>
           )

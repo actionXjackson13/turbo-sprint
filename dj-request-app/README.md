@@ -377,7 +377,7 @@ Four tabs each, and every tab is a place rather than an action.
 | | Tabs |
 | --- | --- |
 | **Guest** | Home · Requests · Vote · My Songs |
-| **DJ** | Control · Requests · Queue · Settings |
+| **DJ** | Control · Requests · Queue · Vote · Settings |
 
 **Home** answers "what now?": what is playing, a vote only while one is
 running, **Request Song**, and the three most popular requests behind a
@@ -388,8 +388,9 @@ with no way to see past the first few songs.
 **Vote** greys out, with a reason, when no round is running. It keeps its slot
 rather than appearing and disappearing, so the tabs beside it never move.
 
-The DJ's **Vote** came off the bar: it is used a handful of times a night and
-is reached from Control, where the DJ already is.
+The DJ's **Vote** is a destination of its own rather than a block on the
+control panel. Its tab carries a badge with the running total, which is the one
+thing the control panel used to show at a glance.
 
 ### Request cards
 

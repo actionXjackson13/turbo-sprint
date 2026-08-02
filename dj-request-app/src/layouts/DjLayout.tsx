@@ -15,6 +15,7 @@ import { DjEventProvider } from '../contexts/DjEventProvider'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
+import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 
 /**
  * Shell for the DJ's per-event screens. The dashboard and create-event screens
@@ -44,8 +45,29 @@ export function DjLayout() {
   if (!profile) return <Navigate to={routes.dj.signIn} replace />
   if (!eventId) return <Navigate to={routes.dj.dashboard} replace />
 
-  // Four destinations. Vote came off the bar: it is used a handful of times a
-  // night and is reached from the control panel, where the DJ already is.
+  return (
+    <DjEventProvider eventId={eventId}>
+      <RootLayout hasBottomNav>
+        <DjEventGate>
+          <Outlet />
+        </DjEventGate>
+        <DjNav eventId={eventId} />
+        {isDemoMode() && <DemoSwitcher eventId={eventId} view="dj" />}
+      </RootLayout>
+    </DjEventProvider>
+  )
+}
+
+/**
+ * Vote is a destination again rather than a block on the control panel, so it
+ * gets a slot here. The badge carries the one thing the DJ lost by moving it
+ * off Control: that a round is running, and how many have voted.
+ */
+function DjNav({ eventId }: { eventId: string }) {
+  const { results } = useVotingRound(eventId)
+  const liveVote =
+    results && results.round.status === 'active' ? results : null
+
   const items: NavItem[] = [
     {
       to: routes.dj.event(eventId),
@@ -56,23 +78,20 @@ export function DjLayout() {
     { to: routes.dj.requests(eventId), label: 'Requests', icon: NavIcons.list },
     { to: routes.dj.queue(eventId), label: 'Queue', icon: NavIcons.queue },
     {
+      to: routes.dj.activeVote(eventId),
+      label: 'Vote',
+      icon: NavIcons.vote,
+      badge: liveVote?.totalVotes,
+      badgeLabel: 'votes cast',
+    },
+    {
       to: routes.dj.settings(eventId),
       label: 'Settings',
       icon: NavIcons.settings,
     },
   ]
 
-  return (
-    <DjEventProvider eventId={eventId}>
-      <RootLayout hasBottomNav>
-        <DjEventGate>
-          <Outlet />
-        </DjEventGate>
-        <BottomNavigation items={items} />
-        {isDemoMode() && <DemoSwitcher eventId={eventId} view="dj" />}
-      </RootLayout>
-    </DjEventProvider>
-  )
+  return <BottomNavigation items={items} />
 }
 
 /**
