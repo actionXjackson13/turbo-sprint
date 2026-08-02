@@ -6,29 +6,29 @@
    --------------------------------------------------------------------------- */
 @theme {
   /* Surfaces, darkest to lightest.
-     Kept to a short ladder on purpose: a screen should use the page colour and
-     at most one raised surface. Stacking three or four near-identical greys is
-     what made cards-inside-cards read as visual noise rather than hierarchy. */
-  --color-ink-950: #08080e;
-  --color-ink-900: #0e0e16;
-  --color-ink-800: #14141e;
-  --color-ink-700: #1b1b28;
-  --color-ink-600: #242433;
-  --color-ink-500: #34344a;
+     The page stays near-black so the room's glare doesn't wash it out, but
+     every raised surface above it was within a few points of the page and
+     effectively invisible on a phone at arm's length. The steps are wider now:
+     a card should be obviously a card before you look for its edge. */
+  --color-ink-950: #0a0a12;
+  --color-ink-900: #191922;
+  --color-ink-800: #22222f;
+  --color-ink-700: #2c2c3d;
+  --color-ink-600: #38384d;
+  --color-ink-500: #4a4a64;
 
-  /* Separation is carried by a hairline rather than a solid 1px box. Boxing
-     every element outlines it against the page; a hairline only suggests the
-     edge, which is what reads as "slim". */
-  --color-hairline: rgb(255 255 255 / 0.06);
-  --color-hairline-strong: rgb(255 255 255 / 0.1);
+  /* Edges. A 6% hairline reads on a calibrated monitor in a dark room and
+     disappears on a phone at half brightness, which is where this app is
+     actually used. These are drawn to be seen. */
+  --color-hairline: rgb(255 255 255 / 0.14);
+  --color-hairline-strong: rgb(255 255 255 / 0.24);
 
-  /* Text.
-     "Subtle" is as dim as it gets: at 4.8:1 on the page it still clears the
-     WCAG AA floor for small text. Quiet has to stay legible in a dark room —
-     going dimmer looked tidier in a screenshot and failed contrast. */
-  --color-fg: #f7f6ff;
-  --color-fg-muted: #9d9bb8;
-  --color-fg-subtle: #7d7b98;
+  /* Text. Clearing the AA floor is not the same as being easy to read at a
+     glance, one-handed, in a dark room. Muted and subtle are both lifted well
+     past the minimum; "quiet" should mean lower priority, not hard work. */
+  --color-fg: #ffffff;
+  --color-fg-muted: #c2c0da;
+  --color-fg-subtle: #a3a1bd;
 
   /* Brand — neon party accents */
   --color-brand-400: #a78bfa;

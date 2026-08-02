@@ -32,7 +32,10 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className={clsx('inline-flex rounded-full bg-ink-800 p-0.5', className)}
+      className={clsx(
+        'inline-flex rounded-full border border-hairline bg-ink-800 p-0.5',
+        className,
+      )}
     >
       {options.map((option) => {
         const selected = option.value === value

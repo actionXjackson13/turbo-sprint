@@ -17,9 +17,11 @@ export interface AppButtonProps
 }
 
 /**
- * Only `primary` carries a solid fill. Secondary actions sit on a quiet
- * surface with no outline, so a row of three controls reads as one primary
- * choice plus alternatives rather than three competing blocks.
+ * Only `primary` carries a solid fill; the rest are outlined instead. A quiet
+ * surface with no edge stopped reading as a control at all on a phone, so
+ * secondary and destructive actions are drawn with a border and let the fill
+ * stay muted — still one obvious primary choice, but the alternatives are
+ * visibly buttons.
  */
 const variantStyles: Record<Variant, string> = {
   // brand-600 rather than brand-500: white on the lighter purple measured
@@ -27,13 +29,13 @@ const variantStyles: Record<Variant, string> = {
   primary:
     'bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-600 disabled:bg-ink-700 disabled:text-fg-subtle',
   secondary:
-    'bg-ink-800 text-fg hover:bg-ink-700 active:bg-ink-800 disabled:text-fg-subtle',
+    'border border-hairline-strong bg-ink-800 text-fg hover:bg-ink-700 active:bg-ink-800 disabled:text-fg-subtle',
   ghost:
-    'bg-transparent text-fg-muted hover:bg-ink-800 hover:text-fg active:bg-ink-700 disabled:text-fg-subtle',
+    'border border-transparent bg-transparent text-fg-muted hover:bg-ink-800 hover:text-fg active:bg-ink-700 disabled:text-fg-subtle',
   danger:
-    'bg-danger-500/12 text-danger-500 hover:bg-danger-500/20 disabled:bg-ink-700 disabled:text-fg-subtle',
+    'border border-danger-500/45 bg-danger-500/15 text-danger-500 hover:bg-danger-500/25 disabled:bg-ink-700 disabled:text-fg-subtle',
   success:
-    'bg-success-500/14 text-success-500 hover:bg-success-500/22 disabled:bg-ink-700 disabled:text-fg-subtle',
+    'border border-success-500/45 bg-success-500/15 text-success-500 hover:bg-success-500/25 disabled:bg-ink-700 disabled:text-fg-subtle',
 }
 
 /**

@@ -30,7 +30,7 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
       className={clsx(
         'fixed inset-x-0 bottom-0 z-30',
         'mx-auto w-full max-w-shell',
-        'border-t border-hairline bg-ink-950/85 backdrop-blur-xl',
+        'border-t border-hairline-strong bg-ink-900/95 backdrop-blur-xl',
         'pb-safe',
       )}
     >
@@ -62,7 +62,7 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
                 <span
                   aria-disabled="true"
                   title={item.disabledReason}
-                  className={clsx(shape, 'text-fg-subtle/40')}
+                  className={clsx(shape, 'text-fg-subtle/45')}
                 >
                   {body}
                   {item.disabledReason && (

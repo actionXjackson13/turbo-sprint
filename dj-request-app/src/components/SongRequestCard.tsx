@@ -54,7 +54,12 @@ export function SongRequestCard({
     : `Upvote ${request.title}`
 
   return (
-    <article className={clsx('rounded-card bg-ink-900', className)}>
+    <article
+      className={clsx(
+        'rounded-card border border-hairline bg-ink-900',
+        className,
+      )}
+    >
       {/* Tighter padding than before. Rows are the most repeated element in the
           app, so every extra pixel here is multiplied down the whole list and
           is most of what made screens feel crowded. */}
@@ -104,7 +109,7 @@ export function SongRequestCard({
               'rounded-control transition-colors',
               hasVoted
                 ? 'bg-brand-500/18 text-brand-400'
-                : 'bg-ink-800 text-fg-muted hover:text-fg',
+                : 'border border-hairline-strong bg-ink-800 text-fg-muted hover:text-fg',
               (voteLocked || votePending) && 'opacity-70',
               voteLocked ? 'cursor-default' : 'disabled:cursor-not-allowed',
             )}
@@ -125,7 +130,7 @@ export function SongRequestCard({
               type="button"
               onClick={onMore}
               aria-label={`More actions for ${request.title}`}
-              className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-control text-fg-subtle hover:bg-ink-800 hover:text-fg"
+              className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-control border border-hairline text-fg-muted hover:bg-ink-800 hover:text-fg"
             >
               <svg
                 viewBox="0 0 24 24"

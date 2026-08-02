@@ -18,7 +18,7 @@ export function LoadingSkeleton({ className }: LoadingSkeletonProps) {
 export function SongRequestSkeleton() {
   return (
     // Mirrors the real row: two lines of text and a slim vote control.
-    <div className="rounded-card bg-ink-900 px-3.5 py-3">
+    <div className="rounded-card border border-hairline bg-ink-900 px-3.5 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1 space-y-2">
           <LoadingSkeleton className="h-4 w-3/5" />

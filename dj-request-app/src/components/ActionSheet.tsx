@@ -84,12 +84,14 @@ export function ActionSheet({
                     onClose()
                   }}
                   className={clsx(
-                    'flex min-h-12 w-full items-center rounded-control px-3 text-left',
+                    // Each row carries its own surface and edge. Flat text on
+                    // the sheet did not read as something you could tap.
+                    'flex min-h-12 w-full items-center rounded-control border px-3 text-left',
                     'text-base font-medium transition-colors',
                     'disabled:cursor-not-allowed disabled:opacity-40',
                     item.destructive
-                      ? 'text-danger-500 hover:bg-danger-500/10'
-                      : 'text-fg hover:bg-ink-700',
+                      ? 'border-danger-500/40 bg-danger-500/10 text-danger-500 hover:bg-danger-500/20'
+                      : 'border-hairline-strong bg-ink-700 text-fg hover:bg-ink-600',
                   )}
                 >
                   {item.label}
@@ -102,7 +104,7 @@ export function ActionSheet({
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 min-h-12 shrink-0 rounded-control text-base font-semibold text-fg-muted hover:bg-ink-700 hover:text-fg"
+          className="mt-3 min-h-12 shrink-0 rounded-control border border-hairline text-base font-semibold text-fg-muted hover:bg-ink-700 hover:text-fg"
         >
           Cancel
         </button>

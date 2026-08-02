@@ -124,7 +124,7 @@ export function ManageRequestsPage() {
                 'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors',
                 filterIndex === index
                   ? 'border-brand-500 bg-brand-500/20 text-brand-400'
-                  : 'border-hairline bg-ink-800 text-fg-muted hover:text-fg',
+                  : 'border-hairline-strong bg-ink-800 text-fg-muted hover:text-fg',
               )}
             >
               {filter.label}
