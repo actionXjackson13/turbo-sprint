@@ -14,7 +14,8 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useGuestSession } from '../../hooks/useGuestSession'
 import { useCatalogSearch } from '../../features/catalog/useCatalogSearch'
-import { MAX_ACTIVE_REQUESTS_PER_GUEST } from '../../data/constants'
+import { FIELD_LIMITS, MAX_ACTIVE_REQUESTS_PER_GUEST } from '../../data/constants'
+import { validateArtist, validateSongTitle } from '../../utils/validation'
 import { getErrorMessage } from '../../utils/errors'
 import type { CatalogSong } from '../../services/catalog/appleCatalog'
 import type { SongRequest } from '../../types/domain'
@@ -36,6 +37,14 @@ export function RequestSongPage() {
   const { event, guest } = useGuestSession()
 
   const [term, setTerm] = useState('')
+  /** Escape hatch when search finds nothing, or cannot be reached at all. */
+  const [manual, setManual] = useState(false)
+  const [title, setTitle] = useState('')
+  const [artist, setArtist] = useState('')
+  const [manualErrors, setManualErrors] = useState<{
+    title?: string
+    artist?: string
+  }>({})
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [voting, setVoting] = useState(false)
 
@@ -73,6 +82,42 @@ export function RequestSongPage() {
         artworkUrl: song.artworkUrl,
         catalogUrl: song.catalogUrl,
       })
+      toast.success('Request sent to the DJ.')
+      navigate(routes.guest.myRequests(eventId))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setSubmittingId(null)
+    }
+  }
+
+  /**
+   * Send a song the catalogue could not supply.
+   *
+   * Search is the good path, but it depends on a third party being reachable
+   * from the guest's phone — and a guest who cannot search must still be able
+   * to ask for a song. This is the original two-field form, kept as a fallback
+   * rather than the front door.
+   */
+  const sendTyped = async (force = false) => {
+    const next = {
+      title: validateSongTitle(title) ?? undefined,
+      artist: validateArtist(artist) ?? undefined,
+    }
+    setManualErrors(next)
+    if (next.title || next.artist) return
+
+    setSubmittingId('manual')
+    try {
+      if (!force) {
+        const match = await service.findSimilarRequest(eventId, title, artist)
+        if (match) {
+          setPending(null)
+          setDuplicate(match)
+          return
+        }
+      }
+      await service.createSongRequest({ eventId, title, artist })
       toast.success('Request sent to the DJ.')
       navigate(routes.guest.myRequests(eventId))
     } catch (err) {
@@ -122,7 +167,9 @@ export function RequestSongPage() {
               size="lg"
               fullWidth
               loading={submittingId !== null}
-              onClick={() => pending && void send(pending, true)}
+              onClick={() =>
+                pending ? void send(pending, true) : void sendTyped(true)
+              }
             >
               Request it anyway
             </AppButton>
@@ -145,24 +192,26 @@ export function RequestSongPage() {
 
   return (
     <>
-      <PageHeader title="Request a song" showBack />
+      <PageHeader title={manual ? 'Type a song' : 'Request a song'} showBack />
 
-      <div className="px-4 pt-2 pb-3">
-        <AppInput
-          label="Search for a song"
-          hideLabel
-          type="search"
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          autoFocus
-          disabled={!canSubmit}
-          placeholder="Song or artist"
-          autoComplete="off"
-          autoCorrect="off"
-        />
-      </div>
+      {!manual && (
+        <div className="px-4 pt-2 pb-3">
+          <AppInput
+            label="Search for a song"
+            hideLabel
+            type="search"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            autoFocus
+            disabled={!canSubmit}
+            placeholder="Song or artist"
+            autoComplete="off"
+            autoCorrect="off"
+          />
+        </div>
+      )}
 
-      <main className="flex-1 px-4 pb-5">
+      <main className="flex-1 px-4 pb-5 pt-2">
         {!canSubmit && (
           <p
             role="status"
@@ -176,48 +225,127 @@ export function RequestSongPage() {
           </p>
         )}
 
-        {error && (
-          <p role="alert" className="mb-4 text-sm text-danger-500">
-            {error}
-          </p>
-        )}
-
-        {loading && results.length === 0 && (
-          <div className="space-y-2">
-            <LoadingSkeleton className="h-16" />
-            <LoadingSkeleton className="h-16" />
-            <LoadingSkeleton className="h-16" />
+        {manual ? (
+          <div className="space-y-4">
+            <AppInput
+              label="Song title"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                setManualErrors((p) => ({ ...p, title: undefined }))
+              }}
+              error={manualErrors.title}
+              maxLength={FIELD_LIMITS.songTitle}
+              autoFocus
+              disabled={!canSubmit}
+              placeholder="Dancing Queen"
+            />
+            <AppInput
+              label="Artist"
+              value={artist}
+              onChange={(e) => {
+                setArtist(e.target.value)
+                setManualErrors((p) => ({ ...p, artist: undefined }))
+              }}
+              error={manualErrors.artist}
+              maxLength={FIELD_LIMITS.artist}
+              disabled={!canSubmit}
+              placeholder="ABBA"
+            />
+            <AppButton
+              size="lg"
+              fullWidth
+              loading={submittingId === 'manual'}
+              disabled={!canSubmit}
+              onClick={() => void sendTyped()}
+            >
+              Send to the DJ
+            </AppButton>
+            <AppButton
+              variant="ghost"
+              size="lg"
+              fullWidth
+              onClick={() => setManual(false)}
+            >
+              Back to search
+            </AppButton>
           </div>
-        )}
+        ) : (
+          <>
+            {error && (
+              <div
+                role="alert"
+                className="mb-4 rounded-control bg-ink-800 p-3 text-sm"
+              >
+                <p className="text-danger-500">{error}</p>
+                <AppButton
+                  variant="secondary"
+                  fullWidth
+                  className="mt-3"
+                  onClick={() => setManual(true)}
+                >
+                  Type the song in instead
+                </AppButton>
+              </div>
+            )}
 
-        {empty && (
-          <EmptyState
-            title="No songs found"
-            description="Try the artist's name, or a different spelling."
-          />
-        )}
+            {loading && results.length === 0 && (
+              <div className="space-y-2">
+                <LoadingSkeleton className="h-16" />
+                <LoadingSkeleton className="h-16" />
+                <LoadingSkeleton className="h-16" />
+              </div>
+            )}
 
-        {results.length > 0 && (
-          <ul className="space-y-2">
-            {results.map((song) => (
-              <li key={song.id}>
-                <SongResult
-                  song={song}
-                  disabled={!canSubmit || submittingId !== null}
-                  pending={submittingId === song.id}
-                  onSelect={() => void send(song)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+            {empty && (
+              <EmptyState
+                title="No songs found"
+                description="Try the artist's name, or a different spelling."
+                action={
+                  <AppButton
+                    variant="secondary"
+                    onClick={() => setManual(true)}
+                  >
+                    Type it in instead
+                  </AppButton>
+                }
+              />
+            )}
 
-        {term.trim().length === 0 && (
-          <p className="px-1 text-sm text-fg-muted">
-            Search Apple Music for the song you want. You can have up to{' '}
-            {MAX_ACTIVE_REQUESTS_PER_GUEST} requests waiting at once — your own
-            counts as its first vote.
-          </p>
+            {results.length > 0 && (
+              <ul className="space-y-2">
+                {results.map((song) => (
+                  <li key={song.id}>
+                    <SongResult
+                      song={song}
+                      disabled={!canSubmit || submittingId !== null}
+                      pending={submittingId === song.id}
+                      onSelect={() => void send(song)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {term.trim().length === 0 && (
+              <p className="px-1 text-sm text-fg-muted">
+                Search for the song you want. You can have up to{' '}
+                {MAX_ACTIVE_REQUESTS_PER_GUEST} requests waiting at once — your
+                own counts as its first vote.
+              </p>
+            )}
+
+            {/* Always reachable, not only after a failure — the catalogue does
+                not have everything, and a guest should never be stuck. */}
+            <AppButton
+              variant="ghost"
+              fullWidth
+              className="mt-4"
+              onClick={() => setManual(true)}
+            >
+              Can't find it? Type it in
+            </AppButton>
+          </>
         )}
       </main>
     </>

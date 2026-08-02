@@ -63,7 +63,10 @@ export async function searchCatalog(
   } catch (err) {
     // An aborted request is the caller superseding it, not a failure.
     if (err instanceof DOMException && err.name === 'AbortError') throw err
-    throw new ServiceError('network', 'Could not reach song search.')
+    throw new ServiceError(
+      'network',
+      'Could not reach song search. Check your connection, or type the song in below.',
+    )
   }
 
   if (response.status === 403 || response.status === 429) {
@@ -73,7 +76,10 @@ export async function searchCatalog(
     )
   }
   if (!response.ok) {
-    throw new ServiceError('network', 'Song search is unavailable right now.')
+    throw new ServiceError(
+      'network',
+      'Song search is unavailable right now. You can type the song in below.',
+    )
   }
 
   const body = (await response.json()) as { results?: ItunesResult[] }
