@@ -311,6 +311,19 @@ export class SupabaseService implements DataService {
     return count ?? 0
   }
 
+  async listEventGuests(eventId: string): Promise<EventGuest[]> {
+    // RLS decides what comes back: the owning DJ sees every guest, a guest
+    // sees only themselves. No extra filtering is needed here.
+    const { data, error } = await this.db
+      .from('event_guests')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('joined_at', { ascending: true })
+
+    if (error) translateError(error, 'Could not load the guest list.')
+    return (data ?? []).map(toEventGuest)
+  }
+
   async setGuestBlocked(
     eventId: string,
     guestId: string,

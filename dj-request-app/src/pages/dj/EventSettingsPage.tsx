@@ -5,7 +5,9 @@ import {
   AppCard,
   AppInput,
   ConfirmationDialog,
+  GuestManager,
   PageHeader,
+  Section,
   StatusBadge,
 } from '../../components'
 import { routes } from '../../lib/router'
@@ -128,6 +130,10 @@ export function EventSettingsPage() {
             </div>
           </dl>
         </AppCard>
+
+        <Section title={`Guests (${guestCount})`}>
+          <GuestManager eventId={eventId} />
+        </Section>
 
         {event.status === 'active' && (
           <AppButton

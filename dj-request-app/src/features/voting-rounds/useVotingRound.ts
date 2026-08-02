@@ -4,6 +4,7 @@ import { useLiveData } from '../../hooks/useAsyncData'
 import { useCountdown } from '../../hooks/useCountdown'
 import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
+import { haptic } from '../../utils/haptics'
 import type { VotingRoundResults } from '../../types/domain'
 
 export interface VotingRoundState {
@@ -64,6 +65,7 @@ export function useVotingRound(eventId: string): VotingRoundState {
   const castVote = useCallback(
     async (optionId: string) => {
       setCastingOptionId(optionId)
+      haptic('tap')
       try {
         if (!round) return
         await service.castRoundVote(round.id, optionId)

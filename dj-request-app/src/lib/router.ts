@@ -23,6 +23,7 @@ export const routes = {
     dashboard: '/dj',
     createEvent: '/dj/events/new',
     event: (eventId = ':eventId') => `/dj/events/${eventId}`,
+    share: (eventId = ':eventId') => `/dj/events/${eventId}/share`,
     requests: (eventId = ':eventId') => `/dj/events/${eventId}/requests`,
     queue: (eventId = ':eventId') => `/dj/events/${eventId}/queue`,
     createVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote/new`,

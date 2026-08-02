@@ -20,6 +20,8 @@ export {
   type BottomNavigationProps,
 } from './BottomNavigation'
 export { NavIcons } from './navIcons'
+export { QrCode, type QrCodeProps } from './QrCode'
+export { GuestManager, type GuestManagerProps } from './GuestManager'
 export { StatusBadge } from './StatusBadge'
 export { SongRequestCard, type SongRequestCardProps } from './SongRequestCard'
 export { VotingOptionCard, type VotingOptionCardProps } from './VotingOptionCard'

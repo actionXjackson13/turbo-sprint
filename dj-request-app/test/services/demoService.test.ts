@@ -204,6 +204,44 @@ describe('DemoService', () => {
       ).rejects.toMatchObject({ code: 'blocked' })
     })
 
+    it('lets a blocked guest be unblocked and request again', async () => {
+      await service.signInDj(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
+      const guest = await service.getGuestSession(eventId)
+
+      await service.setGuestBlocked(eventId, guest!.id, true)
+      await expect(
+        service.createSongRequest({
+          eventId,
+          title: 'While Blocked',
+          artist: 'Someone',
+        }),
+      ).rejects.toMatchObject({ code: 'blocked' })
+
+      // Blocking was a one-way door in the UI until the guest manager landed;
+      // this pins the round trip so it cannot regress.
+      await service.setGuestBlocked(eventId, guest!.id, false)
+      const created = await service.createSongRequest({
+        eventId,
+        title: 'After Unblock',
+        artist: 'Someone',
+      })
+      expect(created.title).toBe('After Unblock')
+    })
+
+    it('lists every guest at the event with their blocked state', async () => {
+      await service.signInDj(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
+      const guests = await service.listEventGuests(eventId)
+
+      expect(guests.length).toBeGreaterThan(1)
+      expect(guests.every((g) => g.eventId === eventId)).toBe(true)
+      expect(guests.every((g) => g.isBlocked === false)).toBe(true)
+
+      const target = guests[1]!
+      await service.setGuestBlocked(eventId, target.id, true)
+      const after = await service.listEventGuests(eventId)
+      expect(after.find((g) => g.id === target.id)?.isBlocked).toBe(true)
+    })
+
     it('gives a new request a founding vote', async () => {
       const created = await service.createSongRequest({
         eventId,

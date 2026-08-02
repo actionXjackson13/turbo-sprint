@@ -3,6 +3,7 @@ import { useService } from '../../hooks/useService'
 import { useLiveData } from '../../hooks/useAsyncData'
 import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
+import { haptic } from '../../utils/haptics'
 import type { RequestSort, RequestStatus, SongRequest } from '../../types/domain'
 
 export interface EventRequestsState {
@@ -64,6 +65,9 @@ export function useEventRequests(
       if (isOwn && myVotes.has(request.id)) return
 
       setPendingVotes((prev) => new Set(prev).add(request.id))
+      // Confirms the tap landed without asking a guest to watch for a colour
+      // change in a dark, loud room.
+      haptic('tap')
       try {
         if (myVotes.has(request.id)) {
           await service.removeRequestVote(request.id)

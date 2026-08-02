@@ -24,6 +24,7 @@ import { SignInPage } from './pages/dj/SignInPage'
 import { SignUpPage } from './pages/dj/SignUpPage'
 import { DjDashboardPage } from './pages/dj/DjDashboardPage'
 import { CreateEventPage } from './pages/dj/CreateEventPage'
+import { ShareEventPage } from './pages/dj/ShareEventPage'
 import { EventControlPanelPage } from './pages/dj/EventControlPanelPage'
 import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
@@ -105,6 +106,15 @@ export default function App() {
                   element={
                     <RequireDj>
                       <CreateEventPage />
+                    </RequireDj>
+                  }
+                />
+                {/* Full-screen by design — this one is meant to be held up. */}
+                <Route
+                  path="/dj/events/:eventId/share"
+                  element={
+                    <RequireDj>
+                      <ShareEventPage />
                     </RequireDj>
                   }
                 />

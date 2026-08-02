@@ -122,6 +122,11 @@ export interface DataService {
   /** The current guest's membership row, or null if they have not joined. */
   getGuestSession(eventId: string): Promise<EventGuest | null>
   getEventGuestCount(eventId: string): Promise<number>
+  /**
+   * Everyone who has joined. DJ-only in practice: RLS lets a guest read just
+   * their own membership row, so this returns a single entry for a guest.
+   */
+  listEventGuests(eventId: string): Promise<EventGuest[]>
   /** DJ-only. Prevents the guest from submitting further requests. */
   setGuestBlocked(
     eventId: string,

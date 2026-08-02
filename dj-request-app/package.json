@@ -16,6 +16,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",
     "clsx": "^2.1.1",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"
@@ -31,6 +32,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "jsdom": "^30.0.1",
+    "jsqr": "^1.4.0",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",

@@ -334,6 +334,33 @@ export function EventControlPanelPage() {
               </AppButton>
             </div>
 
+            {/* Reading a code across a dark room is the biggest drop-off in the
+                whole guest flow; this is the way out of it. */}
+            <AppButton
+              fullWidth
+              className="mt-3"
+              onClick={() => navigate(routes.dj.share(eventId))}
+              leadingIcon={
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <path d="M14 14h3v3h-3zM20 14h1M14 20h3M20 20h1" />
+                </svg>
+              }
+            >
+              Show QR to the room
+            </AppButton>
+
             {/* The current mode is shown as *selected*, not disabled.
                 Disabling it greyed out the active choice, which read as
                 "unavailable" rather than "this is what's on" — and dropped its

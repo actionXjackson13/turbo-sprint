@@ -314,6 +314,13 @@ export class DemoService implements DataService {
     return getDb().guests.filter((g) => g.eventId === eventId).length
   }
 
+  async listEventGuests(eventId: string): Promise<EventGuest[]> {
+    return getDb()
+      .guests.filter((g) => g.eventId === eventId)
+      .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))
+      .map(clone)
+  }
+
   async setGuestBlocked(
     eventId: string,
     guestId: string,

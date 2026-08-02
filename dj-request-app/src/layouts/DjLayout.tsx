@@ -14,6 +14,7 @@ import { isDemoMode } from '../lib/env'
 import { DjEventProvider } from '../contexts/DjEventProvider'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
+import { useWakeLock } from '../hooks/useWakeLock'
 
 /**
  * Shell for the DJ's per-event screens. The dashboard and create-event screens
@@ -22,6 +23,12 @@ import { useDjAuth } from '../hooks/useDjAuth'
 export function DjLayout() {
   const { eventId } = useParams<{ eventId: string }>()
   const { profile, loading } = useDjAuth()
+
+  // The DJ's screens double as a glanceable display mid-set; locking every
+  // thirty seconds and having to unlock one-handed is the wrong interaction
+  // while mixing. Guest screens deliberately do not do this — it is the DJ's
+  // battery to spend, not a guest's.
+  useWakeLock(Boolean(profile))
 
   if (loading) {
     return (

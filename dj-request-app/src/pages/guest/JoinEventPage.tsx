@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AppButton, AppInput } from '../../components'
 import { AuthLayout } from '../../layouts/AuthLayout'
 import { routes } from '../../lib/router'
@@ -8,6 +8,7 @@ import { validateEventCode } from '../../utils/validation'
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
 import { EVENT_CODE_LENGTH } from '../../data/constants'
 import { getErrorMessage } from '../../utils/errors'
+import { readCodeFromSearch } from '../../utils/joinLink'
 
 /**
  * Step one of joining: find the event by its code. The display name is asked
@@ -16,8 +17,12 @@ import { getErrorMessage } from '../../utils/errors'
 export function JoinEventPage() {
   const navigate = useNavigate()
   const service = useService()
+  const location = useLocation()
 
-  const [code, setCode] = useState('')
+  // A guest arriving from the DJ's QR code already has the code; typing it
+  // again would defeat the point of scanning.
+  const prefilled = readCodeFromSearch(location.search)
+  const [code, setCode] = useState(prefilled ?? '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
