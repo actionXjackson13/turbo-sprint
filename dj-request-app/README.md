@@ -186,8 +186,9 @@ back to demo mode.
 6. **Requests** tab: filter by status, sort newest or top-voted, and
    accept / queue / decline / mark played / remove, or block a guest. Vote
    tallies show on every card.
-7. **Queue** tab: reorder with the up/down controls, **Play now** to set the
-   current track.
+7. **Queue** tab: hold the grip and drag a song up or down, or tap its number
+   and pick a slot. **Play now** sets the current track. See
+   [Reordering the queue](#reordering-the-queue).
 8. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
    end it early, then **Add to queue** for the winner.
 9. **Settings**: rename, end the event, reset demo data.
@@ -400,6 +401,28 @@ remove from the queue, reopen, delete, block a guest. The sheet asks
 `cardActionLabels` what the card is already showing and leaves those out, so
 the two never appear twice. Both DJ screens render the same card actions from
 `pages/dj/requestActions.tsx`.
+
+---
+
+## Reordering the queue
+
+Two ways, because they suit different moves.
+
+**Hold the grip, then drag.** The three-line handle sits where the up/down
+arrows used to. It takes a 500ms hold before the row lifts — the queue is
+scrolled far more often than it is reordered, and without the delay every
+scroll of the list risks dragging a song. The row outlines and follows the
+finger, the rest glide out of its way, and a short buzz marks the lift, each
+slot crossed, and the drop.
+
+**Tap the number, pick a slot.** Dragging is fine for a place or two and
+tedious from tenth to second. The position chip opens a menu of every slot;
+choosing one moves that song there and pushes the rest down. It also keeps
+reordering reachable without a pointer — a drag is not something a keyboard or
+switch user can perform, and this is the same operation as a list of buttons.
+
+Both paths end in the same single `reorderQueue` write, so a half-finished
+drag never leaves the queue in a partial state.
 
 ---
 
