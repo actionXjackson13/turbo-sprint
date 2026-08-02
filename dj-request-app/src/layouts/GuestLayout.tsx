@@ -12,6 +12,7 @@ import { routes } from '../lib/router'
 import { isDemoMode } from '../lib/env'
 import { GuestSessionProvider } from '../contexts/GuestSessionProvider'
 import { useGuestSession } from '../hooks/useGuestSession'
+import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 
 /**
  * Shell for every in-event guest screen: session provider, scrollable content,
@@ -22,29 +23,57 @@ export function GuestLayout() {
 
   if (!eventId) return <Navigate to={routes.guest.join} replace />
 
-  const items: NavItem[] = [
-    {
-      to: routes.guest.home(eventId),
-      label: 'Event',
-      icon: NavIcons.home,
-      end: true,
-    },
-    { to: routes.guest.request(eventId), label: 'Request', icon: NavIcons.add },
-    { to: routes.guest.voting(eventId), label: 'Vote', icon: NavIcons.vote },
-    { to: routes.guest.myRequests(eventId), label: 'Mine', icon: NavIcons.list },
-  ]
-
   return (
     <GuestSessionProvider eventId={eventId}>
       <RootLayout hasBottomNav>
         <GuestGate>
           <Outlet />
         </GuestGate>
-        <BottomNavigation items={items} />
+        <GuestNav eventId={eventId} />
         {isDemoMode() && <DemoSwitcher eventId={eventId} view="guest" />}
       </RootLayout>
     </GuestSessionProvider>
   )
+}
+
+/**
+ * Four destinations, no actions.
+ *
+ * "Request a song" used to sit here, which put a verb among a list of places
+ * and left nowhere to browse what everyone else had asked for. Composing a
+ * request is now a button on the screens where you would want one.
+ */
+function GuestNav({ eventId }: { eventId: string }) {
+  const { results } = useVotingRound(eventId)
+  const voteOpen = results?.round.status === 'active'
+
+  const items: NavItem[] = [
+    {
+      to: routes.guest.home(eventId),
+      label: 'Home',
+      icon: NavIcons.home,
+      end: true,
+    },
+    {
+      to: routes.guest.requests(eventId),
+      label: 'Requests',
+      icon: NavIcons.list,
+    },
+    {
+      to: routes.guest.voting(eventId),
+      label: 'Vote',
+      icon: NavIcons.vote,
+      disabled: !voteOpen,
+      disabledReason: 'No vote running yet',
+    },
+    {
+      to: routes.guest.myRequests(eventId),
+      label: 'My Songs',
+      icon: NavIcons.note,
+    },
+  ]
+
+  return <BottomNavigation items={items} />
 }
 
 /**

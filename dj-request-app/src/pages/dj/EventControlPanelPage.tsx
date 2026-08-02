@@ -21,6 +21,8 @@ import { useEventRequests } from '../../features/requests/useEventRequests'
 import { selectMostWanted } from '../../features/requests/requestLists'
 import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
+import { RequestActionSheet } from './RequestActionSheet'
+import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
 import { formatCountdown } from '../../utils/formatRelativeTime'
@@ -35,6 +37,9 @@ type RequestView = 'new' | 'wanted'
 /** How many of the queue to preview before sending the DJ to the Queue tab. */
 const QUEUE_PREVIEW = 3
 
+/** How much of each list the control panel previews before handing off. */
+const PREVIEW = 3
+
 export function EventControlPanelPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
@@ -48,6 +53,7 @@ export function EventControlPanelPage() {
   const { results, secondsRemaining } = useVotingRound(eventId)
 
   const [busy, setBusy] = useState(false)
+  const [sheetFor, setSheetFor] = useState<SongRequest | null>(null)
   const [view, setView] = useState<RequestView>('new')
   const { playNext, pendingId } = usePlayNext(eventId, reload)
 
@@ -235,7 +241,10 @@ export function EventControlPanelPage() {
               value={view}
               onChange={setView}
               options={[
-                { value: 'new', label: `New${pending.length ? ` ${pending.length}` : ''}` },
+                {
+                  value: 'new',
+                  label: `New${pending.length ? ` ${pending.length}` : ''}`,
+                },
                 { value: 'wanted', label: 'Most wanted' },
               ]}
             />
@@ -254,29 +263,23 @@ export function EventControlPanelPage() {
             />
           ) : (
             <div className="space-y-2">
-              {visible.map((request) => (
+              {visible.slice(0, PREVIEW).map((request) => (
                 <SongRequestCard
                   key={request.id}
                   request={request}
                   showVoteCount
                   showStatus={view === 'wanted'}
+                  onMore={() => setSheetFor(request)}
                   actions={
-                    <QuickActions
+                    <CardActions
                       request={request}
-                      onAction={quickAction}
-                      onPlayNext={() => void playNext(request)}
                       playNextPending={pendingId === request.id}
+                      onPlayNext={() => void playNext(request)}
+                      onSetStatus={quickAction}
                     />
                   }
                 />
               ))}
-              <AppButton
-                variant="secondary"
-                fullWidth
-                onClick={() => navigate(routes.dj.requests(eventId))}
-              >
-                Manage all requests
-              </AppButton>
             </div>
           )}
         </Section>
@@ -403,70 +406,13 @@ export function EventControlPanelPage() {
           </AppCard>
         </Section>
       </main>
-    </>
-  )
-}
 
-/**
- * The moves that make sense for a request's current status. The list spans
- * every stage when ordered by votes, so the buttons follow the request rather
- * than the list it appears in.
- *
- * **Play next** is offered at every stage and leads, because it is the move a
- * DJ reaches for when they spot the song the room wants — it jumps the queue
- * rather than joining the back of it, which is all **Queue** does. For a
- * request that is already queued it is the only action worth a tap here;
- * retiring a song is the Queue tab's job, or happens on its own when it plays.
- *
- * Destructive moves (remove, block) live on the Requests screen, behind a
- * confirmation, rather than one stray tap away here.
- */
-function QuickActions({
-  request,
-  onAction,
-  onPlayNext,
-  playNextPending,
-}: {
-  request: SongRequest
-  onAction: (id: string, status: RequestStatus) => void
-  onPlayNext: () => void
-  playNextPending: boolean
-}) {
-  return (
-    <>
-      <AppButton size="sm" loading={playNextPending} onClick={onPlayNext}>
-        Play next
-      </AppButton>
-
-      {request.status !== 'queued' && (
-        <AppButton
-          size="sm"
-          variant="success"
-          onClick={() => onAction(request.id, 'queued')}
-        >
-          Queue
-        </AppButton>
-      )}
-
-      {request.status === 'pending' && (
-        <AppButton
-          size="sm"
-          variant="secondary"
-          onClick={() => onAction(request.id, 'accepted')}
-        >
-          Accept
-        </AppButton>
-      )}
-
-      {request.status !== 'queued' && (
-        <AppButton
-          size="sm"
-          variant="ghost"
-          onClick={() => onAction(request.id, 'declined')}
-        >
-          Decline
-        </AppButton>
-      )}
+      <RequestActionSheet
+        request={sheetFor}
+        onClose={() => setSheetFor(null)}
+        onSetStatus={quickAction}
+        onPlayNext={(request) => void playNext(request)}
+      />
     </>
   )
 }

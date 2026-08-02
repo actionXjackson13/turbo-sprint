@@ -23,7 +23,12 @@ export interface SongRequestCardProps {
   /** Makes the card body activate this handler (navigate to details). */
   onOpen?: () => void
   showStatus?: boolean
-  /** DJ action buttons rendered beneath the card body. */
+  /** Opens the overflow sheet. Rendered as a quiet trailing control. */
+  onMore?: () => void
+  /**
+   * The one or two moves worth a tap from a list. Everything else belongs
+   * behind `onMore` — a card offering seven equal buttons offers none.
+   */
   actions?: ReactNode
   className?: string
 }
@@ -38,6 +43,7 @@ export function SongRequestCard({
   onVoteToggle,
   onOpen,
   showStatus = true,
+  onMore,
   actions,
   className,
 }: SongRequestCardProps) {
@@ -111,9 +117,28 @@ export function SongRequestCard({
         )}
       </div>
 
-      {actions && (
-        <div className="flex flex-wrap gap-1.5 border-t border-hairline px-3.5 py-2.5">
+      {(actions || onMore) && (
+        <div className="flex items-center gap-1.5 border-t border-hairline px-3.5 py-2.5">
           {actions}
+          {onMore && (
+            <button
+              type="button"
+              onClick={onMore}
+              aria-label={`More actions for ${request.title}`}
+              className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-control text-fg-subtle hover:bg-ink-800 hover:text-fg"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <circle cx="5" cy="12" r="1.75" />
+                <circle cx="12" cy="12" r="1.75" />
+                <circle cx="19" cy="12" r="1.75" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
     </article>

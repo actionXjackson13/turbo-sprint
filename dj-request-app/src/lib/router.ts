@@ -10,6 +10,9 @@ export const routes = {
     join: '/join',
     displayName: '/join/name',
     home: (eventId = ':eventId') => `/e/${eventId}`,
+    /** Browse everything the room has asked for. */
+    requests: (eventId = ':eventId') => `/e/${eventId}/requests`,
+    /** Compose a new request — an action, so it stays off the bottom nav. */
     request: (eventId = ':eventId') => `/e/${eventId}/request`,
     requestDetails: (eventId = ':eventId', requestId = ':requestId') =>
       `/e/${eventId}/request/${requestId}`,

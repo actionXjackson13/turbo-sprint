@@ -15,6 +15,7 @@ import { WelcomePage } from './pages/guest/WelcomePage'
 import { JoinEventPage } from './pages/guest/JoinEventPage'
 import { DisplayNamePage } from './pages/guest/DisplayNamePage'
 import { EventHomePage } from './pages/guest/EventHomePage'
+import { RequestsPage } from './pages/guest/RequestsPage'
 import { RequestSongPage } from './pages/guest/RequestSongPage'
 import { RequestDetailsPage } from './pages/guest/RequestDetailsPage'
 import { MyRequestsPage } from './pages/guest/MyRequestsPage'
@@ -79,6 +80,7 @@ export default function App() {
                 {/* In-event guest screens share the session provider and nav */}
                 <Route path="/e/:eventId" element={<GuestLayout />}>
                   <Route index element={<EventHomePage />} />
+                  <Route path="requests" element={<RequestsPage />} />
                   <Route path="request" element={<RequestSongPage />} />
                   <Route
                     path="request/:requestId"

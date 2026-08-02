@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import clsx from 'clsx'
 import {
-  AppButton,
   ConfirmationDialog,
   EmptyState,
   PageHeader,
@@ -14,6 +13,8 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
+import { RequestActionSheet } from './RequestActionSheet'
+import { CardActions } from './requestActions'
 import { getErrorMessage } from '../../utils/errors'
 import type { RequestSort, RequestStatus, SongRequest } from '../../types/domain'
 
@@ -31,6 +32,7 @@ export function ManageRequestsPage() {
 
   const [filterIndex, setFilterIndex] = useState(0)
   const [sort, setSort] = useState<RequestSort>('newest')
+  const [sheetFor, setSheetFor] = useState<SongRequest | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<SongRequest | null>(null)
   const [confirmBlock, setConfirmBlock] = useState<SongRequest | null>(null)
   const [dialogBusy, setDialogBusy] = useState(false)
@@ -149,14 +151,13 @@ export function ManageRequestsPage() {
                 key={request.id}
                 request={request}
                 showVoteCount
+                onMore={() => setSheetFor(request)}
                 actions={
-                  <RequestActions
+                  <CardActions
                     request={request}
-                    onSetStatus={setStatus}
-                    onPlayNext={() => void playNext(request)}
                     playNextPending={pendingId === request.id}
-                    onRemove={() => setConfirmRemove(request)}
-                    onBlock={() => setConfirmBlock(request)}
+                    onPlayNext={() => void playNext(request)}
+                    onSetStatus={setStatus}
                   />
                 }
               />
@@ -164,6 +165,15 @@ export function ManageRequestsPage() {
           </div>
         )}
       </main>
+
+      <RequestActionSheet
+        request={sheetFor}
+        onClose={() => setSheetFor(null)}
+        onSetStatus={setStatus}
+        onPlayNext={(request) => void playNext(request)}
+        onRemove={setConfirmRemove}
+        onBlock={setConfirmBlock}
+      />
 
       <ConfirmationDialog
         open={confirmRemove !== null}
@@ -190,126 +200,6 @@ export function ManageRequestsPage() {
         onConfirm={blockGuest}
         onCancel={() => setConfirmBlock(null)}
       />
-    </>
-  )
-}
-
-/** Actions vary by status so the DJ only sees the moves that make sense. */
-function RequestActions({
-  request,
-  onSetStatus,
-  onPlayNext,
-  playNextPending,
-  onRemove,
-  onBlock,
-}: {
-  request: SongRequest
-  onSetStatus: (id: string, status: RequestStatus) => void
-  onPlayNext: () => void
-  playNextPending: boolean
-  onRemove: () => void
-  onBlock: () => void
-}) {
-  const live =
-    request.status === 'pending' ||
-    request.status === 'accepted' ||
-    request.status === 'queued'
-
-  return (
-    <>
-      {/* Jumps the queue, where Queue joins the back of it. Offered wherever
-          the request is still live — a song already played or turned down
-          goes through Reopen first. */}
-      {live && (
-        <AppButton size="sm" loading={playNextPending} onClick={onPlayNext}>
-          Play next
-        </AppButton>
-      )}
-
-      {request.status === 'pending' && (
-        <>
-          <AppButton
-            size="sm"
-            variant="success"
-            onClick={() => onSetStatus(request.id, 'queued')}
-          >
-            Queue
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="secondary"
-            onClick={() => onSetStatus(request.id, 'accepted')}
-          >
-            Accept
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="ghost"
-            onClick={() => onSetStatus(request.id, 'declined')}
-          >
-            Decline
-          </AppButton>
-        </>
-      )}
-
-      {request.status === 'accepted' && (
-        <>
-          <AppButton
-            size="sm"
-            variant="success"
-            onClick={() => onSetStatus(request.id, 'queued')}
-          >
-            Queue
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="ghost"
-            onClick={() => onSetStatus(request.id, 'declined')}
-          >
-            Decline
-          </AppButton>
-        </>
-      )}
-
-      {request.status === 'queued' && (
-        <>
-          <AppButton
-            size="sm"
-            variant="success"
-            onClick={() => onSetStatus(request.id, 'played')}
-          >
-            Mark played
-          </AppButton>
-          <AppButton
-            size="sm"
-            variant="secondary"
-            onClick={() => onSetStatus(request.id, 'accepted')}
-          >
-            Unqueue
-          </AppButton>
-        </>
-      )}
-
-      {(request.status === 'played' || request.status === 'declined') && (
-        <AppButton
-          size="sm"
-          variant="secondary"
-          onClick={() => onSetStatus(request.id, 'pending')}
-        >
-          Reopen
-        </AppButton>
-      )}
-
-      <AppButton size="sm" variant="ghost" onClick={onRemove}>
-        Remove
-      </AppButton>
-
-      {/* Winners promoted from a vote have no guest to block. */}
-      {request.guestId && (
-        <AppButton size="sm" variant="ghost" onClick={onBlock}>
-          Block guest
-        </AppButton>
-      )}
     </>
   )
 }

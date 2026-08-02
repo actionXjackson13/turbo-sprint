@@ -166,7 +166,7 @@ back to demo mode.
    request's founding vote is locked.
 7. **Requests** is one list — toggle it between **Most wanted** and
    **Newest**. See [Request lists](#request-lists).
-8. **Mine** shows your requests and their live status.
+8. **My Songs** shows your requests and their live status.
 9. **Vote** shows the active round; pick a song, then pick another to change
    your vote — the total does not increase.
 
@@ -367,6 +367,38 @@ A request already queued shows Play next as its only action on the control
 panel — retiring a song is the Queue tab's job, or happens on its own when the
 next one starts. Played and declined requests get **Reopen** instead; they go
 back through the normal flow rather than jumping the queue from the dead.
+
+---
+
+## Navigation
+
+Four tabs each, and every tab is a place rather than an action.
+
+| | Tabs |
+| --- | --- |
+| **Guest** | Home · Requests · Vote · My Songs |
+| **DJ** | Control · Requests · Queue · Settings |
+
+**Home** answers "what now?": what is playing, a vote only while one is
+running, **Request Song**, and the three most popular requests behind a
+**View all**. Browsing and ordering live on the **Requests** tab, which is the
+slot the compose action used to occupy — a verb sitting among destinations,
+with no way to see past the first few songs.
+
+**Vote** greys out, with a reason, when no round is running. It keeps its slot
+rather than appearing and disappearing, so the tabs beside it never move.
+
+The DJ's **Vote** came off the bar: it is used a handful of times a night and
+is reached from Control, where the DJ already is.
+
+### Request cards
+
+A card carries at most two buttons — normally **Play Next** and **Add to
+Queue** — plus **⋯**, which opens the rest: accept, decline, mark as played,
+remove from the queue, reopen, delete, block a guest. The sheet asks
+`cardActionLabels` what the card is already showing and leaves those out, so
+the two never appear twice. Both DJ screens render the same card actions from
+`pages/dj/requestActions.tsx`.
 
 ---
 

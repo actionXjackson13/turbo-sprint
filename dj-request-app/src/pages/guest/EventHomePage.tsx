@@ -1,13 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AppButton,
   AppCard,
-  EmptyState,
   NowPlayingCard,
   PageHeader,
   Section,
-  SegmentedControl,
+  SectionLink,
   SongRequestListSkeleton,
   SongRequestCard,
   StatusBadge,
@@ -15,15 +14,13 @@ import {
 import { routes } from '../../lib/router'
 import { useGuestSession } from '../../hooks/useGuestSession'
 import { useEventRequests } from '../../features/requests/useEventRequests'
-import {
-  selectMostWanted,
-  selectRecent,
-} from '../../features/requests/requestLists'
+import { selectMostWanted } from '../../features/requests/requestLists'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { formatCountdown } from '../../utils/formatRelativeTime'
 
-type RequestView = 'wanted' | 'recent'
+/** A taste of what the room wants — the full list is one tap away. */
+const HOME_PREVIEW = 3
 
 export function EventHomePage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -35,12 +32,12 @@ export function EventHomePage() {
     useEventRequests(eventId)
   const { results, secondsRemaining } = useVotingRound(eventId)
 
-  // One list, two orderings. Showing "most wanted" and "just requested" as
-  // separate sections meant the same handful of songs appeared twice.
-  const [view, setView] = useState<RequestView>('wanted')
-  const visible = useMemo(
-    () => (view === 'wanted' ? selectMostWanted(requests) : selectRecent(requests)),
-    [requests, view],
+  // A taste of what the room wants. Browsing and ordering live on the
+  // Requests tab: a home screen should answer "what now?", not "show me
+  // everything sorted how I like".
+  const popular = useMemo(
+    () => selectMostWanted(requests, HOME_PREVIEW),
+    [requests],
   )
 
   const activeRound =
@@ -132,34 +129,30 @@ export function EventHomePage() {
           )}
         </div>
 
-        <Section
-          title="Requests"
-          action={
-            <SegmentedControl
-              label="Order requests by"
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'wanted', label: 'Most wanted' },
-                { value: 'recent', label: 'Newest' },
-              ]}
-            />
-          }
-        >
-          {loading && requests.length === 0 ? (
-            <SongRequestListSkeleton count={3} />
-          ) : visible.length === 0 ? (
-            <EmptyState
-              title="No requests yet"
-              description="Be the first to ask for a song."
-            />
-          ) : (
+        {/* Hidden entirely when there is nothing to show, rather than an
+            empty card saying so. */}
+        {loading && requests.length === 0 ? (
+          <Section title="Popular">
+            <SongRequestListSkeleton count={2} />
+          </Section>
+        ) : popular.length > 0 ? (
+          <Section
+            title="Popular"
+            action={
+              <SectionLink
+                onClick={() => navigate(routes.guest.requests(eventId))}
+              >
+                View all
+              </SectionLink>
+            }
+          >
             <div className="space-y-2">
-              {visible.map((request) => (
+              {popular.map((request) => (
                 <SongRequestCard
                   key={request.id}
                   request={request}
                   showVote
+                  showStatus={false}
                   hasVoted={myVotes.has(request.id)}
                   voteLocked={
                     guest !== null &&
@@ -176,8 +169,8 @@ export function EventHomePage() {
                 />
               ))}
             </div>
-          )}
-        </Section>
+          </Section>
+        ) : null}
       </main>
     </>
   )

@@ -10,6 +10,13 @@ export interface NavItem {
   badge?: number
   /** Match only the exact path — used for index routes. */
   end?: boolean
+  /**
+   * Greys the tab out and blocks navigation. Preferred over dropping the item:
+   * a tab that appears and disappears moves every tab beside it.
+   */
+  disabled?: boolean
+  /** Why the tab is unavailable. Announced, and shown on long press. */
+  disabledReason?: string
 }
 
 export interface BottomNavigationProps {
@@ -28,21 +35,12 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
       )}
     >
       <ul className="flex items-stretch">
-        {items.map((item) => (
-          <li key={item.to} className="flex-1">
-            <NavLink
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                clsx(
-                  'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-1.5',
-                  'text-[0.625rem] font-medium tracking-wide transition-colors',
-                  isActive
-                    ? 'text-brand-400'
-                    : 'text-fg-subtle hover:text-fg-muted',
-                )
-              }
-            >
+        {items.map((item) => {
+          const shape =
+            'relative flex min-h-14 w-full flex-col items-center justify-center gap-1 px-1 py-1.5 text-[0.625rem] font-medium tracking-wide transition-colors'
+
+          const body = (
+            <>
               <span className="relative" aria-hidden="true">
                 {item.icon}
                 {item.badge !== undefined && item.badge > 0 && (
@@ -55,9 +53,41 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
               {item.badge !== undefined && item.badge > 0 && (
                 <span className="sr-only">{item.badge} new</span>
               )}
-            </NavLink>
-          </li>
-        ))}
+            </>
+          )
+
+          return (
+            <li key={item.to} className="flex-1">
+              {item.disabled ? (
+                <span
+                  aria-disabled="true"
+                  title={item.disabledReason}
+                  className={clsx(shape, 'text-fg-subtle/40')}
+                >
+                  {body}
+                  {item.disabledReason && (
+                    <span className="sr-only">{item.disabledReason}</span>
+                  )}
+                </span>
+              ) : (
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    clsx(
+                      shape,
+                      isActive
+                        ? 'text-brand-400'
+                        : 'text-fg-subtle hover:text-fg-muted',
+                    )
+                  }
+                >
+                  {body}
+                </NavLink>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </nav>
   )

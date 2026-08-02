@@ -44,6 +44,8 @@ export function DjLayout() {
   if (!profile) return <Navigate to={routes.dj.signIn} replace />
   if (!eventId) return <Navigate to={routes.dj.dashboard} replace />
 
+  // Four destinations. Vote came off the bar: it is used a handful of times a
+  // night and is reached from the control panel, where the DJ already is.
   const items: NavItem[] = [
     {
       to: routes.dj.event(eventId),
@@ -53,7 +55,6 @@ export function DjLayout() {
     },
     { to: routes.dj.requests(eventId), label: 'Requests', icon: NavIcons.list },
     { to: routes.dj.queue(eventId), label: 'Queue', icon: NavIcons.queue },
-    { to: routes.dj.activeVote(eventId), label: 'Vote', icon: NavIcons.vote },
     {
       to: routes.dj.settings(eventId),
       label: 'Settings',
