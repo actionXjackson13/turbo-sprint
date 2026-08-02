@@ -104,6 +104,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0003_rls_policies.sql'))
     await db.exec(read('0004_realtime.sql'))
     await db.exec(read('0005_fuzzy_dedupe.sql'))
+    await db.exec(read('0006_catalog_metadata.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.

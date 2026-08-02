@@ -57,6 +57,10 @@ export interface CreateRequestInput {
   eventId: string
   title: string
   artist: string
+  /** Set when the song came from catalogue search rather than free text. */
+  catalogId?: string | null
+  artworkUrl?: string | null
+  catalogUrl?: string | null
 }
 
 export interface VotingOptionInput {

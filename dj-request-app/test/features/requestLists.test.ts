@@ -30,6 +30,9 @@ function request(
     status,
     queuePosition: null,
     sourceRoundId: null,
+    catalogId: null,
+    artworkUrl: null,
+    catalogUrl: null,
     createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
     updatedAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
   }

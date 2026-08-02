@@ -274,6 +274,9 @@ function req(input: {
     status: input.status,
     queuePosition: input.queuePosition ?? null,
     sourceRoundId: null,
+    catalogId: null,
+    artworkUrl: null,
+    catalogUrl: null,
     createdAt: minutesAgo(input.minutes),
     updatedAt: minutesAgo(input.minutes),
   }

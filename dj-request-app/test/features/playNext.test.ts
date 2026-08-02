@@ -21,6 +21,9 @@ function queued(id: string, queuePosition: number): SongRequest {
     status: 'queued',
     queuePosition,
     sourceRoundId: null,
+    catalogId: null,
+    artworkUrl: null,
+    catalogUrl: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

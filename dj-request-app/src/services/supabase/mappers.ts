@@ -79,6 +79,9 @@ export function toSongRequest(row: Row): SongRequest {
     status: row.status,
     queuePosition: row.queue_position ?? null,
     sourceRoundId: row.source_round_id ?? null,
+    catalogId: row.catalog_id ?? null,
+    artworkUrl: row.artwork_url ?? null,
+    catalogUrl: row.catalog_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

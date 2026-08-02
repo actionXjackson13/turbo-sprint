@@ -463,6 +463,9 @@ export class DemoService implements DataService {
           status: 'pending',
           queuePosition: null,
           sourceRoundId: null,
+          catalogId: input.catalogId ?? null,
+          artworkUrl: input.artworkUrl ?? null,
+          catalogUrl: input.catalogUrl ?? null,
           createdAt: now,
           updatedAt: now,
         }
@@ -902,6 +905,9 @@ export class DemoService implements DataService {
           status: 'queued',
           queuePosition: positions.length > 0 ? Math.max(...positions) + 1 : 0,
           sourceRoundId: roundId,
+          catalogId: null,
+          artworkUrl: null,
+          catalogUrl: null,
           createdAt: now,
           updatedAt: now,
         }

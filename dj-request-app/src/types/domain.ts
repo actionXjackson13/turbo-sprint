@@ -86,6 +86,15 @@ export interface SongRequest {
   queuePosition: number | null
   /** Set when this row was created by promoting a voting-round winner. */
   sourceRoundId: string | null
+  /**
+   * Apple catalogue identity, when the guest picked a song from search rather
+   * than typing it. Nullable throughout: requests predating search, and vote
+   * winners the DJ typed in, have no catalogue entry and must still work.
+   */
+  catalogId: string | null
+  artworkUrl: string | null
+  /** Opens the track in Apple Music. */
+  catalogUrl: string | null
   createdAt: string
   updatedAt: string
 }

@@ -413,6 +413,9 @@ export class SupabaseService implements DataService {
         p_event_id: input.eventId,
         p_title: input.title.trim(),
         p_artist: input.artist.trim(),
+        p_catalog_id: input.catalogId ?? null,
+        p_artwork_url: input.artworkUrl ?? null,
+        p_catalog_url: input.catalogUrl ?? null,
       })
       .single()
 

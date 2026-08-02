@@ -118,7 +118,7 @@ shows a message saying so.
 
 ### 3. Apply the migrations
 
-Run the five files in `supabase/migrations/` **in order**. Either paste each
+Run the six files in `supabase/migrations/` **in order**. Either paste each
 into the dashboard SQL editor, or use the CLI:
 
 ```bash
@@ -132,6 +132,7 @@ supabase link --project-ref <your-project-ref> && supabase db push
 | `0003_rls_policies.sql` | Row-level security policies and column grants |
 | `0004_realtime.sql` | Realtime publication |
 | `0005_fuzzy_dedupe.sql` | `pg_trgm`, rebuilt normalisation, similarity lookup |
+| `0006_catalog_metadata.sql` | Catalogue id, artwork and link on requests |
 
 ### 4. Configure the app
 
@@ -157,11 +158,12 @@ back to demo mode.
 1. Open the app, tap **Join an event**, enter the code (`PLAY` in demo).
 2. Enter a display name and join.
 3. **Refresh the page** — you stay in the event.
-4. Tap **Request a song**, enter a title and artist, send it.
-5. Request something already on the list — the app offers to upvote the
-   existing request instead. Try it with deliberate mistakes: `Blinding Light`
-   / `The Weekend` still finds `Blinding Lights` / `The Weeknd`. See
-   [Duplicate detection](#duplicate-detection).
+4. Tap **Request a song** and search. Pick a result — the request carries the
+   real title, artist and artwork. See [Song search](#song-search).
+5. Search for something already on the list — the app offers to upvote the
+   existing request instead. Typed-in requests from before search still match
+   through typos: `Blinding Light` / `The Weekend` finds `Blinding Lights` /
+   `The Weeknd`. See [Duplicate detection](#duplicate-detection).
 6. Tap the vote pill on any request to add or remove your vote. Your own
    request's founding vote is locked.
 7. **Requests** is one list — toggle it between **Most wanted** and
@@ -435,6 +437,36 @@ vocabularies.
 
 ---
 
+## Song search
+
+Guests pick a song instead of describing one. Two free-text boxes meant a
+request arrived as whatever someone managed to type, and the DJ had to work
+out what was meant.
+
+Search runs against the **iTunes Search API** — the same catalogue behind Apple
+Music, but the public endpoint. No developer account, no key, no signed token,
+no server of ours: it sends permissive CORS headers, so the browser calls it
+directly. The trade-off is that it returns catalogue metadata only, which is
+all this app needs. Playback stays wherever the DJ already has it; each request
+carries a `music.apple.com` link.
+
+A picked song stores `catalogId`, `artworkUrl` and `catalogUrl` alongside the
+title and artist. All three are nullable and stay that way: requests made
+before search existed have none, and neither do voting-round winners the DJ
+typed. Nothing may assume they are present.
+
+### Rate limiting
+
+The limit is per IP and undocumented — commonly reported around 20 requests a
+minute. Everyone at an event shares the venue's WiFi, so that is one budget for
+the whole room, which is why `useCatalogSearch` waits 400ms after the last
+keystroke and ignores terms under two characters. Typing "mr brightside" costs
+one request rather than thirteen. If a party ever does exhaust it, the guest
+sees "Too many searches at once" and can retry; caching through an Edge
+Function is the fix if it turns out to matter.
+
+---
+
 ## Security model
 
 Guest controls are hidden in the UI where they don't apply, but **the UI is
@@ -516,7 +548,7 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 134 tests:
+`npm run test` runs 140 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
