@@ -177,7 +177,7 @@ back to demo mode.
 3. The **Event** card at the foot of the control panel holds the join code and
    the **Open / Pause / Close** intake toggle — set-up details you need once,
    not all night.
-4. Control panel leads with **Now playing** — **Start next song** promotes the
+4. Control panel leads with **Now playing** — **Play next song** promotes the
    top of the queue in one tap. Below it, the queue preview, then one request
    list toggling between **New** and **Most wanted** (the same ranking the
    guests see). See [Request lists](#request-lists).
@@ -186,11 +186,13 @@ back to demo mode.
 6. **Requests** tab: filter by status, sort newest or top-voted, and
    accept / queue / decline / mark played / remove, or block a guest. Vote
    tallies show on every card.
-7. **Queue** tab: hold the grip and drag a song up or down, or tap its number
-   and pick a slot. **Play now** sets the current track. See
-   [Reordering the queue](#reordering-the-queue).
+7. **Queue** tab: **Play next song** at the top advances the night by one.
+   Each row's **Play next** jumps that song to the front instead. Reorder by
+   holding the grip and dragging, or by tapping a number and picking a slot.
+   See [Reordering the queue](#reordering-the-queue).
 8. **Vote** tab → create a round with 2–4 songs and a duration, watch tallies,
-   end it early, then **Add to queue** for the winner.
+   end it early, then send any option to the queue with **Play next** or
+   **Add to queue**.
 9. **Settings**: rename, end the event, reset demo data.
 
 ### Seeing live updates
@@ -423,6 +425,13 @@ switch user can perform, and this is the same operation as a list of buttons.
 
 Both paths end in the same single `reorderQueue` write, so a half-finished
 drag never leaves the queue in a partial state.
+
+**Play next vs Play next song.** A row's **Play next** moves that song to the
+front of the queue; it does not interrupt what is playing. **Play next song**,
+at the top beside the current track, starts whatever is at the front. One
+decides the order, the other advances the night — the same split the control
+panel uses, and the same wording, so the two screens do not teach different
+vocabularies.
 
 ---
 

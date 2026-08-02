@@ -9,7 +9,10 @@ export interface QueueListProps {
   busy: boolean
   /** Persists a new order. Receives request ids, first to last. */
   onReorder: (orderedIds: string[]) => Promise<void>
-  onPlayNow: (request: SongRequest) => void
+  /** Moves the song to the front of the queue. */
+  onPlayNext: (request: SongRequest) => void
+  /** Id currently being moved, so its button can show progress. */
+  playNextPendingId: string | null
   onMarkPlayed: (request: SongRequest) => void
 }
 
@@ -37,7 +40,8 @@ export function QueueList({
   queue,
   busy,
   onReorder,
-  onPlayNow,
+  onPlayNext,
+  playNextPendingId,
   onMarkPlayed,
 }: QueueListProps) {
   const listRef = useRef<HTMLOListElement>(null)
@@ -215,10 +219,11 @@ export function QueueList({
               <AppButton
                 size="sm"
                 fullWidth
-                disabled={busy || drag !== null}
-                onClick={() => onPlayNow(request)}
+                disabled={busy || drag !== null || index === 0}
+                loading={playNextPendingId === request.id}
+                onClick={() => onPlayNext(request)}
               >
-                Play now
+                Play next
               </AppButton>
               <AppButton
                 size="sm"

@@ -13,6 +13,7 @@ import { routes } from '../../lib/router'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
+import { queueOrderWithFirst } from '../../features/requests/usePlayNext'
 import { formatCountdown } from '../../utils/formatRelativeTime'
 import { getErrorMessage } from '../../utils/errors'
 
@@ -58,12 +59,35 @@ export function ActiveVotingRoundPage() {
     }
   }
 
-  const queueWinner = async (optionId: string) => {
+  /**
+   * Send an option to the queue, optionally to the front of it.
+   *
+   * A finished vote is the moment the DJ decides what happens to the result,
+   * and "the room picked this, play it next" is as common as "add it to the
+   * pile" — so both are offered rather than making the second a trip to the
+   * Queue tab.
+   */
+  const queueOption = async (optionId: string, toFront: boolean) => {
     if (!round) return
     setBusy(true)
     try {
       const queued = await service.pushWinnerToQueue(round.id, optionId)
-      toast.success(`${queued.title} added to the queue.`)
+
+      if (toFront) {
+        const inQueue = await service.listSongRequests(eventId, {
+          statuses: ['queued'],
+        })
+        await service.reorderQueue(
+          eventId,
+          queueOrderWithFirst(inQueue, queued.id),
+        )
+      }
+
+      toast.success(
+        toFront
+          ? `${queued.title} plays next.`
+          : `${queued.title} added to the queue.`,
+      )
       navigate(routes.dj.queue(eventId))
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -141,17 +165,30 @@ export function ActiveVotingRoundPage() {
                 readOnly
               />
               {!isActive && round.status === 'ended' && (
-                <AppButton
-                  variant={
-                    round.winnerOptionId === option.id ? 'primary' : 'secondary'
-                  }
-                  size="sm"
-                  fullWidth
-                  disabled={busy}
-                  onClick={() => queueWinner(option.id)}
-                >
-                  Add to queue
-                </AppButton>
+                <div className="flex gap-2">
+                  <AppButton
+                    variant={
+                      round.winnerOptionId === option.id
+                        ? 'primary'
+                        : 'secondary'
+                    }
+                    size="sm"
+                    fullWidth
+                    disabled={busy}
+                    onClick={() => queueOption(option.id, true)}
+                  >
+                    Play next
+                  </AppButton>
+                  <AppButton
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    disabled={busy}
+                    onClick={() => queueOption(option.id, false)}
+                  >
+                    Add to queue
+                  </AppButton>
+                </div>
               )}
             </div>
           ))}

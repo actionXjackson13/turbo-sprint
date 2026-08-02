@@ -180,7 +180,7 @@ export function EventControlPanelPage() {
                 disabled={busy || !upNext}
                 onClick={() => void startNextSong()}
               >
-                Start next song
+                Play next song
               </AppButton>
             </div>
           </NowPlayingCard>

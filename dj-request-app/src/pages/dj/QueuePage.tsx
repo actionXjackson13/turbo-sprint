@@ -12,6 +12,7 @@ import { useDjEvent } from '../../hooks/useDjEvent'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
+import { usePlayNext } from '../../features/requests/usePlayNext'
 import { QueueList } from './QueueList'
 import { getErrorMessage } from '../../utils/errors'
 import type { SongRequest } from '../../types/domain'
@@ -32,6 +33,7 @@ export function QueuePage() {
 
   const { requests, loading, reload } = useEventRequests(eventId)
   const [busy, setBusy] = useState(false)
+  const { playNext, pendingId } = usePlayNext(eventId, reload)
 
   const queue = useMemo(
     () =>
@@ -62,16 +64,23 @@ export function QueuePage() {
     }
   }
 
-  const playNow = async (request: SongRequest) => {
+  /**
+   * Advance the night by one song, the same gesture the control panel offers.
+   * Promoting a queued request also retires it from the queue, so this is the
+   * whole "next track" move — and it lives at the top, next to what is on.
+   */
+  const startNextSong = async () => {
+    const next = queue[0]
+    if (!next) return
     setBusy(true)
     try {
       await service.setNowPlaying(eventId, {
-        title: request.title,
-        artist: request.artist,
-        sourceRequestId: request.id,
+        title: next.title,
+        artist: next.artist,
+        sourceRequestId: next.id,
       })
       await Promise.all([refresh(), reload()])
-      toast.success(`Now playing ${request.title}`)
+      toast.success(`Now playing ${next.title}`)
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -99,18 +108,28 @@ export function QueuePage() {
         <Section title="Now playing">
           <NowPlayingCard
             nowPlaying={event?.nowPlaying ?? null}
-            emptyHint="Tap “Play now” on a queued song to set it."
+            emptyHint="Nothing playing yet."
           >
-            {event?.nowPlaying && (
+            <div className="space-y-2">
               <AppButton
-                variant="secondary"
+                size="lg"
                 fullWidth
-                disabled={busy}
-                onClick={clearNowPlaying}
+                disabled={busy || queue.length === 0}
+                onClick={() => void startNextSong()}
               >
-                Clear
+                Play next song
               </AppButton>
-            )}
+              {event?.nowPlaying && (
+                <AppButton
+                  variant="ghost"
+                  fullWidth
+                  disabled={busy}
+                  onClick={clearNowPlaying}
+                >
+                  Clear
+                </AppButton>
+              )}
+            </div>
           </NowPlayingCard>
         </Section>
 
@@ -127,7 +146,8 @@ export function QueuePage() {
               queue={queue}
               busy={busy}
               onReorder={reorder}
-              onPlayNow={playNow}
+              onPlayNext={(request) => void playNext(request)}
+              playNextPendingId={pendingId}
               onMarkPlayed={markPlayed}
             />
           )}
