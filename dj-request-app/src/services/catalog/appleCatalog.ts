@@ -1,4 +1,5 @@
 import { ServiceError } from '../types'
+import { searchMusicBrainz } from './musicbrainz'
 
 /**
  * Song lookup against Apple's public catalogue.
@@ -43,7 +44,36 @@ function upscaleArtwork(url: string | undefined): string | null {
   return url.replace(/\/\d+x\d+bb\./, '/300x300bb.')
 }
 
+/**
+ * Search Apple, and fall back to MusicBrainz if Apple cannot be reached.
+ *
+ * The fallback exists because `itunes.apple.com` is on ad-blocker lists, so a
+ * guest running one gets nothing at all — see musicbrainz.ts. It is only ever
+ * reached when the first attempt fails, so the better results stay the
+ * default.
+ */
 export async function searchCatalog(
+  term: string,
+  opts?: { signal?: AbortSignal; limit?: number },
+): Promise<CatalogSong[]> {
+  try {
+    return await searchApple(term, opts)
+  } catch (err) {
+    // An abort is the caller superseding this search, not a failure to reach
+    // anything — retrying elsewhere would race the newer search.
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+
+    try {
+      return await searchMusicBrainz(term, opts)
+    } catch (fallbackErr) {
+      if (fallbackErr instanceof DOMException) throw fallbackErr
+      // Report the first failure: it is the one describing the usual cause.
+      throw err
+    }
+  }
+}
+
+async function searchApple(
   term: string,
   opts?: { signal?: AbortSignal; limit?: number },
 ): Promise<CatalogSong[]> {

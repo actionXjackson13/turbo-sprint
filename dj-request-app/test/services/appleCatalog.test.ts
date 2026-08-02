@@ -74,3 +74,111 @@ describe('searchCatalog', () => {
     await expect(searchCatalog('anything')).rejects.toThrow(DOMException)
   })
 })
+
+/**
+ * The fallback is the whole point of this module for guests running a
+ * blocker: `itunes.apple.com` is on several lists, so for them the first
+ * request never completes.
+ */
+describe('falling back when Apple is unreachable', () => {
+  const mbBody = {
+    recordings: [
+      {
+        id: 'mb-1',
+        title: 'Mr. Brightside',
+        'artist-credit': [{ name: 'The Killers' }],
+        releases: [{ title: 'Hot Fuss' }],
+      },
+      // The same recording again from another release — MusicBrainz lists one
+      // row per release, which would otherwise fill the list with duplicates.
+      {
+        id: 'mb-2',
+        title: 'Mr. Brightside',
+        'artist-credit': [{ name: 'The Killers' }],
+        releases: [{ title: 'Sawdust' }],
+      },
+    ],
+  }
+
+  it('uses MusicBrainz when the Apple request is blocked', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('itunes.apple.com')) {
+        return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mbBody),
+      } as unknown as Response)
+    })
+
+    const songs = await searchCatalog('mr brightside')
+    expect(songs).toHaveLength(1)
+    expect(songs[0]).toMatchObject({
+      title: 'Mr. Brightside',
+      artist: 'The Killers',
+      artworkUrl: null,
+    })
+  })
+
+  it('reports the original failure when neither source answers', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('Failed to fetch'),
+    )
+    await expect(searchCatalog('anything')).rejects.toThrow(
+      /Could not reach song search/,
+    )
+  })
+
+  it('does not fall back when the caller aborted', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new DOMException('aborted', 'AbortError'))
+
+    await expect(searchCatalog('anything')).rejects.toThrow(DOMException)
+    // One attempt only: a superseded search must not race the newer one.
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MusicBrainz ranking', () => {
+  /**
+   * MusicBrainz scores nearly every title match 100, so its own order puts
+   * covers above the recording everyone means. Release count is the signal.
+   */
+  it('ranks the widely released recording above the covers', async () => {
+    const recording = (id: string, artist: string, releases: number) => ({
+      id,
+      title: 'Mr. Brightside',
+      'artist-credit': [{ name: artist }],
+      releases: Array.from({ length: releases }, () => ({ title: 'X' })),
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input).includes('itunes.apple.com')) {
+        return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            recordings: [
+              // MusicBrainz returns the covers first.
+              recording('a', 'A Cappella Group', 1),
+              recording('b', 'Some Cover Band', 1),
+              // Split across rows, as the real API does — one per release.
+              recording('c', 'The Killers', 3),
+              recording('d', 'The Killers', 5),
+            ],
+          }),
+      } as unknown as Response)
+    })
+
+    const songs = await searchCatalog('mr brightside')
+    expect(songs[0]!.artist).toBe('The Killers')
+    // The two Killers rows collapse into one entry.
+    expect(songs.filter((s) => s.artist === 'The Killers')).toHaveLength(1)
+  })
+})

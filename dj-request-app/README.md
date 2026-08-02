@@ -455,6 +455,26 @@ title and artist. All three are nullable and stay that way: requests made
 before search existed have none, and neither do voting-round winners the DJ
 typed. Nothing may assume they are present.
 
+### When Apple is blocked
+
+`itunes.apple.com` is on several ad-blocker lists — not because song search
+tracks anyone, but because Apple serves other things from that host. A guest
+running AdGuard, Brave, or a filtering DNS has the request killed before it
+leaves the phone, and no app-side change fixes that.
+
+So a failed Apple search falls through to **MusicBrainz**, an open music
+database run by a non-profit: no ads, no tracking, on nobody's blocklist, and
+it sends `access-control-allow-origin: *`. The cost is real — no artwork and no
+Apple Music link — which is why it is the fallback and not the default.
+
+Its ranking needs help. MusicBrainz scores nearly every title match 100, so its
+own order puts a university a-cappella cover above the recording everyone
+means. Results are collapsed by song-and-artist and sorted by how many releases
+each appeared across: for "Mr. Brightside" that is 17 releases for The Killers
+against 1 for the covers that outranked them.
+
+Failing both, the guest can still type the song in.
+
 ### Rate limiting
 
 The limit is per IP and undocumented — commonly reported around 20 requests a
@@ -548,7 +568,7 @@ imports, so that layer could be lifted into a React Native app unchanged.
 
 ## How it was verified
 
-`npm run test` runs 140 tests:
+`npm run test` runs 144 tests:
 
 - **`normalizeText`** — the duplicate-matching rules, shared with the SQL
   function of the same name.
