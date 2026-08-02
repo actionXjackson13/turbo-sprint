@@ -93,7 +93,7 @@ export function QueuePage() {
     <>
       <PageHeader title="Queue" subtitle={`${queue.length} up next`} />
 
-      <main className="flex-1 space-y-5 px-4 py-4">
+      <main className="flex-1 space-y-7 px-4 py-5">
         <Section title="Now playing">
           <NowPlayingCard
             nowPlaying={event?.nowPlaying ?? null}

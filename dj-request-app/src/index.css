@@ -5,18 +5,30 @@
    light theme, so these are plain values rather than a `dark:` variant scheme.
    --------------------------------------------------------------------------- */
 @theme {
-  /* Surfaces, darkest to lightest */
-  --color-ink-950: #07070d;
-  --color-ink-900: #0b0b12;
-  --color-ink-800: #13131d;
-  --color-ink-700: #1c1c2a;
-  --color-ink-600: #272739;
-  --color-ink-500: #3a3a52;
+  /* Surfaces, darkest to lightest.
+     Kept to a short ladder on purpose: a screen should use the page colour and
+     at most one raised surface. Stacking three or four near-identical greys is
+     what made cards-inside-cards read as visual noise rather than hierarchy. */
+  --color-ink-950: #08080e;
+  --color-ink-900: #0e0e16;
+  --color-ink-800: #14141e;
+  --color-ink-700: #1b1b28;
+  --color-ink-600: #242433;
+  --color-ink-500: #34344a;
 
-  /* Text */
-  --color-fg: #f6f5ff;
-  --color-fg-muted: #a6a4c0;
-  --color-fg-subtle: #6f6d8a;
+  /* Separation is carried by a hairline rather than a solid 1px box. Boxing
+     every element outlines it against the page; a hairline only suggests the
+     edge, which is what reads as "slim". */
+  --color-hairline: rgb(255 255 255 / 0.06);
+  --color-hairline-strong: rgb(255 255 255 / 0.1);
+
+  /* Text.
+     "Subtle" is as dim as it gets: at 4.8:1 on the page it still clears the
+     WCAG AA floor for small text. Quiet has to stay legible in a dark room —
+     going dimmer looked tidier in a screenshot and failed contrast. */
+  --color-fg: #f7f6ff;
+  --color-fg-muted: #9d9bb8;
+  --color-fg-subtle: #7d7b98;
 
   /* Brand — neon party accents */
   --color-brand-400: #a78bfa;
@@ -39,7 +51,34 @@
   /* Mobile-app shell width — the centered column on tablet/desktop */
   --spacing-shell: 30rem;
 
-  --radius-card: 1.25rem;
+  /* Two radii only. Previously cards used 16px and 20px in different places,
+     which reads as sloppiness rather than variety. */
+  --radius-card: 1.125rem;
+  --radius-control: 0.75rem;
+
+  /* Type scale.
+     The old UI drew almost everything at 12/14/16px and weight 600, so nothing
+     could stand out — emphasis is relative, and when everything is bold
+     nothing is. These steps are deliberately far apart, and the body weights
+     sit at 400/500 so that 600+ actually signals importance. */
+  --text-label: 0.6875rem; /* 11px — section headings, all-caps */
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.09em;
+  --text-label--font-weight: 500;
+
+  --text-meta: 0.75rem; /* 12px — who asked, how long ago */
+  --text-meta--line-height: 1.35;
+
+  --text-row: 0.9375rem; /* 15px — a song title in a list */
+  --text-row--line-height: 1.3;
+
+  --text-title: 1.375rem; /* 22px — screen titles */
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.02em;
+
+  --text-hero: 1.75rem; /* 28px — the one thing a screen is about */
+  --text-hero--line-height: 1.1;
+  --text-hero--letter-spacing: -0.03em;
 
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,

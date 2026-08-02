@@ -32,10 +32,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className={clsx(
-        'inline-flex rounded-full border border-ink-600 bg-ink-800 p-0.5',
-        className,
-      )}
+      className={clsx('inline-flex rounded-full bg-ink-800 p-0.5', className)}
     >
       {options.map((option) => {
         const selected = option.value === value
@@ -47,9 +44,18 @@ export function SegmentedControl<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(option.value)}
             className={clsx(
-              'min-h-8 rounded-full px-3 text-xs font-semibold transition-colors',
+              'text-meta relative min-h-7 rounded-full px-3 font-medium transition-colors',
+              // The chip stays visually slim while an invisible overlay gives
+              // it a full 44px tap target. Thumbs need the height even when
+              // the design doesn't show it.
+              'after:absolute after:inset-x-0 after:top-1/2 after:h-11',
+              'after:-translate-y-1/2 after:content-[""]',
+              // The selected segment is a solid raised chip rather than a
+              // tinted one, so which view you're in reads at a glance.
+              // Unselected uses fg-muted, not fg-subtle: this chip sits on a
+              // lighter surface, where subtle drops under the contrast floor.
               selected
-                ? 'bg-brand-500/20 text-brand-400'
+                ? 'bg-ink-600 text-fg'
                 : 'text-fg-muted hover:text-fg',
             )}
           >

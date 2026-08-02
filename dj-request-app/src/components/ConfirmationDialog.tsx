@@ -55,7 +55,7 @@ export function ConfirmationDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby={description ? 'confirm-desc' : undefined}
-        className="relative mx-auto w-full max-w-shell rounded-t-3xl border-t border-ink-600 bg-ink-800 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        className="relative mx-auto w-full max-w-shell rounded-t-3xl border-t border-hairline bg-ink-800 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink-500" />
         <h2 id="confirm-title" className="text-lg font-bold text-fg">

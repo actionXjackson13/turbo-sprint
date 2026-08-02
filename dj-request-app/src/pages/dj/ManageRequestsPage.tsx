@@ -105,7 +105,7 @@ export function ManageRequestsPage() {
       />
 
       {/* Status filter rail */}
-      <div className="sticky top-14 z-10 border-b border-ink-800 bg-ink-950/90 backdrop-blur">
+      <div className="sticky top-14 z-10 border-b border-hairline bg-ink-950/90 backdrop-blur">
         <div
           role="tablist"
           aria-label="Filter requests"
@@ -122,7 +122,7 @@ export function ManageRequestsPage() {
                 'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors',
                 filterIndex === index
                   ? 'border-brand-500 bg-brand-500/20 text-brand-400'
-                  : 'border-ink-600 bg-ink-800 text-fg-muted hover:text-fg',
+                  : 'border-hairline bg-ink-800 text-fg-muted hover:text-fg',
               )}
             >
               {filter.label}
@@ -143,7 +143,7 @@ export function ManageRequestsPage() {
             description="Requests move between these tabs as you action them."
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {visible.map((request) => (
               <SongRequestCard
                 key={request.id}

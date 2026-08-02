@@ -23,7 +23,7 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
       className={clsx(
         'fixed inset-x-0 bottom-0 z-30',
         'mx-auto w-full max-w-shell',
-        'border-t border-ink-800 bg-ink-900/95 backdrop-blur',
+        'border-t border-hairline bg-ink-950/85 backdrop-blur-xl',
         'pb-safe',
       )}
     >
@@ -35,8 +35,8 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
               end={item.end}
               className={({ isActive }) =>
                 clsx(
-                  'relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2',
-                  'text-xs font-medium transition-colors',
+                  'relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-1.5',
+                  'text-[0.625rem] font-medium tracking-wide transition-colors',
                   isActive
                     ? 'text-brand-400'
                     : 'text-fg-subtle hover:text-fg-muted',

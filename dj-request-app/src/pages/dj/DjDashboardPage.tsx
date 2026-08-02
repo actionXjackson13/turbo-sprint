@@ -45,7 +45,7 @@ export function DjDashboardPage() {
         }
       />
 
-      <main className="flex-1 space-y-5 px-4 py-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <main className="flex-1 space-y-7 px-4 py-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
         <AppButton
           size="lg"
           fullWidth
@@ -76,7 +76,7 @@ export function DjDashboardPage() {
               <section aria-labelledby="live-heading">
                 <h2
                   id="live-heading"
-                  className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+                  className="mb-2 text-label text-fg-subtle uppercase"
                 >
                   Live
                 </h2>
@@ -119,7 +119,7 @@ export function DjDashboardPage() {
               <section aria-labelledby="past-heading">
                 <h2
                   id="past-heading"
-                  className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+                  className="mb-2 text-label text-fg-subtle uppercase"
                 >
                   Ended
                 </h2>

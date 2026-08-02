@@ -44,7 +44,7 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
         <label
           htmlFor={inputId}
           className={clsx(
-            'text-sm font-medium text-fg-muted',
+            'text-meta font-medium text-fg-muted',
             hideLabel && 'sr-only',
           )}
         >
@@ -56,12 +56,12 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={clsx(
-            'min-h-12 w-full rounded-2xl border bg-ink-800 px-4 text-base text-fg',
+            'min-h-12 w-full rounded-control border bg-ink-900 px-3.5 text-[0.9375rem] text-fg',
             'placeholder:text-fg-subtle',
             'transition-colors duration-150',
             error
-              ? 'border-danger-500'
-              : 'border-ink-600 focus:border-brand-400',
+              ? 'border-danger-500/60'
+              : 'border-hairline focus:border-brand-500/60',
             className,
           )}
           {...rest}

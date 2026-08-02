@@ -200,6 +200,40 @@ demo mode).
 
 ---
 
+## Design rules
+
+The first build drew almost everything at 12–16px and weight 600, inside a
+bordered card. Measured on the DJ's control panel that came to 28 of 43 text
+elements at semibold and 18 outlined boxes on one screen — so nothing could
+stand out, because emphasis is relative and when everything is bold nothing
+is. Four rules keep that from creeping back:
+
+1. **Weight is a signal, not a default.** Body text is 400–500. 600 and above
+   is reserved for the handful of things that genuinely lead a screen. The same
+   screen now has 4 semibold elements instead of 28.
+2. **Separate with surface and space, not outlines.** `AppCard` draws no border
+   by default; a slightly lighter surface is enough. Only a selected or winning
+   item gets an outline. That screen went from 18 bordered boxes to 4.
+3. **Air goes between groups, not inside them.** Sections are spaced generously
+   (`space-y-7`); rows within a list are tight (`space-y-2`). Loosening
+   everything uniformly is what made screens feel simultaneously cramped and
+   sprawling.
+4. **Slim visually, never in the hit area.** Chips and links render at 28px but
+   carry an invisible 44px tap target via an `::after` overlay. No control is
+   under 44px on any screen.
+
+Type steps live in `src/index.css` as `text-label` / `text-meta` / `text-row` /
+`text-title` / `text-hero`, deliberately far apart so the hierarchy survives
+contact with real content.
+
+Contrast is checked, not eyeballed: every text/background pair on all nine
+screens meets WCAG AA (4.5:1, or 3:1 for large text). That audit is what caught
+`fg-subtle` sitting at 3.4:1 and white-on-brand-500 buttons at 4.2:1 — both now
+fixed. Disabled controls sit below the floor deliberately; WCAG exempts them,
+and looking inactive is the point.
+
+---
+
 ## Request lists
 
 The guest event screen and the DJ control panel each show **one** request list

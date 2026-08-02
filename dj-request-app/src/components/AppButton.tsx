@@ -16,24 +16,37 @@ export interface AppButtonProps
   className?: string
 }
 
+/**
+ * Only `primary` carries a solid fill. Secondary actions sit on a quiet
+ * surface with no outline, so a row of three controls reads as one primary
+ * choice plus alternatives rather than three competing blocks.
+ */
 const variantStyles: Record<Variant, string> = {
+  // brand-600 rather than brand-500: white on the lighter purple measured
+  // 4.2:1, under the AA floor for small text. This sits at 5.7:1.
   primary:
-    'bg-brand-500 text-white hover:bg-brand-400 active:bg-brand-600 disabled:bg-ink-600 disabled:text-fg-subtle',
+    'bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-600 disabled:bg-ink-700 disabled:text-fg-subtle',
   secondary:
-    'bg-ink-700 text-fg hover:bg-ink-600 active:bg-ink-800 border border-ink-500 disabled:text-fg-subtle',
+    'bg-ink-800 text-fg hover:bg-ink-700 active:bg-ink-800 disabled:text-fg-subtle',
   ghost:
     'bg-transparent text-fg-muted hover:bg-ink-800 hover:text-fg active:bg-ink-700 disabled:text-fg-subtle',
   danger:
-    'bg-danger-500 text-white hover:bg-danger-600 active:bg-danger-600 disabled:bg-ink-600 disabled:text-fg-subtle',
+    'bg-danger-500/12 text-danger-500 hover:bg-danger-500/20 disabled:bg-ink-700 disabled:text-fg-subtle',
   success:
-    'bg-success-500 text-ink-950 hover:brightness-110 active:brightness-95 disabled:bg-ink-600 disabled:text-fg-subtle',
+    'bg-success-500/14 text-success-500 hover:bg-success-500/22 disabled:bg-ink-700 disabled:text-fg-subtle',
 }
 
-// Every size clears the 44px minimum touch target required by the spec.
+/**
+ * Sizes are visually slimmer than before but every one still clears the 44px
+ * minimum touch target — `sm` is 44px tall, it just carries less padding and
+ * a lighter label.
+ */
 const sizeStyles: Record<Size, string> = {
-  sm: 'min-h-11 px-3 text-sm gap-1.5',
-  md: 'min-h-12 px-4 text-base gap-2',
-  lg: 'min-h-14 px-5 text-lg gap-2.5',
+  // 13px, not 12: these are the DJ's mid-set controls in a dark room, and
+  // button labels are the last place to shave a pixel.
+  sm: 'min-h-11 px-3 text-[0.8125rem] gap-1.5',
+  md: 'min-h-12 px-4 text-sm gap-2',
+  lg: 'min-h-13 px-5 text-base gap-2',
 }
 
 export const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(
@@ -60,7 +73,7 @@ export const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(
         disabled={isDisabled}
         aria-busy={loading || undefined}
         className={clsx(
-          'inline-flex items-center justify-center rounded-2xl font-semibold',
+          'inline-flex items-center justify-center rounded-control font-medium',
           'transition-colors duration-150 select-none',
           'disabled:cursor-not-allowed',
           variantStyles[variant],

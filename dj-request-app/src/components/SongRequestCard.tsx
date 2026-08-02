@@ -48,19 +48,19 @@ export function SongRequestCard({
     : `Upvote ${request.title}`
 
   return (
-    <article
-      className={clsx(
-        'rounded-card border border-ink-700 bg-ink-800',
-        className,
-      )}
-    >
-      <div className="flex items-start gap-3 p-4">
+    <article className={clsx('rounded-card bg-ink-900', className)}>
+      {/* Tighter padding than before. Rows are the most repeated element in the
+          app, so every extra pixel here is multiplied down the whole list and
+          is most of what made screens feel crowded. */}
+      <div className="flex items-center gap-3 px-3.5 py-3">
         {/* The tappable body is a button so keyboard users get it for free. */}
         {onOpen ? (
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 text-left"
+            // min-h-11 keeps the row's primary tap target at 44px even though
+            // the two lines of text only need 40.
+            className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left"
           >
             <RequestBody request={request} showStatus={showStatus} />
           </button>
@@ -72,13 +72,13 @@ export function SongRequestCard({
 
         {!showVote && showVoteCount && (
           <div
-            className="flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border border-ink-600 bg-ink-700 text-fg-muted"
+            className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-1 text-fg-muted"
             aria-label={`${request.voteCount} ${
               request.voteCount === 1 ? 'vote' : 'votes'
             }`}
           >
             <VoteArrow />
-            <span className="text-sm font-bold tabular-nums">
+            <span className="text-meta font-semibold tabular-nums">
               {request.voteCount}
             </span>
           </div>
@@ -92,16 +92,19 @@ export function SongRequestCard({
             aria-pressed={hasVoted}
             aria-label={voteLabel}
             className={clsx(
-              'flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border transition-colors',
+              // Visually a slim 44px square rather than a heavy bordered tile;
+              // the touch target is unchanged.
+              'flex size-11 shrink-0 flex-col items-center justify-center gap-0.5',
+              'rounded-control transition-colors',
               hasVoted
-                ? 'border-brand-500 bg-brand-500/20 text-brand-400'
-                : 'border-ink-600 bg-ink-700 text-fg-muted hover:border-brand-500/50 hover:text-fg',
+                ? 'bg-brand-500/18 text-brand-400'
+                : 'bg-ink-800 text-fg-muted hover:text-fg',
               (voteLocked || votePending) && 'opacity-70',
               voteLocked ? 'cursor-default' : 'disabled:cursor-not-allowed',
             )}
           >
             <VoteArrow filled={hasVoted} />
-            <span className="text-sm font-bold tabular-nums">
+            <span className="text-meta font-semibold tabular-nums">
               {request.voteCount}
             </span>
           </button>
@@ -109,7 +112,7 @@ export function SongRequestCard({
       </div>
 
       {actions && (
-        <div className="flex flex-wrap gap-2 border-t border-ink-700 p-3">
+        <div className="flex flex-wrap gap-1.5 border-t border-hairline px-3.5 py-2.5">
           {actions}
         </div>
       )}
@@ -143,15 +146,22 @@ function RequestBody({
 }) {
   return (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-base leading-snug font-semibold text-fg">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-row min-w-0 flex-1 truncate font-medium text-fg">
           {request.title}
         </h3>
         {showStatus && <StatusBadge status={request.status} />}
       </div>
-      <p className="mt-0.5 truncate text-sm text-fg-muted">{request.artist}</p>
-      <p className="mt-1.5 truncate text-xs text-fg-subtle">
-        {request.guestDisplayName} · {formatRelativeTime(request.createdAt)}
+
+      {/* Artist and provenance share a line. Three stacked lines per row made
+          lists tall enough that only three songs fit on a phone; two lines
+          keeps every detail and shows noticeably more of the queue. */}
+      <p className="text-meta mt-1 truncate text-fg-subtle">
+        <span className="text-fg-muted">{request.artist}</span>
+        <span aria-hidden="true"> · </span>
+        {request.guestDisplayName}
+        <span aria-hidden="true"> · </span>
+        {formatRelativeTime(request.createdAt)}
       </p>
     </>
   )

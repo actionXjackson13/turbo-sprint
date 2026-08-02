@@ -24,22 +24,22 @@ export function NowPlayingCard({
   children,
 }: NowPlayingCardProps) {
   return (
-    <AppCard emphasis={Boolean(nowPlaying)}>
-      <div className="flex items-center gap-3">
+    <AppCard tone={nowPlaying ? 'accent' : 'raised'}>
+      <div className={clsx('flex gap-3', headline ? 'items-start' : 'items-center')}>
         <span
           className={clsx(
             'flex shrink-0 items-center justify-center rounded-full',
             nowPlaying
               ? 'bg-brand-500/20 text-brand-400'
-              : 'bg-ink-700 text-fg-subtle',
-            headline ? 'size-14' : 'size-11',
+              : 'bg-ink-800 text-fg-subtle',
+            headline ? 'size-11' : 'size-9',
           )}
           aria-hidden="true"
         >
           <svg
             viewBox="0 0 24 24"
             fill="currentColor"
-            className={headline ? 'size-7' : 'size-5'}
+            className={headline ? 'size-5' : 'size-4'}
           >
             <path d="M9 18V5l12-2v13" />
             <circle cx="6" cy="18" r="3" />
@@ -50,10 +50,12 @@ export function NowPlayingCard({
         <div className="min-w-0 flex-1">
           {nowPlaying ? (
             <>
+              {/* On the screens that lead with it this is the largest text in
+                  the app — the single thing a DJ glances at mid-set. */}
               <p
                 className={clsx(
                   'truncate font-bold text-fg',
-                  headline ? 'text-2xl leading-tight' : 'text-base',
+                  headline ? 'text-hero' : 'text-row',
                 )}
               >
                 {nowPlaying.title}
@@ -61,19 +63,19 @@ export function NowPlayingCard({
               <p
                 className={clsx(
                   'truncate text-fg-muted',
-                  headline ? 'text-base' : 'text-sm',
+                  headline ? 'mt-1 text-sm' : 'text-meta mt-0.5',
                 )}
               >
                 {nowPlaying.artist}
               </p>
             </>
           ) : (
-            <p className="text-sm text-fg-muted">{emptyHint}</p>
+            <p className="text-meta text-fg-muted">{emptyHint}</p>
           )}
         </div>
       </div>
 
-      {children && <div className="mt-4">{children}</div>}
+      {children && <div className="mt-3.5">{children}</div>}
     </AppCard>
   )
 }

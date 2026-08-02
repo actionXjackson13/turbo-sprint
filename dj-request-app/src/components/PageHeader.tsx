@@ -31,12 +31,12 @@ export function PageHeader({
   return (
     <header
       className={clsx(
-        'sticky top-0 z-20 border-b border-ink-800 bg-ink-950/90 backdrop-blur',
+        'sticky top-0 z-20 border-b border-hairline bg-ink-950/85 backdrop-blur-xl',
         'pt-safe',
         className,
       )}
     >
-      <div className="flex min-h-14 items-center gap-2 px-4 py-2">
+      <div className="flex min-h-14 items-center gap-2 px-4 py-2.5">
         {showBack && (
           <button
             type="button"
@@ -60,11 +60,12 @@ export function PageHeader({
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl leading-tight font-bold text-fg">
-            {title}
-          </h1>
+          {/* The one element on the screen allowed to be large and bold. */}
+          <h1 className="text-title truncate font-bold text-fg">{title}</h1>
           {subtitle && (
-            <div className="truncate text-sm text-fg-muted">{subtitle}</div>
+            <div className="text-meta mt-0.5 truncate text-fg-subtle">
+              {subtitle}
+            </div>
           )}
         </div>
 

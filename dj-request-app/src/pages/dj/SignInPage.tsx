@@ -105,8 +105,8 @@ export function SignInPage() {
         </AppButton>
 
         {showDemoShortcuts() && (
-          <div className="rounded-2xl border border-dashed border-ink-600 p-3">
-            <p className="mb-2 text-center text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+          <div className="rounded-control border border-dashed border-hairline-strong p-3">
+            <p className="mb-2 text-center text-label text-fg-subtle uppercase">
               Demo mode
             </p>
             <AppButton

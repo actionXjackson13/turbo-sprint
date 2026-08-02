@@ -7,10 +7,11 @@ const iconProps = {
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 2,
+  // Lighter stroke and a smaller box: the nav should recede until you need it.
+  strokeWidth: 1.75,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
-  className: 'size-6',
+  className: 'size-5',
 }
 
 export const NavIcons = {

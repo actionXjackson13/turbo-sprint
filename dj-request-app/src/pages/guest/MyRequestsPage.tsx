@@ -75,7 +75,7 @@ export function MyRequestsPage() {
             }
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {requests.map((request) => (
               <SongRequestCard
                 key={request.id}

@@ -17,14 +17,14 @@ export function LoadingSkeleton({ className }: LoadingSkeletonProps) {
 /** Placeholder matching the shape of a SongRequestCard. */
 export function SongRequestSkeleton() {
   return (
-    <div className="rounded-card border border-ink-700 bg-ink-800 p-4">
-      <div className="flex items-start gap-3">
+    // Mirrors the real row: two lines of text and a slim vote control.
+    <div className="rounded-card bg-ink-900 px-3.5 py-3">
+      <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1 space-y-2">
-          <LoadingSkeleton className="h-5 w-3/5" />
-          <LoadingSkeleton className="h-4 w-2/5" />
-          <LoadingSkeleton className="h-3 w-1/3" />
+          <LoadingSkeleton className="h-4 w-3/5" />
+          <LoadingSkeleton className="h-3 w-2/5" />
         </div>
-        <LoadingSkeleton className="h-14 w-14 rounded-2xl" />
+        <LoadingSkeleton className="size-11 rounded-control" />
       </div>
     </div>
   )

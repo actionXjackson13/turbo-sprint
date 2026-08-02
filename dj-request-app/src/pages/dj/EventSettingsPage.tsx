@@ -77,7 +77,7 @@ export function EventSettingsPage() {
     <>
       <PageHeader title="Event settings" />
 
-      <main className="flex-1 space-y-5 px-4 py-4">
+      <main className="flex-1 space-y-7 px-4 py-5">
         <form onSubmit={saveName} noValidate className="space-y-3">
           <AppInput
             label="Event name"
@@ -161,8 +161,8 @@ export function EventSettingsPage() {
         </AppButton>
 
         {isDemoMode() && (
-          <div className="rounded-2xl border border-dashed border-ink-600 p-3">
-            <p className="mb-2 text-center text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+          <div className="rounded-control border border-dashed border-hairline-strong p-3">
+            <p className="mb-2 text-center text-label text-fg-subtle uppercase">
               Demo mode
             </p>
             <AppButton

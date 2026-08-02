@@ -147,7 +147,7 @@ export function EventControlPanelPage() {
         }
       />
 
-      <main className="flex-1 space-y-5 px-4 py-4">
+      <main className="flex-1 space-y-7 px-4 py-5">
         {/* The night, in one card: what is on, and what follows it. */}
         <Section title="Now playing">
           <NowPlayingCard
@@ -155,9 +155,9 @@ export function EventControlPanelPage() {
             headline
             emptyHint="Nothing set yet."
           >
-            <div className="space-y-3">
-              <div className="rounded-2xl bg-ink-900/60 px-3 py-2">
-                <p className="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+            <div className="space-y-2">
+              <div className="rounded-control bg-ink-900/60 px-3 py-2">
+                <p className="text-label text-fg-subtle uppercase">
                   Up next
                 </p>
                 <p className="mt-0.5 truncate text-sm text-fg">
@@ -253,7 +253,7 @@ export function EventControlPanelPage() {
               }
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {visible.map((request) => (
                 <SongRequestCard
                   key={request.id}
@@ -322,7 +322,7 @@ export function EventControlPanelPage() {
           <AppCard>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+                <p className="text-label text-fg-subtle uppercase">
                   Join code
                 </p>
                 <span className="font-mono text-3xl font-bold tracking-[0.25em] text-brand-400">
@@ -334,10 +334,20 @@ export function EventControlPanelPage() {
               </AppButton>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            {/* The current mode is shown as *selected*, not disabled.
+                Disabling it greyed out the active choice, which read as
+                "unavailable" rather than "this is what's on" — and dropped its
+                label under the contrast floor. Re-picking the current mode is
+                harmless, so the buttons stay live. */}
+            <div
+              role="group"
+              aria-label="Request intake"
+              className="mt-4 grid grid-cols-3 gap-2"
+            >
               <AppButton
                 variant={event.requestStatus === 'open' ? 'success' : 'secondary'}
-                disabled={busy || event.requestStatus === 'open'}
+                aria-pressed={event.requestStatus === 'open'}
+                disabled={busy}
                 onClick={() => setIntake('open')}
               >
                 Open
@@ -346,7 +356,8 @@ export function EventControlPanelPage() {
                 variant={
                   event.requestStatus === 'paused' ? 'primary' : 'secondary'
                 }
-                disabled={busy || event.requestStatus === 'paused'}
+                aria-pressed={event.requestStatus === 'paused'}
+                disabled={busy}
                 onClick={() => setIntake('paused')}
               >
                 Pause
@@ -355,7 +366,8 @@ export function EventControlPanelPage() {
                 variant={
                   event.requestStatus === 'closed' ? 'danger' : 'secondary'
                 }
-                disabled={busy || event.requestStatus === 'closed'}
+                aria-pressed={event.requestStatus === 'closed'}
+                disabled={busy}
                 onClick={() => setIntake('closed')}
               >
                 Close

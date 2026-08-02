@@ -63,11 +63,11 @@ export function EventHomePage() {
         }
       />
 
-      <main className="flex-1 space-y-5 px-4 py-4">
+      <main className="flex-1 space-y-7 px-4 py-5">
         {!online && (
           <div
             role="status"
-            className="rounded-2xl border border-status-pending/40 bg-status-pending/10 p-3 text-sm text-status-pending"
+            className="rounded-control border border-status-pending/40 bg-status-pending/10 p-3 text-sm text-status-pending"
           >
             You're offline. Updates will resume when you reconnect.
           </div>
@@ -154,7 +154,7 @@ export function EventHomePage() {
               description="Be the first to ask for a song."
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {visible.map((request) => (
                 <SongRequestCard
                   key={request.id}

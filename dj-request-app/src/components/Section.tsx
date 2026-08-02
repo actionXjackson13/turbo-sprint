@@ -22,10 +22,13 @@ export function Section({ title, action, children, className }: SectionProps) {
 
   return (
     <section aria-labelledby={headingId} className={className}>
-      <div className="mb-2 flex min-h-8 items-center justify-between gap-3">
+      {/* The heading is deliberately quiet: small, tracked and subtle. It is a
+          signpost, not content, and competing with the songs beneath it is
+          what made screens feel busy. */}
+      <div className="mb-2.5 flex min-h-7 items-center justify-between gap-3">
         <h2
           id={headingId}
-          className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+          className="text-label text-fg-subtle uppercase"
         >
           {title}
         </h2>
@@ -48,8 +51,11 @@ export function SectionLink({ onClick, children }: SectionLinkProps) {
       type="button"
       onClick={onClick}
       className={clsx(
-        'flex min-h-8 items-center gap-1 rounded-lg px-1 text-xs font-semibold',
+        'relative flex min-h-7 items-center gap-0.5 rounded-lg px-1 text-meta font-medium',
         'text-brand-400 hover:text-brand-500',
+        // Slim label, full-height tap target.
+        'after:absolute after:inset-x-0 after:top-1/2 after:h-11',
+        'after:-translate-y-1/2 after:content-[""]',
       )}
     >
       {children}

@@ -12,7 +12,7 @@ export interface ToastRecord {
 const variantStyles: Record<ToastVariant, string> = {
   success: 'border-success-500/40 bg-ink-700 text-fg',
   error: 'border-danger-500/50 bg-ink-700 text-fg',
-  info: 'border-ink-500 bg-ink-700 text-fg',
+  info: 'border-hairline-strong bg-ink-700 text-fg',
 }
 
 const variantIcons: Record<ToastVariant, string> = {
@@ -50,7 +50,7 @@ export function ToastViewport({ toasts, onDismiss }: ToastViewportProps) {
         <div
           key={toast.id}
           className={clsx(
-            'pointer-events-auto flex items-start gap-3 rounded-2xl border p-3 shadow-lg',
+            'pointer-events-auto flex items-start gap-3 rounded-control border p-3 shadow-lg',
             variantStyles[toast.variant],
           )}
         >

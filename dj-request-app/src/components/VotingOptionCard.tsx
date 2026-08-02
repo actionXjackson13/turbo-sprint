@@ -85,14 +85,16 @@ export function VotingOptionCard({
     </>
   )
 
+  // Only a chosen or winning option is outlined; the rest rely on the surface
+  // alone, so the one that matters is the one your eye lands on.
   const baseClasses = clsx(
     'relative w-full overflow-hidden rounded-card border transition-colors',
     isWinner
       ? 'border-success-500/50'
       : selected
-        ? 'border-brand-500'
-        : 'border-ink-700',
-    'bg-ink-800',
+        ? 'border-brand-500/70'
+        : 'border-transparent',
+    'bg-ink-900',
   )
 
   if (readOnly) {

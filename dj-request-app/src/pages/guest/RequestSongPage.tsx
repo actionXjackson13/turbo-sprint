@@ -92,7 +92,7 @@ export function RequestSongPage() {
         {intakeClosed && (
           <div
             role="status"
-            className="mb-4 rounded-2xl border border-status-pending/40 bg-status-pending/10 p-3 text-sm text-status-pending"
+            className="mb-4 rounded-control border border-status-pending/40 bg-status-pending/10 p-3 text-sm text-status-pending"
           >
             {event?.requestStatus === 'paused'
               ? 'The DJ has paused requests. Hang tight.'
@@ -103,7 +103,7 @@ export function RequestSongPage() {
         {blocked && (
           <div
             role="status"
-            className="mb-4 rounded-2xl border border-danger-500/40 bg-danger-500/10 p-3 text-sm text-danger-500"
+            className="mb-4 rounded-control border border-danger-500/40 bg-danger-500/10 p-3 text-sm text-danger-500"
           >
             The DJ has turned off requests for you at this event.
           </div>

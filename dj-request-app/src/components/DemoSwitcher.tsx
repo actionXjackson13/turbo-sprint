@@ -167,7 +167,7 @@ function DemoSwitcherSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="demo-switcher-title"
-        className="relative mx-auto flex max-h-[85dvh] w-full max-w-shell flex-col rounded-t-3xl border-t border-ink-600 bg-ink-800 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        className="relative mx-auto flex max-h-[85dvh] w-full max-w-shell flex-col rounded-t-3xl border-t border-hairline bg-ink-800 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
       >
         <div className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-ink-500" />
         <h2
@@ -182,7 +182,7 @@ function DemoSwitcherSheet({
 
         <div className="-mx-1 mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+            <h3 className="mb-2 text-label text-fg-subtle uppercase">
               The DJ
             </h3>
             <PersonRow
@@ -195,7 +195,7 @@ function DemoSwitcherSheet({
           </section>
 
           <section>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
+            <h3 className="mb-2 text-label text-fg-subtle uppercase">
               Guests
             </h3>
             <ul className="space-y-2">
@@ -279,7 +279,7 @@ function PersonRow({
       disabled={disabled}
       aria-current={selected || undefined}
       className={clsx(
-        'flex w-full min-h-14 items-center gap-3 rounded-2xl border px-3 py-2 text-left',
+        'flex w-full min-h-14 items-center gap-3 rounded-control border px-3 py-2 text-left',
         'transition-colors disabled:cursor-not-allowed disabled:opacity-60',
         selected
           ? 'border-brand-400 bg-brand-500/10'

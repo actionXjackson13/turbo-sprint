@@ -61,7 +61,7 @@ export function VotingRoundPage() {
         }
       />
 
-      <main className="flex-1 space-y-4 px-4 py-4">
+      <main className="flex-1 space-y-6 px-4 py-5">
         {isActive && secondsRemaining !== null && (
           <AppCard emphasis padded={false}>
             <div className="flex items-center justify-between px-4 py-3">

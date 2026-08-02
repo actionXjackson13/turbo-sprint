@@ -98,7 +98,7 @@ export function RequestDetailsPage() {
     <>
       <PageHeader title="Request" showBack />
 
-      <main className="flex-1 space-y-4 px-4 py-4">
+      <main className="flex-1 space-y-6 px-4 py-5">
         <AppCard emphasis>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

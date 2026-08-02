@@ -91,7 +91,7 @@ export function CreateVotingRoundPage() {
           <section aria-labelledby="songs-heading" className="space-y-3">
             <h2
               id="songs-heading"
-              className="text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+              className="text-label text-fg-subtle uppercase"
             >
               Songs ({options.length} of {MAX_VOTING_OPTIONS})
             </h2>
@@ -143,7 +143,7 @@ export function CreateVotingRoundPage() {
           <section aria-labelledby="duration-heading">
             <h2
               id="duration-heading"
-              className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase"
+              className="mb-2 text-label text-fg-subtle uppercase"
             >
               Voting time
             </h2>
@@ -162,10 +162,10 @@ export function CreateVotingRoundPage() {
                     aria-checked={selected}
                     onClick={() => setDurationSeconds(duration.seconds)}
                     className={clsx(
-                      'min-h-12 rounded-2xl border text-sm font-semibold transition-colors',
+                      'min-h-12 rounded-control border text-sm font-semibold transition-colors',
                       selected
                         ? 'border-brand-500 bg-brand-500/20 text-brand-400'
-                        : 'border-ink-600 bg-ink-800 text-fg-muted hover:text-fg',
+                        : 'border-hairline bg-ink-800 text-fg-muted hover:text-fg',
                     )}
                   >
                     {duration.label}
