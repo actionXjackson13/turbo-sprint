@@ -1,5 +1,6 @@
 import { ServiceError } from '../types'
 import { searchMusicBrainz } from './musicbrainz'
+import { searchProxyUrl } from '../../lib/env'
 
 /**
  * Song lookup against Apple's public catalogue.
@@ -80,12 +81,16 @@ async function searchApple(
   const query = term.trim()
   if (!query) return []
 
-  const url = `${ENDPOINT}?${new URLSearchParams({
-    term: query,
-    media: 'music',
-    entity: 'song',
-    limit: String(opts?.limit ?? 20),
-  })}`
+  // Through the proxy when one is configured: a blocker matches on the host
+  // the browser asks for, and the proxy's host is on nobody's list.
+  const url = searchProxyUrl
+    ? `${searchProxyUrl}?${new URLSearchParams({ q: query })}`
+    : `${ENDPOINT}?${new URLSearchParams({
+        term: query,
+        media: 'music',
+        entity: 'song',
+        limit: String(opts?.limit ?? 20),
+      })}`
 
   let response: Response
   try {

@@ -145,6 +145,7 @@ cp .env.example .env
 | `VITE_SUPABASE_URL` | for Supabase | Project URL |
 | `VITE_SUPABASE_ANON_KEY` | for Supabase | Anon public key |
 | `VITE_DEMO_MODE` | no | `true` forces demo mode even with credentials set |
+| `VITE_SEARCH_PROXY_URL` | no | Deployed `workers/song-search.js` URL — see [Guaranteeing Apple results](#guaranteeing-apple-results) |
 
 Restart the dev server. If either credential is missing, the app silently falls
 back to demo mode.
@@ -454,6 +455,29 @@ A picked song stores `catalogId`, `artworkUrl` and `catalogUrl` alongside the
 title and artist. All three are nullable and stay that way: requests made
 before search existed have none, and neither do voting-round winners the DJ
 typed. Nothing may assume they are present.
+
+### Guaranteeing Apple results
+
+`workers/song-search.js` is a ~90-line Cloudflare Worker that calls Apple on
+the guest's behalf. Deploying it is what makes Apple's results — with artwork
+and Apple Music links — reach *every* guest, including those running a blocker.
+
+1. Sign up at <https://workers.cloudflare.com> (free, no card).
+2. **Create Worker**, name it `song-search`, and replace the sample code with
+   `workers/song-search.js`. Add your own site to `ALLOWED_ORIGINS` first.
+3. Deploy, then copy the `*.workers.dev` URL.
+4. Put it in `.env` as `VITE_SEARCH_PROXY_URL` and rebuild.
+
+The client then asks the worker instead of Apple. A blocker matches on the host
+the *browser* requests, and the worker's host is on nobody's list; the call to
+Apple happens server-to-server, where no blocker exists.
+
+It also caches for ten minutes, which removes the rate limit as a concern
+entirely: a room full of guests searching the same song is one request to
+Apple, not one per person per WiFi.
+
+Without the worker everything still works — the client calls Apple directly and
+falls back as below.
 
 ### When Apple is blocked
 
