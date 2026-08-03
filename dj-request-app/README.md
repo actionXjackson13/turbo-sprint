@@ -155,12 +155,39 @@ That is the right trust level for a party, where the worst available mischief
 is voting twice from a browser you tampered with. Supabase mode is where an
 identity is actually checked.
 
+### Staying connected
+
+Three things were dropping guests out of working parties, and all three looked
+identical from a phone — the event loads nothing for a minute or two, then
+ejects you.
+
+- **A read woke every screen at the party.** Binding the caller's identity went
+  through the demo's persona switcher, which notifies every subscriber. Each
+  guest call did that twice, and each notification broadcast "something
+  changed" to every guest, who reloaded and called again. `asGuest` in
+  `demoStore.ts` now swaps the identity silently; only real writes announce
+  themselves. There is a test that counts wake-ups.
+- **`disconnected` was treated as fatal.** It is not a verdict — a phone
+  changing WiFi channel or going into a pocket produces it, and WebRTC recovers
+  on its own. Only `failed` and `closed` drop a peer now.
+- **The relay closing ended the party.** It is a matchmaker, not a lifeline;
+  once a data channel is open it has no further part. It now only counts while
+  nobody is connected yet, and the socket re-registers with backoff so late
+  guests can still find the code.
+
+On top of that a guest who genuinely loses the connection is no longer ejected:
+`PeerGuestService` rebuilds it for 90 seconds, and calls made during a blip
+wait for it rather than failing. The host holds a screen wake lock the whole
+time it is hosting, because a locked phone suspends the page and a suspended
+page stops answering.
+
 ### What it costs you
 
 Nothing, and no account. What it costs the DJ:
 
-- **The app has to stay open.** The party runs on that phone; close it and
-  guests are disconnected. `useWakeLock` already keeps the invite screen awake.
+- **The app has to stay open, and the screen stays on.** The party runs on
+  that phone; `useHostParty` holds a wake lock for as long as it is hosting,
+  because a locked phone suspends the page and stops answering its guests.
 - **Direct connections are not always possible.** There is no TURN server,
   because relaying traffic costs money. One room on one WiFi is the case this
   handles well; guests on mobile data behind a carrier-grade NAT may not get

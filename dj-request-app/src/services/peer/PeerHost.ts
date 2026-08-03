@@ -1,4 +1,9 @@
-import { channels, subscribe, setActiveGuestUserId, getActiveGuestUserId } from '../demo/demoStore'
+import {
+  asGuest,
+  channels,
+  setDemoLatency,
+  subscribe,
+} from '../demo/demoStore'
 import { ServiceError } from '../types'
 import type { DataService } from '../types'
 import {
@@ -111,6 +116,9 @@ export class PeerHost {
     await link.connect()
     this.link = link
 
+    // Real guests on a real connection do not need a pretend one on top.
+    setDemoLatency(false)
+
     /**
      * Tell guests to re-read whenever the store changes, whoever changed it.
      * Hooking the store rather than the call sites means a DJ action taken on
@@ -135,6 +143,7 @@ export class PeerHost {
   }
 
   stop(): void {
+    setDemoLatency(true)
     for (const off of this.unsubscribes) off()
     this.unsubscribes = []
     this.guestIds.clear()
@@ -178,21 +187,19 @@ export class PeerHost {
       return
     }
 
-    const previous = getActiveGuestUserId()
     try {
-      setActiveGuestUserId(guestUserId)
-      const fn = this.service[call.method as keyof DataService] as (
-        ...args: unknown[]
-      ) => Promise<unknown>
-      const value = await fn.apply(this.service, call.args ?? [])
+      const value = await asGuest(guestUserId, () => {
+        const fn = this.service[call.method as keyof DataService] as (
+          ...args: unknown[]
+        ) => Promise<unknown>
+        return fn.apply(this.service, call.args ?? [])
+      })
       link.send(peerId, { t: 'result', id: call.id, ok: true, value })
     } catch (err) {
       const kind = err instanceof ServiceError ? err.code : 'unknown'
       const message =
         err instanceof Error ? err.message : 'Something went wrong.'
       this.fail(peerId, call.id, kind, message)
-    } finally {
-      setActiveGuestUserId(previous)
     }
   }
 

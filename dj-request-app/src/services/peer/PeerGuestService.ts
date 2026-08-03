@@ -48,6 +48,18 @@ const CALL_TIMEOUT_MS = 10_000
 /** How long the initial connection may take before it is called a failure. */
 const CONNECT_TIMEOUT_MS = 15_000
 
+/**
+ * How long to keep trying to get back to the DJ before giving up on them.
+ *
+ * A party is a room full of phones moving around, going in pockets and losing
+ * WiFi for a moment. Being ejected from the event on the first blip is worse
+ * than waiting: the guest loses their place, their requests and their votes
+ * over something that fixes itself in seconds. Long enough to cover a walk to
+ * the bar, short enough that a DJ who has actually gone home is noticed.
+ */
+const RECONNECT_WINDOW_MS = 90_000
+const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000]
+
 interface Pending {
   resolve: (value: unknown) => void
   reject: (error: unknown) => void
@@ -60,7 +72,10 @@ export class PeerGuestService implements DataService {
   private readonly pending = new Map<number, Pending>()
   private readonly listeners = new Map<string, Set<() => void>>()
   private readonly guestUserId = getOrCreateLocalGuestId()
-  private disconnected: PeerError | null = null
+  /** Set once the DJ is gone for good; every later call fails fast. */
+  private dead: PeerError | null = null
+  /** An in-flight reconnect, awaited by calls made during a blip. */
+  private reconnecting: Promise<void> | null = null
 
   private readonly code: string
   private readonly onDisconnect?: (error: PeerError) => void
@@ -72,9 +87,59 @@ export class PeerGuestService implements DataService {
 
   /** Dials the DJ and waits for the channel to open. */
   async connect(): Promise<void> {
+    await this.openLink()
+  }
+
+  /**
+   * Get back to the DJ after the channel drops, rather than ejecting the guest.
+   *
+   * The old behaviour was to hand the app back its local storage the instant
+   * anything went wrong, which — since the party's event does not exist on the
+   * guest's own device — threw them out of the event entirely. Almost every
+   * drop is temporary, so this rebuilds the connection quietly and only gives
+   * up once it is clear the DJ has gone.
+   */
+  private reconnect(cause: PeerError): void {
+    if (this.dead || this.reconnecting) return
+
+    const deadline = Date.now() + RECONNECT_WINDOW_MS
+
+    // Never rejects: callers await it only to find out whether to carry on,
+    // and `dead` is what carries the verdict.
+    this.reconnecting = (async () => {
+      for (let attempt = 0; Date.now() < deadline; attempt++) {
+        const wait =
+          RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]!
+        await new Promise((r) => setTimeout(r, wait))
+        if (this.dead) return
+
+        try {
+          this.link?.close()
+          await this.openLink()
+          this.reconnecting = null
+          /**
+           * Wake every screen. Whatever changed at the party while this guest
+           * was away, they are now looking at a stale copy of it — and the
+           * subscription tick is the path each screen already uses to refresh.
+           */
+          for (const set of this.listeners.values()) {
+            for (const listener of [...set]) listener()
+          }
+          return
+        } catch {
+          // Still unreachable; the loop decides whether there is time to retry.
+        }
+      }
+
+      this.reconnecting = null
+      this.fallOver(cause)
+    })()
+  }
+
+  private openLink(): Promise<void> {
     const hostId = hostIdForCode(this.code)
 
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       let settled = false
       const finish = (err?: PeerError) => {
         if (settled) return
@@ -115,11 +180,11 @@ export class PeerGuestService implements DataService {
           onClose: () => {
             const error = new PeerError('lost', 'Lost the connection to the DJ.')
             finish(error)
-            this.fallOver(error)
+            this.reconnect(error)
           },
           onError: (error) => {
             finish(error)
-            this.fallOver(error)
+            this.reconnect(error)
           },
         },
         false,
@@ -140,8 +205,15 @@ export class PeerGuestService implements DataService {
   }
 
   disconnect(): void {
+    // Marks this service finished, so an in-flight reconnect stops trying.
+    this.dead ??= new PeerError('lost', 'You left the party.')
     this.link?.close()
     this.link = null
+  }
+
+  /** True while the connection is being rebuilt, for the UI to say so. */
+  get isReconnecting(): boolean {
+    return this.reconnecting !== null
   }
 
   // ---- Wire --------------------------------------------------------------
@@ -171,8 +243,8 @@ export class PeerGuestService implements DataService {
 
   /** Everything the DJ is dropped once: later calls fail fast, not slowly. */
   private fallOver(error: PeerError): void {
-    if (this.disconnected) return
-    this.disconnected = error
+    if (this.dead) return
+    this.dead = error
 
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer)
@@ -182,17 +254,30 @@ export class PeerGuestService implements DataService {
     this.onDisconnect?.(error)
   }
 
-  private call<T>(method: string, ...args: unknown[]): Promise<T> {
-    if (this.disconnected) {
-      return Promise.reject(
-        new ServiceError('network', this.disconnected.message),
-      )
+  /** Throws if the DJ is gone for good. Re-read each time, never cached. */
+  private throwIfGone(): void {
+    const gone = this.dead
+    if (gone) throw new ServiceError('network', gone.message)
+  }
+
+  private async call<T>(method: string, ...args: unknown[]): Promise<T> {
+    this.throwIfGone()
+
+    /**
+     * Ride out a blip rather than reporting it.
+     *
+     * A screen that asks for something a second after the WiFi wobbled should
+     * get an answer, not an error it will render as a broken party. Waiting
+     * costs the guest a moment; failing costs them the screen.
+     */
+    if (this.reconnecting) {
+      await this.reconnecting
+      this.throwIfGone()
     }
+
     const link = this.link
     if (!link) {
-      return Promise.reject(
-        new ServiceError('network', 'Not connected to the party.'),
-      )
+      throw new ServiceError('network', 'Not connected to the party.')
     }
 
     const id = this.nextCallId++

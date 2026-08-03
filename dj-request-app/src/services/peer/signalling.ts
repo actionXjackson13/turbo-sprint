@@ -176,6 +176,8 @@ export class PeerLink {
   private readonly connectionIds = new Map<string, string>()
 
   private closed = false
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectAttempts = 0
 
   readonly id: string
   private readonly events: PeerLinkEvents
@@ -190,6 +192,34 @@ export class PeerLink {
 
   /** Registers `id` with the relay. Rejects if it is taken or unreachable. */
   connect(): Promise<void> {
+    return this.openSocket()
+  }
+
+  /**
+   * Re-register after the relay drops us.
+   *
+   * Existing guests are unaffected — they are on direct channels — but a host
+   * with no socket is invisible to anyone who has not joined yet, and their
+   * code silently stops working halfway through the night. Backs off so a
+   * relay that is genuinely down is not hammered.
+   */
+  private scheduleReconnect(): void {
+    if (this.closed || this.reconnectTimer) return
+
+    const delay = Math.min(2_000 * 2 ** this.reconnectAttempts, 30_000)
+    this.reconnectAttempts += 1
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      if (this.closed) return
+      this.openSocket()
+        .then(() => {
+          this.reconnectAttempts = 0
+        })
+        .catch(() => this.scheduleReconnect())
+    }, delay)
+  }
+
+  private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       const token = Math.random().toString(36).slice(2)
       const url = `${SIGNAL_HOST}&id=${encodeURIComponent(this.id)}&token=${token}`
@@ -226,6 +256,7 @@ export class PeerLink {
         if (msg.type === 'OPEN') {
           settle(() => {
             this.ws = ws
+            if (this.heartbeat) clearInterval(this.heartbeat)
             this.heartbeat = setInterval(() => {
               if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'HEARTBEAT' }))
@@ -270,11 +301,24 @@ export class PeerLink {
           )
           return
         }
-        if (!this.closed) {
+        /**
+         * The relay is a matchmaker, not a lifeline. Once a data channel is
+         * open the two phones are talking to each other directly and the
+         * signalling socket has no further part in it — PeerJS's free service
+         * drops idle sockets on its own schedule, and reporting that as
+         * "lost the party" was ending sessions that were working perfectly.
+         *
+         * It only matters while nobody is connected yet, when it is the one
+         * thing a guest is waiting on.
+         */
+        if (this.closed) return
+
+        if (this.peers.size === 0) {
           this.events.onError?.(
             new PeerError('lost', 'Lost the connection to the party.'),
           )
         }
+        this.scheduleReconnect()
       }
     })
   }
@@ -313,6 +357,8 @@ export class PeerLink {
     this.closed = true
     if (this.heartbeat) clearInterval(this.heartbeat)
     this.heartbeat = null
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
     for (const id of [...this.peers.keys()]) this.drop(id)
     this.ws?.close()
     this.ws = null
@@ -448,7 +494,18 @@ export class PeerLink {
       }
     }
     pc.onconnectionstatechange = () => {
-      if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+      /**
+       * `disconnected` is not a verdict — it means packets stopped arriving,
+       * which a phone does every time it changes WiFi channel, drifts to the
+       * far side of a room, or has its screen turned off for a moment. WebRTC
+       * recovers from it on its own and returns to `connected`. Treating it as
+       * terminal is why a guest was being dropped out of a working party a
+       * minute or two in: nothing was actually broken.
+       *
+       * `failed` is the verdict. That one is terminal, and ICE only declares
+       * it after its own retries have been exhausted.
+       */
+      if (['failed', 'closed'].includes(pc.connectionState)) {
         this.drop(remoteId)
       }
     }

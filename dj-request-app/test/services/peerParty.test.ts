@@ -223,6 +223,54 @@ describe('a party hosted on the DJ’s phone', () => {
     ).rejects.toThrow(/closed/i)
   })
 
+  /**
+   * A read must be silent.
+   *
+   * Binding the caller's identity used to go through the demo's persona
+   * switcher, which wakes every screen — so serving one question broadcast
+   * "everything changed" to every guest, who each reloaded and asked more
+   * questions, which broadcast again. The party never stopped talking to
+   * itself, and from a phone that looked like nothing loading and then being
+   * dropped.
+   */
+  it('tells nobody anything when a guest only reads', async () => {
+    await guest.joinEvent(DEMO_EVENT_CODE, 'Sam on the sofa')
+    await settle()
+
+    let woken = 0
+    const stop = guest.subscribeSongRequests(eventId, () => {
+      woken += 1
+    })
+
+    await guest.listSongRequests(eventId)
+    await guest.getMyRequests(eventId)
+    await guest.getEventById(eventId)
+    await settle()
+
+    stop()
+    expect(woken).toBe(0)
+  })
+
+  it('still announces a write, exactly once', async () => {
+    await guest.joinEvent(DEMO_EVENT_CODE, 'Sam on the sofa')
+    await settle()
+
+    let woken = 0
+    const stop = guest.subscribeSongRequests(eventId, () => {
+      woken += 1
+    })
+
+    await guest.createSongRequest({
+      eventId,
+      title: 'Common People',
+      artist: 'Pulp',
+    })
+    await settle()
+
+    stop()
+    expect(woken).toBe(1)
+  })
+
   it('counts a connected guest for the DJ', () => {
     expect(host.guestCount).toBe(1)
   })
