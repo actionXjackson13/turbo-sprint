@@ -1,20 +1,27 @@
 import { ServiceError } from '../types'
 import { searchMusicBrainz } from './musicbrainz'
-import { searchProxyUrl } from '../../lib/env'
 
 /**
  * Song lookup against Apple's public catalogue.
  *
  * Uses the iTunes Search API rather than the Apple Music API: it needs no
- * developer account, no key, no signed token and no server of our own, and it
- * sends permissive CORS headers so the browser can call it directly. The
+ * developer account, no key, no signed token and no server of our own. The
  * trade-off is that it returns catalogue metadata only — enough to identify a
  * song exactly, which is all this app needs. Playback stays with whatever the
  * DJ already uses.
  *
- * Rate limiting is per IP and undocumented, commonly reported around 20
- * requests a minute. A whole party shares one WiFi address, so callers must
- * debounce — see useCatalogSearch.
+ * The browser calls Apple directly. Apple answers a request carrying an
+ * `Origin` header with a matching `access-control-allow-origin`, so this needs
+ * no proxy of our own — and must not have one. Every request Apple rejects is
+ * rejected on the *caller's* IP, and hosted proxies share their egress
+ * addresses with everybody else on the platform: a Cloudflare Worker gets a
+ * flat `429 Rate limit has been exceeded` on every call, first one included.
+ * The guest's own phone is the only address with budget left, so it is the one
+ * that has to ask.
+ *
+ * That budget is small — per IP, undocumented, and a party shares the venue's
+ * one WiFi address. Rationing it is the caller's job: see useCatalogSearch,
+ * which debounces, sets a floor on query length, and caches.
  */
 
 export interface CatalogSong {
@@ -48,10 +55,12 @@ function upscaleArtwork(url: string | undefined): string | null {
 /**
  * Search Apple, and fall back to MusicBrainz if Apple cannot be reached.
  *
- * The fallback exists because `itunes.apple.com` is on ad-blocker lists, so a
- * guest running one gets nothing at all — see musicbrainz.ts. It is only ever
- * reached when the first attempt fails, so the better results stay the
- * default.
+ * The fallback covers the two ways Apple goes quiet on a guest: the venue's
+ * shared address running out of rate-limit budget, and `itunes.apple.com`
+ * sitting on several ad-blocker lists. Neither is something app code can talk
+ * its way out of, and MusicBrainz is subject to neither — see musicbrainz.ts.
+ * It is only ever reached when the first attempt fails, so the better results
+ * stay the default.
  */
 export async function searchCatalog(
   term: string,
@@ -81,16 +90,12 @@ async function searchApple(
   const query = term.trim()
   if (!query) return []
 
-  // Through the proxy when one is configured: a blocker matches on the host
-  // the browser asks for, and the proxy's host is on nobody's list.
-  const url = searchProxyUrl
-    ? `${searchProxyUrl}?${new URLSearchParams({ q: query })}`
-    : `${ENDPOINT}?${new URLSearchParams({
-        term: query,
-        media: 'music',
-        entity: 'song',
-        limit: String(opts?.limit ?? 20),
-      })}`
+  const url = `${ENDPOINT}?${new URLSearchParams({
+    term: query,
+    media: 'music',
+    entity: 'song',
+    limit: String(opts?.limit ?? 20),
+  })}`
 
   let response: Response
   try {
@@ -98,16 +103,26 @@ async function searchApple(
   } catch (err) {
     // An aborted request is the caller superseding it, not a failure.
     if (err instanceof DOMException && err.name === 'AbortError') throw err
+
+    /**
+     * A throw here is usually a rate limit rather than a dead connection.
+     * Apple attaches CORS headers to the results but not to its `429`, so the
+     * browser refuses to show us that response at all and reports the same
+     * opaque failure it would for an unreachable host or a blocked request.
+     * The three are indistinguishable from here, so the wording covers them
+     * without claiming to know which — the fallback below decides whether the
+     * guest ever sees it.
+     */
     throw new ServiceError(
       'network',
-      'Could not reach song search. Check your connection, or type the song in below.',
+      'Song search is busy right now. Wait a moment, or type the song in below.',
     )
   }
 
   if (response.status === 403 || response.status === 429) {
     throw new ServiceError(
       'network',
-      'Too many searches at once. Wait a moment and try again.',
+      'Song search is busy right now. Wait a moment, or type the song in below.',
     )
   }
   if (!response.ok) {

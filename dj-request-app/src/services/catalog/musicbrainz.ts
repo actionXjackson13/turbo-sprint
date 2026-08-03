@@ -5,10 +5,13 @@ import { songMatchKey } from '../../utils/normalizeText'
 /**
  * Fallback song lookup, for guests who cannot reach Apple's catalogue.
  *
+ * Two things put a guest here, and app code can talk its way out of neither.
+ * Apple's rate limit is per IP, and a whole party shares the venue's one
+ * address, so a busy room runs the budget down for everybody at once. And
  * `itunes.apple.com` sits on several ad-blocker lists — not because song
  * search is tracking anyone, but because Apple serves other things from that
- * host. A guest running AdGuard, Brave, or a filtering DNS gets the request
- * killed before it leaves the phone, and no amount of app code changes that.
+ * host — so a guest running AdGuard, Brave, or a filtering DNS has the request
+ * killed before it leaves the phone.
  *
  * MusicBrainz is an open music database run by a non-profit. It carries no
  * ads and no tracking, so it is on nobody's blocklist, and it sends
@@ -35,6 +38,15 @@ interface MbRecording {
 
 const ENDPOINT = 'https://musicbrainz.org/ws/2/recording'
 
+/**
+ * MusicBrainz allows roughly one request a second per address and answers
+ * `503` above that. A party shares one address, so two guests typing at once
+ * is enough to trip it — and this is the last thing standing between a guest
+ * and an empty screen, so it waits out the window once rather than giving up
+ * on a limit that has already expired by the time the retry lands.
+ */
+const RETRY_AFTER_MS = 1100
+
 export async function searchMusicBrainz(
   term: string,
   opts?: { signal?: AbortSignal; limit?: number },
@@ -50,12 +62,11 @@ export async function searchMusicBrainz(
     limit: '40',
   })}`
 
-  let response: Response
-  try {
-    response = await fetch(url, { signal: opts?.signal })
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') throw err
-    throw new ServiceError('network', 'Could not reach song search.')
+  let response = await request(url, opts?.signal)
+
+  if (response.status === 503) {
+    await delay(RETRY_AFTER_MS, opts?.signal)
+    response = await request(url, opts?.signal)
   }
 
   if (!response.ok) {
@@ -109,4 +120,32 @@ export async function searchMusicBrainz(
     .map((entry) => entry.song)
 
   return songs
+}
+
+async function request(url: string, signal?: AbortSignal): Promise<Response> {
+  try {
+    return await fetch(url, { signal })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new ServiceError('network', 'Could not reach song search.')
+  }
+}
+
+/** Resolves after `ms`, or rejects the moment the caller supersedes us. */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    function onAbort() {
+      clearTimeout(timer)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
 }

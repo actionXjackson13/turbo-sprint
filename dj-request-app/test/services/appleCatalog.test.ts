@@ -59,7 +59,9 @@ describe('searchCatalog', () => {
 
   it('explains a rate limit in words a guest can act on', async () => {
     mockFetch({ ok: false, status: 429 })
-    await expect(searchCatalog('anything')).rejects.toThrow(/Too many searches/)
+    await expect(searchCatalog('anything')).rejects.toThrow(
+      /busy right now.*type the song in/i,
+    )
   })
 
   it('reports other failures as a service error', async () => {
@@ -122,12 +124,50 @@ describe('falling back when Apple is unreachable', () => {
     })
   })
 
+  it('waits out the MusicBrainz rate limit rather than giving up on it', async () => {
+    vi.useFakeTimers()
+    try {
+      let mbCalls = 0
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = String(input)
+        if (url.includes('itunes.apple.com')) {
+          return Promise.reject(new TypeError('Failed to fetch'))
+        }
+        mbCalls += 1
+        // MusicBrainz allows about one request a second per address, and a
+        // party shares one — so the first ask is routinely the one too soon.
+        // Failing here would leave the guest with nothing at all.
+        if (mbCalls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 503,
+          } as unknown as Response)
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mbBody),
+        } as unknown as Response)
+      })
+
+      const pending = searchCatalog('mr brightside')
+      await vi.advanceTimersByTimeAsync(1200)
+
+      expect(await pending).toHaveLength(1)
+      expect(mbCalls).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reports the original failure when neither source answers', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(
       new TypeError('Failed to fetch'),
     )
+    // Apple's wording, not MusicBrainz's: a thrown fetch is most often the
+    // rate limit, whose 429 carries no CORS headers for the browser to show.
     await expect(searchCatalog('anything')).rejects.toThrow(
-      /Could not reach song search/,
+      /busy right now.*type the song in/i,
     )
   })
 

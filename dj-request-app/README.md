@@ -145,7 +145,6 @@ cp .env.example .env
 | `VITE_SUPABASE_URL` | for Supabase | Project URL |
 | `VITE_SUPABASE_ANON_KEY` | for Supabase | Anon public key |
 | `VITE_DEMO_MODE` | no | `true` forces demo mode even with credentials set |
-| `VITE_SEARCH_PROXY_URL` | no | Deployed `workers/song-search.js` URL — see [Guaranteeing Apple results](#guaranteeing-apple-results) |
 
 Restart the dev server. If either credential is missing, the app silently falls
 back to demo mode.
@@ -445,10 +444,9 @@ request arrived as whatever someone managed to type, and the DJ had to work
 out what was meant.
 
 Search runs against the **iTunes Search API** — the same catalogue behind Apple
-Music, but the public endpoint. No developer account, no key, no signed token,
-no server of ours: it sends permissive CORS headers, so the browser calls it
-directly. The trade-off is that it returns catalogue metadata only, which is
-all this app needs. Playback stays wherever the DJ already has it; each request
+Music, but the public endpoint. No developer account, no key and no signed
+token. The trade-off is that it returns catalogue metadata only, which is all
+this app needs. Playback stays wherever the DJ already has it; each request
 carries a `music.apple.com` link.
 
 A picked song stores `catalogId`, `artworkUrl` and `catalogUrl` alongside the
@@ -456,40 +454,44 @@ title and artist. All three are nullable and stay that way: requests made
 before search existed have none, and neither do voting-round winners the DJ
 typed. Nothing may assume they are present.
 
-### Guaranteeing Apple results
+### Why there is no proxy
 
-`workers/song-search.js` is a ~90-line Cloudflare Worker that calls Apple on
-the guest's behalf. Deploying it is what makes Apple's results — with artwork
-and Apple Music links — reach *every* guest, including those running a blocker.
+Apple answers a request carrying an `Origin` header with a matching
+`access-control-allow-origin`, so the guest's browser calls it directly. It
+must: a proxy of our own makes search *worse*, and this was tried before it was
+understood.
 
-1. Sign up at <https://workers.cloudflare.com> (free, no card).
-2. **Create Worker**, name it `song-search`, and replace the sample code with
-   `workers/song-search.js`. Add your own site to `ALLOWED_ORIGINS` first.
-3. Deploy, then copy the `*.workers.dev` URL.
-4. Put it in `.env` as `VITE_SEARCH_PROXY_URL` and rebuild.
+Apple rate-limits per IP, and hosted platforms share their egress addresses
+across every customer on them. A Cloudflare Worker sitting in front of the
+search gets `429 Rate limit has been exceeded` on every call, including its
+first — the shared address is exhausted before the worker ever runs. Caching
+cannot rescue it, because there is no successful response to cache. The guest's
+own phone is the only address with budget left, so it is the one that asks.
 
-The client then asks the worker instead of Apple. A blocker matches on the host
-the *browser* requests, and the worker's host is on nobody's list; the call to
-Apple happens server-to-server, where no blocker exists.
+That budget is small, so the client rations it rather than routing around it:
+searches are debounced, ignored below three characters, and cached per term for
+the life of the page, so backspacing to something already searched costs
+nothing. What is left over is covered by the fallback below.
 
-It also caches for ten minutes, which removes the rate limit as a concern
-entirely: a room full of guests searching the same song is one request to
-Apple, not one per person per WiFi.
-
-Without the worker everything still works — the client calls Apple directly and
-falls back as below.
-
-### When Apple is blocked
+### When Apple cannot be reached
 
 `itunes.apple.com` is on several ad-blocker lists — not because song search
 tracks anyone, but because Apple serves other things from that host. A guest
 running AdGuard, Brave, or a filtering DNS has the request killed before it
 leaves the phone, and no app-side change fixes that.
 
-So a failed Apple search falls through to **MusicBrainz**, an open music
-database run by a non-profit: no ads, no tracking, on nobody's blocklist, and
-it sends `access-control-allow-origin: *`. The cost is real — no artwork and no
-Apple Music link — which is why it is the fallback and not the default.
+The other way Apple goes quiet is the rate limit above: a busy room shares one
+WiFi address, and when its budget runs out Apple returns a `429` with no CORS
+headers on it — which the browser will not show us, so a rate limit and an
+ad blocker arrive here as the same opaque failure. Both are covered the same
+way.
+
+A failed Apple search falls through to **MusicBrainz**, an open music database
+run by a non-profit: no ads, no tracking, on nobody's blocklist, and it sends
+`access-control-allow-origin: *`. The cost is real — no artwork and no Apple
+Music link — which is why it is the fallback and not the default. It allows
+about one request a second per address and answers `503` above that, so a
+`503` is retried once after the window rather than treated as failure.
 
 Its ranking needs help. MusicBrainz scores nearly every title match 100, so its
 own order puts a university a-cappella cover above the recording everyone

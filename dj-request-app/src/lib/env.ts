@@ -28,16 +28,4 @@ export function showDemoShortcuts(): boolean {
   return isDemoMode()
 }
 
-/**
- * Optional proxy for song search.
- *
- * Set to a deployed `workers/song-search.js` URL to route catalogue lookups
- * through your own domain instead of calling `itunes.apple.com` from the
- * guest's phone. That is what makes search work for guests running an ad
- * blocker — see the README. Unset, the app calls Apple directly and falls back
- * to MusicBrainz if it cannot be reached.
- */
-export const searchProxyUrl =
-  import.meta.env.VITE_SEARCH_PROXY_URL?.trim() ?? ''
-
 export const isDev = import.meta.env.DEV
