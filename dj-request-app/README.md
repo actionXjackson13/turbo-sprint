@@ -92,34 +92,101 @@ different person rather than all tabs switching together.
 **Reset demo data** from the DJ's *Event settings* screen. This also drops you
 back to the seeded "You" identity, since any guest you added no longer exists.
 
-### One device, always
+### The sample event is one device
 
-Demo mode has no server. Every event, guest and request lives in that
-browser's own `localStorage`, so nothing crosses between devices — a second
-phone opening the app gets its own private copy of the sample data, not a
-window onto yours.
+The seeded event is local by construction: it ships in every copy of the app
+under the same code (`PLAY`), belongs to nobody, and lives in that browser's
+own `localStorage`. Cross-*tab* sync works via the `storage` event, which is
+what makes the DJ-and-guest demo worth showing; cross-*device* does not, and
+cannot.
 
-This is the single most confusing thing about running the app unconfigured,
-because demo mode is otherwise indistinguishable from the real product: the DJ
-can create an event, get a join code, and hold up a QR that no other phone on
-earth can act on. A friend typing that code sees only "no event found", which
-reads as a typo rather than as the app having no backend.
+That is the sandbox. An event the DJ actually creates is a different matter —
+see below.
 
-So the screens that invite other people carry a `DemoNotice` — the join screen,
-the DJ's control panel and the share/QR screen — and the join failure explains
-itself rather than blaming the code. The component renders nothing once
-credentials are set, so a real event never shows a word of it.
+---
 
-Cross-*tab* sync in the same browser does work, via the `storage` event, which
-is what makes the DJ-and-guest demo worth showing at all.
+## Parties without a backend
+
+The app is static files on GitHub Pages, so there is no server to run a party
+on. There does not need to be one. Guests connect **directly to the DJ's phone**
+over a WebRTC data channel, and the DJ's phone is the authority — which it
+already is in every other sense.
+
+The racing game at the root of this repository does the same thing, and this is
+its transport generalised: `services/peer/signalling.ts`.
+
+### How it fits together
+
+| Piece | Job |
+| --- | --- |
+| `signalling.ts` | Registers a code on the free PeerJS relay and opens data channels. The relay only forwards the handshake — no gameplay, no song, no request ever passes through it. |
+| `PeerHost.ts` | The DJ's side. Runs each guest's call against the *local* `DemoService`, bound to that guest's identity. |
+| `PeerGuestService.ts` | A `DataService` whose every method is a round trip to the DJ. Screens cannot tell. |
+| `partySession.ts` | Which mode this device is in, and the swap when a party is joined. |
+
+The DJ hosts automatically: `DjEventProvider` calls `useHostParty`, so the
+party is open wherever the DJ is in the app, and `PartyStatus` says whether it
+actually is. The sample event is deliberately never hosted — one code shared by
+every install would mean the first person to open the demo took the id and
+everyone else collided with them.
+
+### Why the host reuses DemoService
+
+Because the rules are already written and already tested. Duplicate detection,
+the per-guest request cap, one-vote-each, queue ordering — a guest's call runs
+through the same code the sandbox runs, with `setActiveGuestUserId` bound to
+whoever sent it. There is no second implementation to disagree with the first.
+
+Calls are serialised for exactly that reason: the acting guest is module state,
+so two calls in flight at once could let one guest's identity leak into the
+other's write.
+
+### The security boundary
+
+`GUEST_METHODS` in `PeerHost.ts`, and nothing else. The DJ is signed in on the
+hosting device, so `DemoService`'s ownership checks — which ask whether the
+*local* user owns the event — pass for anything that reaches them, including a
+message a guest crafted by hand. The allowlist mirrors what RLS grants an
+anonymous guest in Supabase mode, so the two backends agree on who may do what.
+There is a test that forges a DJ-only call and asserts it bounces.
+
+Guest identity is local and unverified — the DJ takes the guest's word for it.
+That is the right trust level for a party, where the worst available mischief
+is voting twice from a browser you tampered with. Supabase mode is where an
+identity is actually checked.
+
+### What it costs you
+
+Nothing, and no account. What it costs the DJ:
+
+- **The app has to stay open.** The party runs on that phone; close it and
+  guests are disconnected. `useWakeLock` already keeps the invite screen awake.
+- **Direct connections are not always possible.** There is no TURN server,
+  because relaying traffic costs money. One room on one WiFi is the case this
+  handles well; guests on mobile data behind a carrier-grade NAT may not get
+  through, and are told so rather than left waiting.
+- **Nothing survives the DJ closing the app**, since there is no database.
+
+For a party in a room, that is the whole trade. For anything that has to
+outlive the evening, use Supabase.
+
+### Testing it
+
+`test/services/peerParty.test.ts` stands a real `PeerHost` and a real
+`PeerGuestService` up facing each other in one process, with only the WebRTC
+handshake swapped for a pair of queues — `__setPeerTransportFactory`. It covers
+what is new here: the allowlist, whose identity a call runs as, change
+propagation, and error passthrough. The handshake itself is covered by having
+shipped, in the game.
 
 ---
 
 ## Connecting a real Supabase project
 
-Demo mode is a development sandbox. **A real event needs this** — without it
-the app is single-device and guests cannot join at all, however the build is
-deployed. It is free and takes about ten minutes.
+Peer-to-peer above covers a party in a room. Supabase is what you want when the
+DJ's phone should not have to stay awake, when guests are on mobile data, or
+when the event has to survive the app being closed. It is free and takes about
+ten minutes.
 
 ### 1. Create the project
 

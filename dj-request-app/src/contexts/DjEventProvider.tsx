@@ -1,11 +1,17 @@
 import { useCallback, useMemo, type ReactNode } from 'react'
 import { useService } from '../hooks/useService'
 import { useLiveData } from '../hooks/useAsyncData'
+import { useHostParty } from '../hooks/useHostParty'
 import { DjEventContext, type DjEventValue } from './djEventContext'
 
 /**
  * Loads the event a DJ screen is scoped to, keeping it live so intake status,
  * now-playing and guest count stay current across every DJ tab.
+ *
+ * Also where the party goes online. Hosting belongs to the event rather than
+ * to any one screen — the DJ moves between the control panel, the queue and
+ * the invite screen all night, and guests must not be dropped in between — and
+ * every DJ screen is already inside this provider.
  */
 export function DjEventProvider({
   eventId,
@@ -30,6 +36,8 @@ export function DjEventProvider({
   )
 
   const { data, loading, error, reload } = useLiveData(loader, subscribe)
+
+  useHostParty(eventId, data?.event?.code)
 
   const value = useMemo<DjEventValue>(
     () => ({

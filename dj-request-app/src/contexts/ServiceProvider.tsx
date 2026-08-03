@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from 'react'
-import { getDataService } from '../services'
+import { useSyncExternalStore, type ReactNode } from 'react'
+import { getActiveService, subscribeParty } from '../services/partySession'
 import type { DataService } from '../services/types'
 import { ServiceContext } from './serviceContext'
 
@@ -10,8 +10,21 @@ export interface ServiceProviderProps {
 }
 
 export function ServiceProvider({ children, service }: ServiceProviderProps) {
-  const value = useMemo(() => service ?? getDataService(), [service])
+  /**
+   * Subscribed rather than resolved once: joining a party swaps the backend
+   * underneath the whole app — the same screens start reading from the DJ's
+   * phone instead of this device's own storage — and every screen has to
+   * follow. Nothing above this needs to know that happened.
+   */
+  const active = useSyncExternalStore(
+    subscribeParty,
+    getActiveService,
+    getActiveService,
+  )
+
   return (
-    <ServiceContext.Provider value={value}>{children}</ServiceContext.Provider>
+    <ServiceContext.Provider value={service ?? active}>
+      {children}
+    </ServiceContext.Provider>
   )
 }

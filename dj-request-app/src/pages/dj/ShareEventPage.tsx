@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AppButton, DemoNotice, PageHeader, QrCode } from '../../components'
+import { AppButton, PageHeader, PartyStatus, QrCode } from '../../components'
 import { RootLayout } from '../../layouts/RootLayout'
 import { routes } from '../../lib/router'
 import { useDjEvent } from '../../hooks/useDjEvent'
@@ -79,12 +79,9 @@ function ShareEventContent() {
 
       <main className="flex flex-1 flex-col items-center justify-center gap-7 px-6 py-6">
         {/* Before the code, not after it: the whole screen is an invitation,
-            and someone about to hold it up to a room needs to know first. */}
-        <DemoNotice className="w-full">
-          Nobody else can join this code. The sample event lives only in this
-          browser, so another phone scanning this QR will not find it. Connect
-          Supabase to run a real party.
-        </DemoNotice>
+            and someone about to hold it up to a room needs to know first
+            whether the code they are showing actually works. */}
+        <PartyStatus code={event.code} className="w-full" />
 
         <div className="text-center">
           <p className="text-label text-fg-subtle uppercase">Join code</p>

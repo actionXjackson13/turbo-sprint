@@ -10,7 +10,7 @@ import {
   type NavItem,
 } from '../components'
 import { routes } from '../lib/router'
-import { isDemoMode } from '../lib/env'
+import { useParty } from '../hooks/useParty'
 import { DjEventProvider } from '../contexts/DjEventProvider'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
@@ -24,6 +24,9 @@ import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 export function DjLayout() {
   const { eventId } = useParams<{ eventId: string }>()
   const { profile, loading } = useDjAuth()
+  // Acting as a guest edits this device's store directly, behind the back of
+  // anyone connected to it. Sandbox only.
+  const sandbox = useParty().mode === 'sandbox'
 
   // The DJ's screens double as a glanceable display mid-set; locking every
   // thirty seconds and having to unlock one-handed is the wrong interaction
@@ -52,7 +55,7 @@ export function DjLayout() {
           <Outlet />
         </DjEventGate>
         <DjNav eventId={eventId} />
-        {isDemoMode() && <DemoSwitcher eventId={eventId} view="dj" />}
+        {sandbox && <DemoSwitcher eventId={eventId} view="dj" />}
       </RootLayout>
     </DjEventProvider>
   )

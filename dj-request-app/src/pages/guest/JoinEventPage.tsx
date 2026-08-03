@@ -1,9 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AppButton, AppInput, DemoNotice } from '../../components'
+import { AppButton, AppInput } from '../../components'
 import { AuthLayout } from '../../layouts/AuthLayout'
 import { routes } from '../../lib/router'
-import { useService } from '../../hooks/useService'
+import {
+  getActiveService,
+  isRemoteCode,
+  joinParty,
+} from '../../services/partySession'
+import { PeerError } from '../../services/peer/signalling'
 import { isDemoMode } from '../../lib/env'
 import { validateEventCode } from '../../utils/validation'
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
@@ -18,7 +23,6 @@ import { readCodeFromSearch } from '../../utils/joinLink'
  */
 export function JoinEventPage() {
   const navigate = useNavigate()
-  const service = useService()
   const location = useLocation()
 
   // A guest arriving from the DJ's QR code already has the code; typing it
@@ -40,18 +44,40 @@ export function JoinEventPage() {
     setSubmitting(true)
     setError(null)
     try {
-      const event = await service.getEventByCode(code)
+      /**
+       * A code that isn't the sandbox's is somebody's actual party, so try to
+       * reach them before deciding it does not exist. This is what makes a
+       * scanned QR code work on a phone that has never seen this app: the
+       * connection is established here, and every screen afterwards is talking
+       * to the DJ without knowing it.
+       */
+      if (isRemoteCode(code)) {
+        try {
+          await joinParty(code)
+        } catch (err) {
+          setError(
+            err instanceof PeerError
+              ? err.message
+              : 'Could not reach that party.',
+          )
+          return
+        }
+      }
+
+      // Resolved after the join, not before: joining replaces the backend, and
+      // the one captured when this screen rendered is this device's own.
+      const backend = getActiveService()
+
+      const event = await backend.getEventByCode(code)
       if (!event) {
         /**
-         * In demo mode the answer is never "check the code". This browser
-         * holds its own private copy of the sample data, so the only event
-         * that can possibly exist here is the seeded one — a code from
-         * somebody else's phone will never be found, however carefully it is
-         * retyped. Saying so beats sending a guest round the loop again.
+         * Reaching this without a backend means the code was the sandbox's
+         * own, so no connection was attempted — every other code goes over the
+         * network above and fails there with something specific.
          */
         setError(
           isDemoMode()
-            ? `This is the demo, so only the sample event (${DEMO_EVENT_CODE}) exists on this device. A code from someone else's phone cannot work until the app is connected to a server.`
+            ? `The sample event is ${DEMO_EVENT_CODE}. For a real party, use the code the DJ is showing.`
             : 'No event found with that code. Check it and try again.',
         )
         return
@@ -87,11 +113,6 @@ export function JoinEventPage() {
       }
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
-        <DemoNotice>
-          Only the sample event ({DEMO_EVENT_CODE}) exists on this phone. A code
-          from someone else's device will not be found.
-        </DemoNotice>
-
         <AppInput
           label="Event code"
           value={code}

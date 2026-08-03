@@ -9,7 +9,7 @@ import {
   type NavItem,
 } from '../components'
 import { routes } from '../lib/router'
-import { isDemoMode } from '../lib/env'
+import { useParty } from '../hooks/useParty'
 import { GuestSessionProvider } from '../contexts/GuestSessionProvider'
 import { useGuestSession } from '../hooks/useGuestSession'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
@@ -20,6 +20,9 @@ import { useVotingRound } from '../features/voting-rounds/useVotingRound'
  */
 export function GuestLayout() {
   const { eventId } = useParams<{ eventId: string }>()
+  // Switching identity edits this device's own store. In a real party that
+  // store is not the authority, so the switcher belongs to the sandbox alone.
+  const sandbox = useParty().mode === 'sandbox'
 
   if (!eventId) return <Navigate to={routes.guest.join} replace />
 
@@ -30,7 +33,7 @@ export function GuestLayout() {
           <Outlet />
         </GuestGate>
         <GuestNav eventId={eventId} />
-        {isDemoMode() && <DemoSwitcher eventId={eventId} view="guest" />}
+        {sandbox && <DemoSwitcher eventId={eventId} view="guest" />}
       </RootLayout>
     </GuestSessionProvider>
   )
