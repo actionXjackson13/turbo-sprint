@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AppButton, AppInput } from '../../components'
+import { AppButton, AppInput, DemoNotice } from '../../components'
 import { AuthLayout } from '../../layouts/AuthLayout'
 import { routes } from '../../lib/router'
 import { useService } from '../../hooks/useService'
+import { isDemoMode } from '../../lib/env'
 import { validateEventCode } from '../../utils/validation'
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
+import { DEMO_EVENT_CODE } from '../../services/demo/seed'
 import { EVENT_CODE_LENGTH } from '../../data/constants'
 import { getErrorMessage } from '../../utils/errors'
 import { readCodeFromSearch } from '../../utils/joinLink'
@@ -40,7 +42,18 @@ export function JoinEventPage() {
     try {
       const event = await service.getEventByCode(code)
       if (!event) {
-        setError('No event found with that code. Check it and try again.')
+        /**
+         * In demo mode the answer is never "check the code". This browser
+         * holds its own private copy of the sample data, so the only event
+         * that can possibly exist here is the seeded one — a code from
+         * somebody else's phone will never be found, however carefully it is
+         * retyped. Saying so beats sending a guest round the loop again.
+         */
+        setError(
+          isDemoMode()
+            ? `This is the demo, so only the sample event (${DEMO_EVENT_CODE}) exists on this device. A code from someone else's phone cannot work until the app is connected to a server.`
+            : 'No event found with that code. Check it and try again.',
+        )
         return
       }
       if (event.status === 'ended') {
@@ -74,6 +87,11 @@ export function JoinEventPage() {
       }
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <DemoNotice>
+          Only the sample event ({DEMO_EVENT_CODE}) exists on this phone. A code
+          from someone else's device will not be found.
+        </DemoNotice>
+
         <AppInput
           label="Event code"
           value={code}

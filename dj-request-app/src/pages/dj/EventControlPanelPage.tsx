@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   AppButton,
   AppCard,
+  DemoNotice,
   EmptyState,
   NowPlayingCard,
   PageHeader,
@@ -281,6 +282,11 @@ export function EventControlPanelPage() {
 
         {/* Set-up details: needed once at the start, not all night. */}
         <Section title="Event">
+          <DemoNotice className="mb-3">
+            The code below only works in this browser. Guests on other phones
+            cannot join it, and their requests never arrive here.
+          </DemoNotice>
+
           <AppCard>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

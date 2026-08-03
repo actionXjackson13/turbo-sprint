@@ -92,12 +92,34 @@ different person rather than all tabs switching together.
 **Reset demo data** from the DJ's *Event settings* screen. This also drops you
 back to the seeded "You" identity, since any guest you added no longer exists.
 
+### One device, always
+
+Demo mode has no server. Every event, guest and request lives in that
+browser's own `localStorage`, so nothing crosses between devices — a second
+phone opening the app gets its own private copy of the sample data, not a
+window onto yours.
+
+This is the single most confusing thing about running the app unconfigured,
+because demo mode is otherwise indistinguishable from the real product: the DJ
+can create an event, get a join code, and hold up a QR that no other phone on
+earth can act on. A friend typing that code sees only "no event found", which
+reads as a typo rather than as the app having no backend.
+
+So the screens that invite other people carry a `DemoNotice` — the join screen,
+the DJ's control panel and the share/QR screen — and the join failure explains
+itself rather than blaming the code. The component renders nothing once
+credentials are set, so a real event never shows a word of it.
+
+Cross-*tab* sync in the same browser does work, via the `storage` event, which
+is what makes the DJ-and-guest demo worth showing at all.
+
 ---
 
 ## Connecting a real Supabase project
 
-Demo mode is a development sandbox. For a real event you need a Supabase
-project.
+Demo mode is a development sandbox. **A real event needs this** — without it
+the app is single-device and guests cannot join at all, however the build is
+deployed. It is free and takes about ten minutes.
 
 ### 1. Create the project
 

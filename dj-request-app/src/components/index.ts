@@ -41,6 +41,7 @@ export {
   type ConfirmationDialogProps,
 } from './ConfirmationDialog'
 export { DemoSwitcher, type DemoSwitcherProps } from './DemoSwitcher'
+export { DemoNotice, type DemoNoticeProps } from './DemoNotice'
 export {
   ToastViewport,
   type ToastRecord,
