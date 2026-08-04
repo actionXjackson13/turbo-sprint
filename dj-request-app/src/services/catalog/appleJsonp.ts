@@ -1,6 +1,6 @@
-import { ServiceError } from '../types'
 import type { CatalogSong, ItunesResult } from './appleCatalog'
 import { mapItunesResults } from './appleCatalog'
+import { jsonp } from './jsonp'
 
 /**
  * The same Apple search, fetched as a script instead of as data.
@@ -36,108 +36,23 @@ const TIMEOUT_MS = 7_000
 
 const ENDPOINT = 'https://itunes.apple.com/search'
 
-let counter = 0
-
-/**
- * The script attempt, swappable.
- *
- * jsdom never loads an external script and never reports that it hasn't, so a
- * suite exercising the MusicBrainz fallback would sit on this transport's
- * timeout for every case. Tests that are not about JSONP turn it off; the
- * tests that are about it drive `searchAppleJsonp` directly.
- */
-type JsonpSearch = typeof searchAppleJsonp
-let transport: JsonpSearch | null = null
-
-export function runAppleJsonp(
-  term: string,
-  opts?: { signal?: AbortSignal; limit?: number },
-): Promise<CatalogSong[]> {
-  return (transport ?? searchAppleJsonp)(term, opts)
-}
-
-/** Test hook. Pass null to restore the real script transport. */
-export function __setAppleJsonp(next: JsonpSearch | null): void {
-  transport = next
-}
-
-interface JsonpWindow {
-  [key: string]: unknown
-}
-
-export function searchAppleJsonp(
+export async function searchAppleJsonp(
   term: string,
   opts?: { signal?: AbortSignal; limit?: number },
 ): Promise<CatalogSong[]> {
   const query = term.trim()
-  if (!query) return Promise.resolve([])
+  if (!query) return []
 
-  // No DOM to hang a script on — a test environment, or server rendering.
-  if (typeof document === 'undefined') {
-    return Promise.reject(
-      new ServiceError('network', 'Song search is unavailable here.'),
-    )
-  }
-
-  return new Promise<CatalogSong[]>((resolve, reject) => {
-    const name = `__soundboardCatalog${counter++}`
-    const script = document.createElement('script')
-    let settled = false
-
-    const cleanup = () => {
-      clearTimeout(timer)
-      opts?.signal?.removeEventListener('abort', onAbort)
-      delete (window as unknown as JsonpWindow)[name]
-      script.remove()
-    }
-
-    const fail = (error: unknown) => {
-      if (settled) return
-      settled = true
-      cleanup()
-      reject(error)
-    }
-
-    ;(window as unknown as JsonpWindow)[name] = (payload: unknown) => {
-      if (settled) return
-      settled = true
-      cleanup()
-      const body = payload as { results?: ItunesResult[] }
-      resolve(mapItunesResults(body.results ?? []))
-    }
-
-    function onAbort() {
-      fail(new DOMException('Aborted', 'AbortError'))
-    }
-    opts?.signal?.addEventListener('abort', onAbort, { once: true })
-
-    /**
-     * A script that 404s, is blocked, or returns a non-JavaScript error page
-     * fires `error` — and one that is simply never answered fires nothing at
-     * all, which is what the timer is for.
-     */
-    const timer = setTimeout(
-      () =>
-        fail(
-          new ServiceError(
-            'network',
-            'Apple’s song search didn’t respond in time.',
-          ),
-        ),
-      TIMEOUT_MS,
-    )
-
-    script.onerror = () =>
-      fail(new ServiceError('network', 'Apple’s song search refused this request.'))
-
-    script.src = `${ENDPOINT}?${new URLSearchParams({
+  const body = await jsonp<{ results?: ItunesResult[] }>(
+    ENDPOINT,
+    {
       term: query,
       media: 'music',
       entity: 'song',
       limit: String(opts?.limit ?? 20),
-      callback: name,
-    })}`
-    script.async = true
-    document.head.appendChild(script)
-  })
+    },
+    { signal: opts?.signal, timeoutMs: TIMEOUT_MS },
+  )
+
+  return mapItunesResults(body.results ?? [])
 }

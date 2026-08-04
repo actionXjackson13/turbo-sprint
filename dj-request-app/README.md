@@ -655,6 +655,26 @@ browser returns an opaque response, so:
 tests, and checked in a browser against a genuinely blocked host and a
 genuinely refused search.
 
+### Why not Spotify
+
+It was the obvious next thought and it does not work from a static site.
+Spotify's search needs a bearer token — an unauthenticated request is a flat
+`401`. There are two ways to get one and neither survives contact with a party:
+
+- **Client credentials** needs a client *secret*. Anything shipped in the
+  bundle is readable by everyone who loads the page, so the secret would be
+  public the day it deployed. It needs a server to hold it.
+- **Authorization Code with PKCE** is browser-safe and needs no secret, but it
+  makes every guest sign in with their own Spotify account before they can ask
+  for a song. Most people at a party do not have one, and none of them want to.
+
+A Spotify-backed search is perfectly achievable *with* a server — a worker
+holding the secret, which would also make CORS disappear entirely, since the
+worker sets its own headers. It is a real option, and it costs the setup rather
+than the money.
+
+Deezer needs none of that.
+
 ### When Apple cannot be reached
 
 `itunes.apple.com` is on several ad-blocker lists — not because song search
@@ -668,7 +688,16 @@ headers on it — which the browser will not show us, so a rate limit and an
 ad blocker arrive here as the same opaque failure. Both are covered the same
 way.
 
-A failed Apple search falls through to **MusicBrainz**, an open music database
+A failed Apple search falls first to **Deezer**: no account, no key, no server,
+and — the part that matters here — artwork. It sends no CORS headers at all, so
+it is fetched as a script, which is a virtue rather than a workaround given
+that CORS is what keeps failing. Its catalogue is genuinely weaker than
+Apple's: some recordings are missing outright and its ranking will put a cover
+above the original, so results are collapsed by song-and-artist and ordered by
+Deezer's own popularity score, and the screen warns that the artist is worth
+checking.
+
+Below that is **MusicBrainz**, an open music database
 run by a non-profit: no ads, no tracking, on nobody's blocklist, and it sends
 `access-control-allow-origin: *`. The cost is real — no artwork and no Apple
 Music link — which is why it is the fallback and not the default. It allows

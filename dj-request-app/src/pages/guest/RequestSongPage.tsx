@@ -319,7 +319,7 @@ export function RequestSongPage() {
             {/* Apple's rows carry artwork; these do not. Without a word of
                 explanation that reads as the app having got worse, rather
                 than as Apple being unreachable from this phone. */}
-            {source === 'musicbrainz' && results.length > 0 && (
+            {source !== 'apple' && source !== null && results.length > 0 && (
               <p
                 role="status"
                 className="mb-3 rounded-control border border-status-pending/40 bg-status-pending/10 p-2.5 text-meta text-fg-muted"
@@ -327,8 +327,9 @@ export function RequestSongPage() {
                 {appleFailure
                   ? appleFailureMessage(appleFailure)
                   : 'Apple Music search could not be reached.'}{' '}
-                These are basic results — no artwork, and covers can outrank
-                the original, so pick carefully.
+                {source === 'deezer'
+                  ? 'These are from Deezer instead — a cover can outrank the original, so check the artist.'
+                  : 'These are basic results — no artwork, and covers can outrank the original, so pick carefully.'}
               </p>
             )}
 

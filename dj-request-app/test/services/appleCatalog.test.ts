@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { searchCatalog } from '../../src/services/catalog/appleCatalog'
 import { ServiceError } from '../../src/services/types'
-import { __setAppleJsonp } from '../../src/services/catalog/appleJsonp'
+import { __setJsonp } from '../../src/services/catalog/jsonp'
 
 /** A trimmed copy of a real iTunes Search API response. */
 const body = {
@@ -30,18 +30,19 @@ function mockFetch(init: Partial<Response> & { json?: () => unknown }) {
 }
 
 /**
- * jsdom never loads an external script, so the real JSONP attempt would sit on
- * its timeout in every case below. These cases are about what happens when
- * Apple is unusable; jsonp.test.ts covers the transport itself.
+ * jsdom never loads an external script, so every script-based catalogue —
+ * Apple's retry and Deezer — would sit on its timeout in each case below.
+ * These cases are about what happens when a source is unusable; the transport
+ * itself is covered in appleJsonp.test.ts.
  */
 beforeEach(() =>
-  __setAppleJsonp(() =>
+  __setJsonp(() =>
     Promise.reject(new ServiceError('network', 'no script transport in tests')),
   ),
 )
 
 afterEach(() => {
-  __setAppleJsonp(null)
+  __setJsonp(null)
   vi.restoreAllMocks()
 })
 

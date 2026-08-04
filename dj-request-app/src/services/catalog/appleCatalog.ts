@@ -1,6 +1,7 @@
 import { ServiceError } from '../types'
 import { searchMusicBrainz } from './musicbrainz'
-import { runAppleJsonp } from './appleJsonp'
+import { searchAppleJsonp } from './appleJsonp'
+import { searchDeezer } from './deezer'
 
 /**
  * Song lookup against Apple's public catalogue.
@@ -107,7 +108,7 @@ export function withTimeout(
 }
 
 /** Which catalogue actually answered, so the UI can be honest about it. */
-export type CatalogSource = 'apple' | 'musicbrainz'
+export type CatalogSource = 'apple' | 'deezer' | 'musicbrainz'
 
 /**
  * Why Apple was not the one that answered.
@@ -216,7 +217,7 @@ export async function searchCatalog(
      * settling for a catalogue with no artwork in it.
      */
     try {
-      return { songs: await runAppleJsonp(term, opts), source: 'apple' }
+      return { songs: await searchAppleJsonp(term, opts), source: 'apple' }
     } catch (jsonpErr) {
       if (jsonpErr instanceof DOMException && jsonpErr.name === 'AbortError') {
         throw jsonpErr
@@ -226,6 +227,23 @@ export async function searchCatalog(
     // Started rather than awaited, so working out why Apple failed costs no
     // wall time — it runs while the fallback is being fetched.
     const diagnosis = probeApple(opts?.signal)
+
+    /**
+     * Deezer before MusicBrainz, because it has artwork. A list of bare text
+     * rows is what made search feel like no improvement on typing, and Deezer
+     * needs no key and no CORS to avoid it.
+     */
+    try {
+      return {
+        songs: await searchDeezer(term, opts),
+        source: 'deezer',
+        appleFailure: await diagnosis,
+      }
+    } catch (deezerErr) {
+      if (deezerErr instanceof DOMException && deezerErr.name === 'AbortError') {
+        throw deezerErr
+      }
+    }
 
     try {
       return {
