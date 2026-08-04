@@ -1,5 +1,6 @@
 import { ServiceError } from '../types'
 import { searchMusicBrainz } from './musicbrainz'
+import { runAppleJsonp } from './appleJsonp'
 
 /**
  * Song lookup against Apple's public catalogue.
@@ -35,7 +36,7 @@ export interface CatalogSong {
   catalogUrl: string | null
 }
 
-interface ItunesResult {
+export interface ItunesResult {
   trackId?: number
   trackName?: string
   artistName?: string
@@ -206,6 +207,22 @@ export async function searchCatalog(
     // already been turned into a ServiceError, which falls through.
     if (err instanceof DOMException && err.name === 'AbortError') throw err
 
+    /**
+     * Ask Apple again, as a script rather than as data.
+     *
+     * The failure above is very often CORS rather than Apple — the browser
+     * refusing to hand over a response that arrived perfectly well — and a
+     * script tag is not subject to CORS at all. Worth one more attempt before
+     * settling for a catalogue with no artwork in it.
+     */
+    try {
+      return { songs: await runAppleJsonp(term, opts), source: 'apple' }
+    } catch (jsonpErr) {
+      if (jsonpErr instanceof DOMException && jsonpErr.name === 'AbortError') {
+        throw jsonpErr
+      }
+    }
+
     // Started rather than awaited, so working out why Apple failed costs no
     // wall time — it runs while the fallback is being fetched.
     const diagnosis = probeApple(opts?.signal)
@@ -288,7 +305,12 @@ async function searchApple(
 
   const body = (await response.json()) as { results?: ItunesResult[] }
 
-  return (body.results ?? [])
+  return mapItunesResults(body.results ?? [])
+}
+
+/** Apple's rows, filtered to real songs. Shared with the JSONP transport. */
+export function mapItunesResults(rows: ItunesResult[]): CatalogSong[] {
+  return rows
     .filter((r) => r.trackId && r.trackName && r.artistName)
     .map((r) => ({
       id: String(r.trackId),

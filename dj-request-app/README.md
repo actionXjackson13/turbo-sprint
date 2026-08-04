@@ -609,6 +609,28 @@ superseding a search and a source failing to answer arrive as the same
 fall through. Two tests hang a source deliberately and both fail without the
 timeout.
 
+### Two ways to ask Apple
+
+The `fetch` is subject to CORS, and CORS is where this repeatedly failed. The
+browser will not hand the page a cross-origin response without
+`access-control-allow-origin`, and it reports that refusal as an error
+identical to the host being unreachable — so a `429` (whose error responses
+carry no CORS headers) and a perfectly good set of results whose header never
+arrived are the same event from inside the page.
+
+So a failed fetch is retried as a `<script>` tag. Apple's search endpoint has
+supported the `callback` parameter all along, and a script has never been
+subject to CORS: the response is executed whatever headers it carries. If the
+results were arriving and only the header was missing, this gets them — with
+artwork, which is the entire reason Apple is worth the trouble. It also changes
+the resource type, and content blockers match on that as well as on host.
+
+JSONP executes what comes back as code, which is worth stating plainly. It is
+acceptable here because the source is Apple's own endpoint over HTTPS: anyone
+able to substitute that response could already have substituted the app. It
+stays the *second* attempt because a plain fetch, when it works, requires none
+of that reasoning.
+
 ### Finding out why Apple failed
 
 A cross-origin request that fails tells the page almost nothing. An extension
