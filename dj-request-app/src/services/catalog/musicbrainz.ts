@@ -1,5 +1,5 @@
 import { ServiceError } from '../types'
-import type { CatalogSong } from './appleCatalog'
+import { withTimeout, type CatalogSong } from './appleCatalog'
 import { songMatchKey } from '../../utils/normalizeText'
 
 /**
@@ -46,6 +46,9 @@ const ENDPOINT = 'https://musicbrainz.org/ws/2/recording'
  * on a limit that has already expired by the time the retry lands.
  */
 const RETRY_AFTER_MS = 1100
+
+/** Matches Apple's: an unanswered request must still become an answer. */
+const TIMEOUT_MS = 7_000
 
 export async function searchMusicBrainz(
   term: string,
@@ -123,11 +126,18 @@ export async function searchMusicBrainz(
 }
 
 async function request(url: string, signal?: AbortSignal): Promise<Response> {
+  // Bounded for the same reason Apple's is: an unanswered request is worse
+  // than a refused one, because nothing downstream ever runs.
+  const guard = withTimeout(signal, TIMEOUT_MS)
   try {
-    return await fetch(url, { signal })
+    return await fetch(url, { signal: guard.signal })
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    if (!guard.timedOut && err instanceof DOMException && err.name === 'AbortError') {
+      throw err
+    }
     throw new ServiceError('network', 'Could not reach song search.')
+  } finally {
+    guard.done()
   }
 }
 

@@ -52,7 +52,7 @@ export function RequestSongPage() {
   const [duplicate, setDuplicate] = useState<SongRequest | null>(null)
   const [pending, setPending] = useState<CatalogSong | null>(null)
 
-  const { results, loading, error, empty } = useCatalogSearch(term)
+  const { results, loading, error, empty, source } = useCatalogSearch(term)
 
   const intakeClosed = event ? event.requestStatus !== 'open' : false
   const blocked = guest?.isBlocked ?? false
@@ -310,6 +310,20 @@ export function RequestSongPage() {
                   </AppButton>
                 }
               />
+            )}
+
+            {/* Apple's rows carry artwork; these do not. Without a word of
+                explanation that reads as the app having got worse, rather
+                than as Apple being unreachable from this phone. */}
+            {source === 'musicbrainz' && results.length > 0 && (
+              <p
+                role="status"
+                className="mb-3 rounded-control border border-status-pending/40 bg-status-pending/10 p-2.5 text-meta text-fg-muted"
+              >
+                Apple Music search could not be reached, so these are basic
+                results — no artwork, and covers can outrank the original. Pick
+                carefully, or type the song in.
+              </p>
             )}
 
             {results.length > 0 && (

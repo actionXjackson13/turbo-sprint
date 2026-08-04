@@ -33,7 +33,10 @@ afterEach(() => vi.restoreAllMocks())
 describe('searchCatalog', () => {
   it('maps a result and upscales the artwork', async () => {
     mockFetch({})
-    const [song] = await searchCatalog('mr brightside')
+    const { songs, source } = await searchCatalog('mr brightside')
+    const [song] = songs
+
+    expect(source).toBe('apple')
 
     expect(song).toMatchObject({
       id: '1440649762',
@@ -48,12 +51,12 @@ describe('searchCatalog', () => {
 
   it('drops rows that are not identifiable songs', async () => {
     mockFetch({})
-    expect(await searchCatalog('mr brightside')).toHaveLength(1)
+    expect((await searchCatalog('mr brightside')).songs).toHaveLength(1)
   })
 
   it('does not call the network for a blank term', async () => {
     const fetchSpy = mockFetch({})
-    expect(await searchCatalog('   ')).toEqual([])
+    expect((await searchCatalog('   ')).songs).toEqual([])
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -115,7 +118,8 @@ describe('falling back when Apple is unreachable', () => {
       } as unknown as Response)
     })
 
-    const songs = await searchCatalog('mr brightside')
+    const { songs, source } = await searchCatalog('mr brightside')
+    expect(source).toBe('musicbrainz')
     expect(songs).toHaveLength(1)
     expect(songs[0]).toMatchObject({
       title: 'Mr. Brightside',
@@ -153,8 +157,69 @@ describe('falling back when Apple is unreachable', () => {
       const pending = searchCatalog('mr brightside')
       await vi.advanceTimersByTimeAsync(1200)
 
-      expect(await pending).toHaveLength(1)
+      expect((await pending).songs).toHaveLength(1)
       expect(mbCalls).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  /**
+   * The failure that made search look permanently broken.
+   *
+   * `fetch` has no timeout, so a request nobody ever answers — a captive
+   * portal, a filtering DNS that drops rather than refuses — left the promise
+   * pending for ever. Nothing downstream ran: no fallback, no error, no empty
+   * state, just loading skeletons until the guest gave up and typed the song
+   * in by hand.
+   */
+  it('falls back when Apple accepts the request and never answers', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+        const url = String(input)
+        if (url.includes('itunes.apple.com')) {
+          // Never resolves — only the abort signal can end it.
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            )
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mbBody),
+        } as unknown as Response)
+      })
+
+      const pending = searchCatalog('mr brightside')
+      await vi.advanceTimersByTimeAsync(8_000)
+
+      const { songs, source } = await pending
+      expect(source).toBe('musicbrainz')
+      expect(songs).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('gives up on a hung fallback too, rather than hanging with it', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          )
+        })
+      })
+
+      const pending = searchCatalog('mr brightside')
+      // Apple's window, then MusicBrainz's, with room for the 503 retry.
+      const settled = expect(pending).rejects.toThrow(/busy|unavailable/i)
+      await vi.advanceTimersByTimeAsync(30_000)
+      await settled
     } finally {
       vi.useRealTimers()
     }
@@ -216,7 +281,7 @@ describe('MusicBrainz ranking', () => {
       } as unknown as Response)
     })
 
-    const songs = await searchCatalog('mr brightside')
+    const { songs } = await searchCatalog('mr brightside')
     expect(songs[0]!.artist).toBe('The Killers')
     // The two Killers rows collapse into one entry.
     expect(songs.filter((s) => s.artist === 'The Killers')).toHaveLength(1)

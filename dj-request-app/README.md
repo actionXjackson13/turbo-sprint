@@ -589,6 +589,26 @@ searches are debounced, ignored below three characters, and cached per term for
 the life of the page, so backspacing to something already searched costs
 nothing. What is left over is covered by the fallback below.
 
+### Every request is bounded
+
+`fetch` has no timeout. A request that is simply never answered — a captive
+portal swallowing it, a filtering DNS dropping rather than refusing it, a phone
+with bars but no working connection — leaves the promise pending for ever, and
+nothing behind it runs.
+
+That is worse than an error, and it is what made search look permanently
+broken: Apple accepted the request and went quiet, so the fallback below was
+never reached, no message was ever shown, and the loading skeletons stayed up
+until the guest gave up and typed the song in by hand. The old way was the only
+way that worked, which is exactly how it was reported.
+
+Both sources now give up after seven seconds — `withTimeout` in
+`appleCatalog.ts`. It records *whose* abort it was, because a caller
+superseding a search and a source failing to answer arrive as the same
+`AbortError` and mean opposite things: one must stop everything, the other must
+fall through. Two tests hang a source deliberately and both fail without the
+timeout.
+
 ### When Apple cannot be reached
 
 `itunes.apple.com` is on several ad-blocker lists — not because song search
@@ -608,6 +628,12 @@ run by a non-profit: no ads, no tracking, on nobody's blocklist, and it sends
 Music link — which is why it is the fallback and not the default. It allows
 about one request a second per address and answers `503` above that, so a
 `503` is retried once after the window rather than treated as failure.
+
+Which source answered is carried back to the screen rather than swallowed.
+Apple's rows have artwork and an Apple Music link and MusicBrainz's are bare
+text, so a guest looking at the fallback with no explanation sees an app that
+has got worse rather than a catalogue it cannot reach — the request screen says
+which one they are looking at.
 
 Its ranking needs help. MusicBrainz scores nearly every title match 100, so its
 own order puts a university a-cappella cover above the recording everyone

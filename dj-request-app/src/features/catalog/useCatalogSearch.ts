@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   searchCatalog,
+  type CatalogResults,
   type CatalogSong,
+  type CatalogSource,
 } from '../../services/catalog/appleCatalog'
 import { getErrorMessage } from '../../utils/errors'
 
@@ -32,9 +34,9 @@ const MIN_CHARS = 3
  * cap is far above what one guest finding one song will ever touch.
  */
 const CACHE_LIMIT = 50
-const cache = new Map<string, CatalogSong[]>()
+const cache = new Map<string, CatalogResults>()
 
-function remember(key: string, results: CatalogSong[]) {
+function remember(key: string, results: CatalogResults) {
   // Re-insert so the most recently used entry is last, and evict from the
   // front — the oldest untouched term is the cheapest one to have to ask for
   // again.
@@ -52,6 +54,15 @@ export interface CatalogSearchState {
   error: string | null
   /** True once a search has run and come back with nothing. */
   empty: boolean
+  /**
+   * Which catalogue answered.
+   *
+   * Surfaced because the difference is visible and otherwise inexplicable:
+   * Apple's results carry artwork and an Apple Music link, MusicBrainz's are
+   * bare text. A guest seeing the bare version has no way to know they are
+   * looking at the fallback rather than at a worse app.
+   */
+  source: CatalogSource | null
 }
 
 export function useCatalogSearch(term: string): CatalogSearchState {
@@ -60,12 +71,19 @@ export function useCatalogSearch(term: string): CatalogSearchState {
     loading: false,
     error: null,
     empty: false,
+    source: null,
   })
 
   useEffect(() => {
     const query = term.trim()
     if (query.length < MIN_CHARS) {
-      setState({ results: [], loading: false, error: null, empty: false })
+      setState({
+        results: [],
+        loading: false,
+        error: null,
+        empty: false,
+        source: null,
+      })
       return
     }
 
@@ -76,10 +94,11 @@ export function useCatalogSearch(term: string): CatalogSearchState {
       // backspacing to a term already seen feels like the results never left.
       remember(key, cached)
       setState({
-        results: cached,
+        results: cached.songs,
         loading: false,
         error: null,
-        empty: cached.length === 0,
+        empty: cached.songs.length === 0,
+        source: cached.source,
       })
       return
     }
@@ -96,10 +115,11 @@ export function useCatalogSearch(term: string): CatalogSearchState {
           if (controller.signal.aborted) return
           remember(key, results)
           setState({
-            results,
+            results: results.songs,
             loading: false,
             error: null,
-            empty: results.length === 0,
+            empty: results.songs.length === 0,
+            source: results.source,
           })
         } catch (err) {
           if (controller.signal.aborted) return
@@ -108,6 +128,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
             loading: false,
             error: getErrorMessage(err),
             empty: false,
+            source: null,
           })
         }
       })()

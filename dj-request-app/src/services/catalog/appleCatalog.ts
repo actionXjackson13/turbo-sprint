@@ -46,6 +46,73 @@ interface ItunesResult {
 
 const ENDPOINT = 'https://itunes.apple.com/search'
 
+/**
+ * How long to wait before treating a request as failed.
+ *
+ * `fetch` has no timeout of its own: a request that is never answered — a
+ * captive portal swallowing it, a filtering DNS blackholing the host, a phone
+ * that has technically-but-not-really got signal — stays pending forever, and
+ * the promise chain behind it never runs. That is worse than an error. The
+ * search sat on its loading skeletons indefinitely, never reached the
+ * fallback, and never told the guest anything, so the only thing that ever
+ * worked was typing the song in by hand.
+ */
+const TIMEOUT_MS = 7_000
+
+/**
+ * A signal that trips on the caller's abort *or* after `ms`.
+ *
+ * Hand-rolled rather than `AbortSignal.any` + `AbortSignal.timeout`, which
+ * together need Safari 17.4 — too new to require of a guest's phone at a
+ * party, which is the one device this has to work on.
+ */
+export interface TimeoutGuard {
+  signal: AbortSignal
+  /**
+   * True when *we* gave up rather than the caller.
+   *
+   * Both arrive as the same AbortError, and the two mean opposite things: a
+   * caller abort means a newer search has superseded this one and nothing more
+   * should happen, while our own timeout means this source is not answering
+   * and the fallback should be tried. Guessing from the signal is unreliable —
+   * a caller need not pass one at all — so it is recorded instead.
+   */
+  timedOut: boolean
+  done: () => void
+}
+
+export function withTimeout(
+  signal: AbortSignal | undefined,
+  ms: number,
+): TimeoutGuard {
+  const controller = new AbortController()
+  const guard: TimeoutGuard = {
+    signal: controller.signal,
+    timedOut: false,
+    done: () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    },
+  }
+
+  const timer = setTimeout(() => {
+    guard.timedOut = true
+    controller.abort()
+  }, ms)
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
+
+  return guard
+}
+
+/** Which catalogue actually answered, so the UI can be honest about it. */
+export type CatalogSource = 'apple' | 'musicbrainz'
+
+export interface CatalogResults {
+  songs: CatalogSong[]
+  source: CatalogSource
+}
+
 /** The 100px thumbnail the API returns is soft on a modern phone. */
 function upscaleArtwork(url: string | undefined): string | null {
   if (!url) return null
@@ -65,16 +132,19 @@ function upscaleArtwork(url: string | undefined): string | null {
 export async function searchCatalog(
   term: string,
   opts?: { signal?: AbortSignal; limit?: number },
-): Promise<CatalogSong[]> {
+): Promise<CatalogResults> {
   try {
-    return await searchApple(term, opts)
+    return { songs: await searchApple(term, opts), source: 'apple' }
   } catch (err) {
-    // An abort is the caller superseding this search, not a failure to reach
-    // anything — retrying elsewhere would race the newer search.
+    // Only a caller abort reaches here as a DOMException; a timeout has
+    // already been turned into a ServiceError, which falls through.
     if (err instanceof DOMException && err.name === 'AbortError') throw err
 
     try {
-      return await searchMusicBrainz(term, opts)
+      return {
+        songs: await searchMusicBrainz(term, opts),
+        source: 'musicbrainz',
+      }
     } catch (fallbackErr) {
       if (fallbackErr instanceof DOMException) throw fallbackErr
       // Report the first failure: it is the one describing the usual cause.
@@ -97,12 +167,20 @@ async function searchApple(
     limit: String(opts?.limit ?? 20),
   })}`
 
+  const guard = withTimeout(opts?.signal, TIMEOUT_MS)
+
   let response: Response
   try {
-    response = await fetch(url, { signal: opts?.signal })
+    response = await fetch(url, { signal: guard.signal })
   } catch (err) {
-    // An aborted request is the caller superseding it, not a failure.
-    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    /**
+     * The caller superseding this search is not a failure and must not fall
+     * through to another source — that would race the newer search. Our own
+     * timeout is a failure, and must.
+     */
+    if (!guard.timedOut && err instanceof DOMException && err.name === 'AbortError') {
+      throw err
+    }
 
     /**
      * A throw here is usually a rate limit rather than a dead connection.
@@ -117,6 +195,10 @@ async function searchApple(
       'network',
       'Song search is busy right now. Wait a moment, or type the song in below.',
     )
+  } finally {
+    // Whatever happened, stop the clock — a pending timer would abort a
+    // controller nobody is listening to and keep the page awake for nothing.
+    guard.done()
   }
 
   if (response.status === 403 || response.status === 429) {
