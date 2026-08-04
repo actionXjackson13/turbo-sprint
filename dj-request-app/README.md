@@ -609,6 +609,30 @@ superseding a search and a source failing to answer arrive as the same
 fall through. Two tests hang a source deliberately and both fail without the
 timeout.
 
+### Finding out why Apple failed
+
+A cross-origin request that fails tells the page almost nothing. An extension
+killing it, DNS refusing to resolve it, and Apple returning a `429` without the
+CORS headers needed to read it all surface as the same opaque error — and they
+are different problems with different fixes. "Could not be reached" sends
+someone to check the WiFi, which is the one thing that was never wrong.
+
+Only the phone being blocked can tell, so it is asked. On a failure the client
+fetches `itunes.apple.com/robots.txt` with `mode: 'no-cors'` — tiny, on the
+same host, and outside the search rate limit. Without CORS enforcement the
+browser returns an opaque response, so:
+
+| Probe | Meaning | What the guest is told |
+| --- | --- | --- |
+| succeeds | host reachable, the *search* was refused | Apple is rate-limiting this network — wait a minute |
+| fails | the request never left the phone | something here is blocking it — allow `itunes.apple.com` |
+| times out | reachable but not answering | slow or filtered connection |
+| `navigator.onLine` false | no connection at all | reconnect |
+
+`appleFailureMessage` turns each into a sentence with a remedy in it. Driven by
+tests, and checked in a browser against a genuinely blocked host and a
+genuinely refused search.
+
 ### When Apple cannot be reached
 
 `itunes.apple.com` is on several ad-blocker lists — not because song search

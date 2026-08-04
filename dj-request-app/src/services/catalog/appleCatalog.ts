@@ -108,9 +108,75 @@ export function withTimeout(
 /** Which catalogue actually answered, so the UI can be honest about it. */
 export type CatalogSource = 'apple' | 'musicbrainz'
 
+/**
+ * Why Apple was not the one that answered.
+ *
+ * Worth separating because the remedies have nothing in common. A blocked host
+ * is the guest's own device refusing, and only they can allow it. A refusal is
+ * the venue's shared address being rate-limited, and waiting fixes it. Told
+ * "could not be reached", someone will check their WiFi — which is the one
+ * thing that is definitely fine.
+ */
+export type AppleFailure = 'offline' | 'blocked' | 'refused' | 'slow'
+
 export interface CatalogResults {
   songs: CatalogSong[]
   source: CatalogSource
+  /** Set only when `source` is not `apple`. */
+  appleFailure?: AppleFailure
+}
+
+/** Tiny, on the same host, and not part of the search rate limit. */
+const PROBE_URL = 'https://itunes.apple.com/robots.txt'
+const PROBE_TIMEOUT_MS = 4_000
+
+/**
+ * Work out *why* Apple did not answer, from the guest's own phone.
+ *
+ * A cross-origin request that fails tells the page almost nothing: the browser
+ * reports the same opaque error whether an extension killed it, DNS refused to
+ * resolve it, or Apple returned a `429` without the CORS headers needed to let
+ * us read it. Those are different problems with different fixes, and guessing
+ * between them from a datacentre is hopeless — the only machine that can tell
+ * is the one being blocked.
+ *
+ * `no-cors` is what makes this possible. The browser stops enforcing CORS and
+ * hands back an opaque response, so the request succeeding proves the host is
+ * reachable and something about the *search* was refused; it failing proves
+ * the request never got out of the phone at all.
+ */
+async function probeApple(signal?: AbortSignal): Promise<AppleFailure> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'offline'
+  }
+
+  const guard = withTimeout(signal, PROBE_TIMEOUT_MS)
+  try {
+    await fetch(PROBE_URL, {
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: guard.signal,
+    })
+    return 'refused'
+  } catch {
+    return guard.timedOut ? 'slow' : 'blocked'
+  } finally {
+    guard.done()
+  }
+}
+
+/** What to tell the guest, and what they can actually do about it. */
+export function appleFailureMessage(kind: AppleFailure): string {
+  switch (kind) {
+    case 'offline':
+      return 'Your phone is offline, so song search can’t run. Reconnect, or type the song in below.'
+    case 'blocked':
+      return 'Something on this phone is blocking Apple’s song search — usually an ad blocker, a content blocker, or a filtering VPN or DNS profile. Allow itunes.apple.com, or type the song in below.'
+    case 'refused':
+      return 'Apple is limiting searches from this network right now — too many at once from the same WiFi. Wait a minute, or type the song in below.'
+    case 'slow':
+      return 'Apple’s song search didn’t respond in time. Your connection may be slow or filtered — you can type the song in below.'
+  }
 }
 
 /** The 100px thumbnail the API returns is soft on a modern phone. */
@@ -140,15 +206,21 @@ export async function searchCatalog(
     // already been turned into a ServiceError, which falls through.
     if (err instanceof DOMException && err.name === 'AbortError') throw err
 
+    // Started rather than awaited, so working out why Apple failed costs no
+    // wall time — it runs while the fallback is being fetched.
+    const diagnosis = probeApple(opts?.signal)
+
     try {
       return {
         songs: await searchMusicBrainz(term, opts),
         source: 'musicbrainz',
+        appleFailure: await diagnosis,
       }
     } catch (fallbackErr) {
       if (fallbackErr instanceof DOMException) throw fallbackErr
-      // Report the first failure: it is the one describing the usual cause.
-      throw err
+      // Nothing answered, so this is all the guest gets — make it the sentence
+      // that names the actual problem rather than the generic first failure.
+      throw new ServiceError('network', appleFailureMessage(await diagnosis))
     }
   }
 }

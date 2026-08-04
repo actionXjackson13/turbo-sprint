@@ -17,7 +17,10 @@ import { useCatalogSearch } from '../../features/catalog/useCatalogSearch'
 import { FIELD_LIMITS, MAX_ACTIVE_REQUESTS_PER_GUEST } from '../../data/constants'
 import { validateArtist, validateSongTitle } from '../../utils/validation'
 import { getErrorMessage } from '../../utils/errors'
-import type { CatalogSong } from '../../services/catalog/appleCatalog'
+import {
+  appleFailureMessage,
+  type CatalogSong,
+} from '../../services/catalog/appleCatalog'
 import type { SongRequest } from '../../types/domain'
 
 /**
@@ -52,7 +55,8 @@ export function RequestSongPage() {
   const [duplicate, setDuplicate] = useState<SongRequest | null>(null)
   const [pending, setPending] = useState<CatalogSong | null>(null)
 
-  const { results, loading, error, empty, source } = useCatalogSearch(term)
+  const { results, loading, error, empty, source, appleFailure } =
+    useCatalogSearch(term)
 
   const intakeClosed = event ? event.requestStatus !== 'open' : false
   const blocked = guest?.isBlocked ?? false
@@ -320,9 +324,11 @@ export function RequestSongPage() {
                 role="status"
                 className="mb-3 rounded-control border border-status-pending/40 bg-status-pending/10 p-2.5 text-meta text-fg-muted"
               >
-                Apple Music search could not be reached, so these are basic
-                results — no artwork, and covers can outrank the original. Pick
-                carefully, or type the song in.
+                {appleFailure
+                  ? appleFailureMessage(appleFailure)
+                  : 'Apple Music search could not be reached.'}{' '}
+                These are basic results — no artwork, and covers can outrank
+                the original, so pick carefully.
               </p>
             )}
 

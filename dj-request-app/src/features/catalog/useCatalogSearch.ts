@@ -4,6 +4,7 @@ import {
   type CatalogResults,
   type CatalogSong,
   type CatalogSource,
+  type AppleFailure,
 } from '../../services/catalog/appleCatalog'
 import { getErrorMessage } from '../../utils/errors'
 
@@ -63,6 +64,8 @@ export interface CatalogSearchState {
    * looking at the fallback rather than at a worse app.
    */
   source: CatalogSource | null
+  /** Why Apple was skipped, when it was. Drives what the guest is told. */
+  appleFailure: AppleFailure | null
 }
 
 export function useCatalogSearch(term: string): CatalogSearchState {
@@ -72,6 +75,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
     error: null,
     empty: false,
     source: null,
+    appleFailure: null,
   })
 
   useEffect(() => {
@@ -83,6 +87,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
         error: null,
         empty: false,
         source: null,
+        appleFailure: null,
       })
       return
     }
@@ -99,6 +104,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
         error: null,
         empty: cached.songs.length === 0,
         source: cached.source,
+        appleFailure: cached.appleFailure ?? null,
       })
       return
     }
@@ -120,6 +126,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
             error: null,
             empty: results.songs.length === 0,
             source: results.source,
+            appleFailure: results.appleFailure ?? null,
           })
         } catch (err) {
           if (controller.signal.aborted) return
@@ -129,6 +136,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
             error: getErrorMessage(err),
             empty: false,
             source: null,
+            appleFailure: null,
           })
         }
       })()

@@ -62,8 +62,10 @@ describe('searchCatalog', () => {
 
   it('explains a rate limit in words a guest can act on', async () => {
     mockFetch({ ok: false, status: 429 })
+    // The probe reaches Apple, so this is the network's budget rather than
+    // anything wrong with the guest's phone — and is worded that way.
     await expect(searchCatalog('anything')).rejects.toThrow(
-      /busy right now.*type the song in/i,
+      /limiting searches from this network/i,
     )
   })
 
@@ -194,7 +196,8 @@ describe('falling back when Apple is unreachable', () => {
       })
 
       const pending = searchCatalog('mr brightside')
-      await vi.advanceTimersByTimeAsync(8_000)
+      // Apple's seven seconds, then the probe's four alongside the fallback.
+      await vi.advanceTimersByTimeAsync(15_000)
 
       const { songs, source } = await pending
       expect(source).toBe('musicbrainz')
@@ -217,22 +220,88 @@ describe('falling back when Apple is unreachable', () => {
 
       const pending = searchCatalog('mr brightside')
       // Apple's window, then MusicBrainz's, with room for the 503 retry.
-      const settled = expect(pending).rejects.toThrow(/busy|unavailable/i)
-      await vi.advanceTimersByTimeAsync(30_000)
+      const settled = expect(pending).rejects.toThrow(/didn’t respond in time/i)
+      await vi.advanceTimersByTimeAsync(40_000)
       await settled
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('reports the original failure when neither source answers', async () => {
+  /**
+   * Telling the two apart is the whole point: a blocked host is the guest's
+   * own device refusing and only they can allow it, while a refusal is the
+   * venue's address being rate-limited and waiting fixes it. "Could not be
+   * reached" sends someone to check WiFi that was never the problem.
+   */
+  it('names an on-device blocker when the host cannot be reached at all', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('musicbrainz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mbBody),
+        } as unknown as Response)
+      }
+      // Both the search and the probe are killed before leaving the phone.
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+
+    const { source, appleFailure } = await searchCatalog('mr brightside')
+    expect(source).toBe('musicbrainz')
+    expect(appleFailure).toBe('blocked')
+  })
+
+  it('names a rate limit when the host answers but the search does not', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('musicbrainz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mbBody),
+        } as unknown as Response)
+      }
+      if (url.includes('robots.txt')) {
+        // no-cors: opaque, but it proves the request reached Apple.
+        return Promise.resolve({ type: 'opaque', status: 0 } as unknown as Response)
+      }
+      return Promise.resolve({ ok: false, status: 429 } as unknown as Response)
+    })
+
+    const { appleFailure } = await searchCatalog('mr brightside')
+    expect(appleFailure).toBe('refused')
+  })
+
+  it('says so when the phone is simply offline', async () => {
+    const online = vi
+      .spyOn(navigator, 'onLine', 'get')
+      .mockReturnValue(false)
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input).includes('musicbrainz')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mbBody),
+        } as unknown as Response)
+      }
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+
+    const { appleFailure } = await searchCatalog('mr brightside')
+    expect(appleFailure).toBe('offline')
+    online.mockRestore()
+  })
+
+  it('names the cause when neither source answers', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(
       new TypeError('Failed to fetch'),
     )
-    // Apple's wording, not MusicBrainz's: a thrown fetch is most often the
-    // rate limit, whose 429 carries no CORS headers for the browser to show.
+    // Nothing left the phone at all, including the probe — so the guest is
+    // told what to check rather than being left with a generic failure.
     await expect(searchCatalog('anything')).rejects.toThrow(
-      /busy right now.*type the song in/i,
+      /blocking Apple’s song search/i,
     )
   })
 
