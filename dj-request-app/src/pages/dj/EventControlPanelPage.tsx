@@ -14,6 +14,7 @@ import {
   SongRequestCard,
   SongRequestListSkeleton,
   StatusBadge,
+  UpNextRow,
 } from '../../components'
 import { routes } from '../../lib/router'
 import { useDjEvent } from '../../hooks/useDjEvent'
@@ -161,30 +162,13 @@ export function EventControlPanelPage() {
         <div>
           <NowPlayingCard
             nowPlaying={event.nowPlaying}
-            headline
             emptyHint="Nothing set yet."
           >
             <div className="space-y-2">
-              <div className="flex items-center gap-3 rounded-control bg-ink-900/60 px-3 py-2">
-                <AlbumArt url={upNext?.artworkUrl} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-label text-fg-subtle uppercase">
-                    Up next
-                  </p>
-                  <p className="mt-0.5 truncate text-sm text-fg">
-                    {upNext ? (
-                      <>
-                        {upNext.title}{' '}
-                        <span className="text-fg-muted">— {upNext.artist}</span>
-                      </>
-                    ) : (
-                      <span className="text-fg-muted">
-                        Nothing queued. Queue a request below.
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
+              <UpNextRow
+                request={upNext}
+                emptyText="Nothing queued. Queue a request below."
+              />
               <AppButton
                 size="lg"
                 fullWidth

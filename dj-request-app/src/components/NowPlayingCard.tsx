@@ -8,8 +8,6 @@ export interface NowPlayingCardProps {
     artist: string
     artworkUrl?: string | null
   } | null
-  /** Larger treatment for the screen that leads with it — the DJ's panel. */
-  headline?: boolean
   /** Shown in place of a track when nothing is set. */
   emptyHint: string
   /** Controls and context rendered beneath the track. */
@@ -31,10 +29,14 @@ export interface NowPlayingCardProps {
  * bright, so it is scaled past the edges, blurred until no detail survives,
  * and covered by a scrim. What is left is the colour of the record and nothing
  * that competes with the title over it.
+ *
+ * Drawn at one size everywhere. There used to be a smaller variant for the
+ * guest's home screen, which had it backwards: a guest can do nothing about
+ * the current track except look at it, so it is *more* of what their screen is
+ * for, not less.
  */
 export function NowPlayingCard({
   nowPlaying,
-  headline = false,
   emptyHint,
   children,
 }: NowPlayingCardProps) {
@@ -48,7 +50,7 @@ export function NowPlayingCard({
         nowPlaying
           ? 'border border-brand-500/45 bg-brand-500/12'
           : 'border border-hairline bg-ink-900',
-        headline ? 'p-4' : 'p-3.5',
+        'p-4',
       )}
     >
       {artwork && (
@@ -74,7 +76,7 @@ export function NowPlayingCard({
       <div className="flex items-center gap-3.5">
         <AlbumArt
           url={artwork}
-          size={headline ? '3xl' : '2xl'}
+          size="3xl"
           className="shadow-lg shadow-ink-950/60"
         />
 
@@ -83,12 +85,7 @@ export function NowPlayingCard({
 
           {nowPlaying ? (
             <>
-              <p
-                className={clsx(
-                  'mt-1.5 truncate font-bold text-fg',
-                  headline ? 'text-display' : 'text-hero',
-                )}
-              >
+              <p className="mt-1.5 truncate text-display font-bold text-fg">
                 {nowPlaying.title}
               </p>
               <p className="mt-1 truncate text-sm text-fg-muted">

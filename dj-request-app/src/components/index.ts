@@ -15,6 +15,7 @@ export {
   type SegmentedControlOption,
 } from './SegmentedControl'
 export { NowPlayingCard, type NowPlayingCardProps } from './NowPlayingCard'
+export { UpNextRow, type UpNextRowProps } from './UpNextRow'
 export {
   BottomNavigation,
   type NavItem,

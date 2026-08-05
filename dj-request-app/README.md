@@ -580,9 +580,15 @@ title stays white at full contrast against anything, checked against a
 near-white sleeve.
 
 `--text-display` (32px) exists for this one element and nothing else uses it,
-so it never has to compete. Neither screen puts a section heading above the
-card any more — it names itself, and a grey "NOW PLAYING" stacked over a card
-already saying it in brand colour only pushed the thing itself further down.
+so it never has to compete. No screen puts a section heading above the card any
+more — it names itself, and a grey "NOW PLAYING" stacked over a card already
+saying it in brand colour only pushed the thing itself further down.
+
+It is drawn at one size everywhere. A smaller variant for the guest's home
+screen had it backwards: a guest can do nothing about the current track except
+look at it, so it is *more* of what their screen is for, not less. `UpNextRow`
+is shared for the same reason — knowing whether their song is next is most of
+why a guest reopens the app, and it used to be visible only to the DJ.
 
 The little bars beside the label are the only animation in the app. A card
 showing the current track otherwise looks identical whether the party is in

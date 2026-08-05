@@ -10,6 +10,7 @@ import {
   SongRequestListSkeleton,
   SongRequestCard,
   StatusBadge,
+  UpNextRow,
 } from '../../components'
 import { routes } from '../../lib/router'
 import { useGuestSession } from '../../hooks/useGuestSession'
@@ -37,6 +38,20 @@ export function EventHomePage() {
   // everything sorted how I like".
   const popular = useMemo(
     () => selectMostWanted(requests, HOME_PREVIEW),
+    [requests],
+  )
+
+  /**
+   * What the DJ is playing after this one. The guest's card used to stop at
+   * the current track, which left the question they most want answered — is my
+   * song coming? — only askable by walking over to the booth.
+   */
+  const upNext = useMemo(
+    () =>
+      requests
+        .filter((r) => r.status === 'queued')
+        .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))[0] ??
+      null,
     [requests],
   )
 
@@ -71,11 +86,17 @@ export function EventHomePage() {
         )}
 
         {/* The card names itself, so no heading above it — this is the first
-            thing on the screen and should lead, not follow a label. */}
+            thing on the screen and should lead, not follow a label. Drawn
+            exactly as the DJ sees it, down to what is queued next. */}
         <NowPlayingCard
           nowPlaying={event?.nowPlaying ?? null}
           emptyHint="The DJ hasn't set a track yet."
-        />
+        >
+          <UpNextRow
+            request={upNext}
+            emptyText="Nothing queued yet — request something."
+          />
+        </NowPlayingCard>
 
         {activeRound && (
           <Section

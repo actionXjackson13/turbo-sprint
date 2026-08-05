@@ -108,7 +108,7 @@ export function QueuePage() {
       <PageHeader title="Queue" subtitle={`${queue.length} up next`} />
 
       <main className="flex-1 space-y-7 px-4 py-5">
-        <Section title="Now playing">
+        <div>
           <NowPlayingCard
             nowPlaying={event?.nowPlaying ?? null}
             emptyHint="Nothing playing yet."
@@ -134,7 +134,7 @@ export function QueuePage() {
               )}
             </div>
           </NowPlayingCard>
-        </Section>
+        </div>
 
         <Section title="Up next">
           {loading && requests.length === 0 ? (
