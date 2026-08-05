@@ -22,6 +22,9 @@ const SIZES = {
   md: 'size-11',
   lg: 'size-14',
   xl: 'size-16',
+  /** The now-playing sleeve: big enough to read the artwork, not just see it. */
+  '2xl': 'size-20',
+  '3xl': 'size-24',
 } as const
 
 export interface AlbumArtProps {

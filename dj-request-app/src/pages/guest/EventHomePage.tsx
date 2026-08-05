@@ -70,12 +70,12 @@ export function EventHomePage() {
           </div>
         )}
 
-        <Section title="Now playing">
-          <NowPlayingCard
-            nowPlaying={event?.nowPlaying ?? null}
-            emptyHint="The DJ hasn't set a track yet."
-          />
-        </Section>
+        {/* The card names itself, so no heading above it — this is the first
+            thing on the screen and should lead, not follow a label. */}
+        <NowPlayingCard
+          nowPlaying={event?.nowPlaying ?? null}
+          emptyHint="The DJ hasn't set a track yet."
+        />
 
         {activeRound && (
           <Section

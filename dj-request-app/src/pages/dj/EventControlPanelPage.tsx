@@ -154,8 +154,11 @@ export function EventControlPanelPage() {
       />
 
       <main className="flex-1 space-y-7 px-4 py-5">
-        {/* The night, in one card: what is on, and what follows it. */}
-        <Section title="Now playing">
+        {/* The night, in one card: what is on, and what follows it. No
+            section heading — the card names itself, and stacking a grey
+            "NOW PLAYING" above a card that already says it in brand colour
+            just pushed the thing itself further down the screen. */}
+        <div>
           <NowPlayingCard
             nowPlaying={event.nowPlaying}
             headline
@@ -192,7 +195,7 @@ export function EventControlPanelPage() {
               </AppButton>
             </div>
           </NowPlayingCard>
-        </Section>
+        </div>
 
         <Section
           title="Queue"

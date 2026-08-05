@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { AppCard } from './AppCard'
 import { AlbumArt } from './AlbumArt'
 
 export interface NowPlayingCardProps {
@@ -18,9 +17,20 @@ export interface NowPlayingCardProps {
 }
 
 /**
- * The current track. Three screens showed it and all three drew it slightly
- * differently; they now share this, so "what's playing" reads the same to the
- * DJ and to the room.
+ * The current track — the one thing this whole app is arranged around.
+ *
+ * It used to be a card like any other, which undersold it: a guest opening
+ * their phone and a DJ glancing up mid-set are asking the same question, and
+ * it should be answerable from arm's length without reading. So the sleeve
+ * carries the card. Its own artwork, enlarged and blurred, becomes the
+ * background, which makes every track look different from the last — the
+ * cheapest way to make the screen feel like it belongs to the music playing
+ * rather than to a form.
+ *
+ * The blur does real work beyond decoration. Cover art is arbitrary and often
+ * bright, so it is scaled past the edges, blurred until no detail survives,
+ * and covered by a scrim. What is left is the colour of the record and nothing
+ * that competes with the title over it.
  */
 export function NowPlayingCard({
   nowPlaying,
@@ -28,46 +38,97 @@ export function NowPlayingCard({
   emptyHint,
   children,
 }: NowPlayingCardProps) {
+  const artwork = nowPlaying?.artworkUrl
+
   return (
-    <AppCard tone={nowPlaying ? 'accent' : 'raised'}>
-      <div className={clsx('flex gap-3', headline ? 'items-start' : 'items-center')}>
-        {/* The sleeve, at the size the screen leads with. This is the one
-            place a picture does more than decorate: a DJ mid-set identifies
-            what is playing from across the booth by its cover. */}
+    <section
+      className={clsx(
+        'relative isolate overflow-hidden rounded-card',
+        // The brand tint still carries the card when there is no art to do it.
+        nowPlaying
+          ? 'border border-brand-500/45 bg-brand-500/12'
+          : 'border border-hairline bg-ink-900',
+        headline ? 'p-4' : 'p-3.5',
+      )}
+    >
+      {artwork && (
+        <>
+          {/* Scaled well past the edges so the blur has no visible border, and
+              hidden from assistive tech — it carries nothing the title beneath
+              it does not already say. */}
+          <img
+            src={artwork}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 -z-10 size-full scale-150 object-cover opacity-60 blur-2xl"
+          />
+          {/* The scrim. Cover art is frequently pale, and the title has to
+              stay legible over all of it. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 -z-10 bg-gradient-to-br from-ink-950/80 via-ink-950/70 to-ink-950/90"
+          />
+        </>
+      )}
+
+      <div className="flex items-center gap-3.5">
         <AlbumArt
-          url={nowPlaying?.artworkUrl}
-          size={headline ? 'xl' : 'md'}
+          url={artwork}
+          size={headline ? '3xl' : '2xl'}
+          className="shadow-lg shadow-ink-950/60"
         />
 
         <div className="min-w-0 flex-1">
+          <NowPlayingLabel live={Boolean(nowPlaying)} />
+
           {nowPlaying ? (
             <>
-              {/* On the screens that lead with it this is the largest text in
-                  the app — the single thing a DJ glances at mid-set. */}
               <p
                 className={clsx(
-                  'truncate font-bold text-fg',
-                  headline ? 'text-hero' : 'text-row',
+                  'mt-1.5 truncate font-bold text-fg',
+                  headline ? 'text-display' : 'text-hero',
                 )}
               >
                 {nowPlaying.title}
               </p>
-              <p
-                className={clsx(
-                  'truncate text-fg-muted',
-                  headline ? 'mt-1 text-sm' : 'text-meta mt-0.5',
-                )}
-              >
+              <p className="mt-1 truncate text-sm text-fg-muted">
                 {nowPlaying.artist}
               </p>
             </>
           ) : (
-            <p className="text-meta text-fg-muted">{emptyHint}</p>
+            <p className="mt-1.5 text-sm text-fg-muted">{emptyHint}</p>
           )}
         </div>
       </div>
 
-      {children && <div className="mt-3.5">{children}</div>}
-    </AppCard>
+      {children && <div className="mt-4">{children}</div>}
+    </section>
+  )
+}
+
+/**
+ * The label, with bars that move while something is playing.
+ *
+ * A card showing the current track looks identical whether the party is in
+ * full swing or ended two hours ago. Motion is the cheapest way to say which,
+ * and this is the one animation in the app that earns its place. It stops on
+ * its own for anyone who has asked for reduced motion — see index.css.
+ */
+function NowPlayingLabel({ live }: { live: boolean }) {
+  return (
+    <p className="flex items-center gap-2 text-label uppercase text-brand-400">
+      {live && (
+        <span className="flex h-3 items-end gap-0.5" aria-hidden="true">
+          {[0, 150, 300].map((delay) => (
+            <span
+              key={delay}
+              className="eq-bar h-full w-0.5 rounded-full bg-brand-400"
+              style={{ animationDelay: `${delay}ms` }}
+            />
+          ))}
+        </span>
+      )}
+      Now playing
+    </p>
   )
 }

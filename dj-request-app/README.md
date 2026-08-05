@@ -565,6 +565,30 @@ token. The trade-off is that it returns catalogue metadata only, which is all
 this app needs. Playback stays wherever the DJ already has it; each request
 carries a `music.apple.com` link.
 
+### Now playing
+
+The current track is what the app is arranged around — a guest opening their
+phone and a DJ glancing up mid-set are asking the same question — so it is
+built to be answerable from arm's length without reading.
+
+The sleeve carries the card. The track's own artwork, scaled past the edges and
+blurred until no detail survives, becomes the background, so every song looks
+different from the last; it is the cheapest way to make the screen feel like it
+belongs to the music rather than to a form. The blur is not only decoration:
+cover art is arbitrary and frequently pale, so a scrim sits over it and the
+title stays white at full contrast against anything, checked against a
+near-white sleeve.
+
+`--text-display` (32px) exists for this one element and nothing else uses it,
+so it never has to compete. Neither screen puts a section heading above the
+card any more — it names itself, and a grey "NOW PLAYING" stacked over a card
+already saying it in brand colour only pushed the thing itself further down.
+
+The little bars beside the label are the only animation in the app. A card
+showing the current track otherwise looks identical whether the party is in
+full swing or ended two hours ago, and motion is the cheapest way to say which.
+They stop for anyone who has asked for reduced motion.
+
 ### Cover art, everywhere a song appears
 
 Artwork reached the search results and stopped there, so a song a guest had
