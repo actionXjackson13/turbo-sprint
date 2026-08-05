@@ -66,6 +66,10 @@ export interface CreateRequestInput {
 export interface VotingOptionInput {
   title: string
   artist: string
+  /** Carried through when the option came from search — see CatalogSong. */
+  catalogId?: string | null
+  artworkUrl?: string | null
+  catalogUrl?: string | null
 }
 
 export interface CreateVotingRoundInput {

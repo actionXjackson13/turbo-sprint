@@ -101,6 +101,9 @@ export function toVotingOption(row: Row): VotingOption {
     title: row.title,
     artist: row.artist,
     displayOrder: row.display_order,
+    catalogId: row.catalog_id ?? null,
+    artworkUrl: row.artwork_url ?? null,
+    catalogUrl: row.catalog_url ?? null,
   }
 }
 

@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import type { VotingOption } from '../types/domain'
+import { AlbumArt } from './AlbumArt'
 
 export interface VotingOptionCardProps {
   option: VotingOption
@@ -44,6 +45,11 @@ export function VotingOptionCard({
       />
 
       <div className="relative flex items-center gap-3 p-4">
+        {/* Now that the DJ picks options out of the catalogue, this screen can
+            show what every other list does. Choosing between rows of bare text
+            was worst here, of all places — choosing is the whole job. */}
+        <AlbumArt url={option.artworkUrl} size="md" />
+
         <div className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-2">
             <h3 className="min-w-0 truncate text-base font-semibold text-fg">

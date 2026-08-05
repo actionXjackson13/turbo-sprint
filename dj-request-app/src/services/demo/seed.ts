@@ -248,6 +248,9 @@ export function buildSeed(): DemoDb {
       title: 'September',
       artist: 'Earth, Wind & Fire',
       displayOrder: 0,
+      catalogId: null,
+      artworkUrl: artworkFor('September'),
+      catalogUrl: null,
     },
     {
       id: 'demo-opt-2',
@@ -255,6 +258,9 @@ export function buildSeed(): DemoDb {
       title: 'Titanium',
       artist: 'David Guetta',
       displayOrder: 1,
+      catalogId: null,
+      artworkUrl: artworkFor('Titanium'),
+      catalogUrl: null,
     },
     {
       id: 'demo-opt-3',
@@ -262,6 +268,9 @@ export function buildSeed(): DemoDb {
       title: 'Padam Padam',
       artist: 'Kylie Minogue',
       displayOrder: 2,
+      catalogId: null,
+      artworkUrl: artworkFor('Padam Padam'),
+      catalogUrl: null,
     },
   ]
 

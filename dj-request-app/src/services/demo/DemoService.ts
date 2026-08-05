@@ -737,6 +737,9 @@ export class DemoService implements DataService {
             title: opt.title.trim(),
             artist: opt.artist.trim(),
             displayOrder: index,
+            catalogId: opt.catalogId ?? null,
+            artworkUrl: opt.artworkUrl ?? null,
+            catalogUrl: opt.catalogUrl ?? null,
           })
         })
 
@@ -947,9 +950,11 @@ export class DemoService implements DataService {
           status: 'queued',
           queuePosition: positions.length > 0 ? Math.max(...positions) + 1 : 0,
           sourceRoundId: roundId,
-          catalogId: null,
-          artworkUrl: null,
-          catalogUrl: null,
+          // The winner keeps the identity it was picked with, so the request
+          // it becomes looks like any other catalogue-picked one.
+          catalogId: option.catalogId,
+          artworkUrl: option.artworkUrl,
+          catalogUrl: option.catalogUrl,
           createdAt: now,
           updatedAt: now,
         }

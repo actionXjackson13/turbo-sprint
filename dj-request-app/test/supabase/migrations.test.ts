@@ -107,6 +107,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0006_catalog_metadata.sql'))
     await db.exec(read('0007_now_playing_artwork.sql'))
     await db.exec(read('0008_announcements.sql'))
+    await db.exec(read('0009_voting_option_catalog.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -850,6 +851,79 @@ describe('supabase migrations', () => {
           eventId,
         ]),
       ).rejects.toThrow(/forbidden/i)
+    })
+  })
+
+  describe('vote options from the catalogue', () => {
+    it('keeps what the DJ picked, and hands it to the winner', async () => {
+      const round = await runAs<{ create_voting_round: string }>(
+        DJ,
+        `select public.create_voting_round($1, $2::jsonb, null)`,
+        [
+          eventId,
+          JSON.stringify([
+            {
+              title: 'September',
+              artist: 'Earth, Wind & Fire',
+              catalogId: '901',
+              artworkUrl: 'https://cdn.test/september.jpg',
+              catalogUrl: 'https://music.apple.com/x/1',
+            },
+            // Still allowed to be typed, and still stores nulls for it.
+            { title: 'Typed In', artist: 'By Hand' },
+          ]),
+        ],
+      )
+      const roundId = round.rows[0]!.create_voting_round
+
+      const options = await db.query<{
+        title: string
+        catalog_id: string | null
+        artwork_url: string | null
+      }>(
+        `select title, catalog_id, artwork_url from public.voting_options
+         where round_id = $1 order by display_order`,
+        [roundId],
+      )
+      expect(options.rows[0]).toMatchObject({
+        title: 'September',
+        catalog_id: '901',
+        artwork_url: 'https://cdn.test/september.jpg',
+      })
+      expect(options.rows[1]).toMatchObject({
+        title: 'Typed In',
+        catalog_id: null,
+        artwork_url: null,
+      })
+
+      const optionId = await db.query<{ id: string }>(
+        `select id from public.voting_options
+         where round_id = $1 and display_order = 0`,
+        [roundId],
+      )
+
+      /**
+       * The winner becomes a real request, and should look like any other
+       * catalogue-picked one rather than a stranger in the queue.
+       */
+      const winner = await runAs<{
+        title: string
+        artwork_url: string | null
+        catalog_url: string | null
+      }>(DJ, `select * from public.push_winner_to_queue($1, $2)`, [
+        roundId,
+        optionId.rows[0]!.id,
+      ])
+
+      expect(winner.rows[0]).toMatchObject({
+        title: 'September',
+        artwork_url: 'https://cdn.test/september.jpg',
+        catalog_url: 'https://music.apple.com/x/1',
+      })
+
+      // Only one round may be active per event, and the cases after this one
+      // start their own.
+      await runAs(DJ, `select * from public.end_voting_round($1)`, [roundId])
     })
   })
 

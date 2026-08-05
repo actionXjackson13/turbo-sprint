@@ -132,6 +132,14 @@ export interface VotingOption {
   title: string
   artist: string
   displayOrder: number
+  /**
+   * Set when the DJ picked the option out of the catalogue rather than typing
+   * it. Nullable and staying that way — typing one in is still allowed, and
+   * rounds created before search reached this screen have none.
+   */
+  catalogId: string | null
+  artworkUrl: string | null
+  catalogUrl: string | null
 }
 
 export interface VotingRound {

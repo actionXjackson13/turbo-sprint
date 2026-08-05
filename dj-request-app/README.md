@@ -702,9 +702,9 @@ that reads as a rendering fault. Every row reserves the same square either way,
 and a URL that fails to load falls back to it rather than leaving a broken
 image.
 
-Voting options are the one place with no cover, and deliberately so: the DJ
-types those, so no artwork exists for them anywhere in the data model, and
-squares that could never fill would be worse than none.
+Voting options carry covers too, now that the DJ picks them from the catalogue
+rather than typing them — see below. Options typed by hand still show the
+placeholder, as anything without artwork does.
 
 A picked song stores `catalogId`, `artworkUrl` and `catalogUrl` alongside the
 title and artist. All three are nullable and stay that way: requests made
@@ -801,6 +801,25 @@ browser returns an opaque response, so:
 `appleFailureMessage` turns each into a sentence with a remedy in it. Driven by
 tests, and checked in a browser against a genuinely blocked host and a
 genuinely refused search.
+
+### One search, both sides
+
+The DJ's vote builder was two free-text boxes — the exact problem search was
+introduced to solve, left standing on the one screen a guest never sees. It now
+opens the guest's search in a sheet and fills the slot from a result.
+
+`features/catalog/SongSearch.tsx` is that search, shared rather than copied, so
+the debounce, the fallback ordering, the wording when Apple is unreachable and
+the type-it-in escape are one implementation. A DJ can still type an option in;
+the catalogue does not have everything, and neither screen should ever leave
+someone stuck.
+
+The knock-on is that a vote option can carry the track it was picked from
+(migration 0009), which is what finally lets the voting screen show cover art —
+guests had been choosing between rows of bare text on the one screen whose
+entire job is choosing. `push_winner_to_queue` copies it onward, so the request
+a winning song becomes looks like any other catalogue-picked one rather than a
+stranger in the queue.
 
 ### Why not Spotify
 
