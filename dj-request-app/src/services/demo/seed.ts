@@ -29,6 +29,45 @@ export const DEMO_DJ_EMAIL = 'dj@demo.local'
 export const DEMO_DJ_PASSWORD = 'demo1234'
 export const DEMO_EVENT_CODE = 'PLAY'
 
+
+/**
+ * Real cover art for the sample songs, so the demo shows what the app actually
+ * looks like in use rather than a column of placeholder squares. These are
+ * Apple's own CDN paths, which is what they are published for; only the
+ * fragment that varies is stored, since every URL shares the rest.
+ */
+const ARTWORK: Record<string, string> = {
+  'Levitating':
+    'Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg',
+  'Blinding Lights':
+    'Music125/v4/a6/6e/bf/a66ebf79-5008-8948-b352-a790fc87446b/19UM1IM04638.rgb.jpg',
+  'Dancing Queen':
+    'Music115/v4/60/f8/a6/60f8a6bc-e875-238d-f2f8-f34a6034e6d2/14UMGIM07615.rgb.jpg',
+  'Murder On The Dancefloor':
+    'Music123/v4/c3/11/ad/c311ad1c-0b83-dd10-2092-5a06687f2eb1/06UMGIM15668.rgb.jpg',
+  'Pepas':
+    'Music115/v4/73/a5/bf/73a5bfac-5a57-1372-8f4e-3a83c2349346/cover_2624266.jpg',
+  'Free Bird':
+    'Music126/v4/57/00/f3/5700f331-2d06-7f5d-cb98-43970fd52874/14UMGIM00860.rgb.jpg',
+  'Rasputin':
+    'Music115/v4/b7/86/45/b786452a-a723-eaed-8170-cdc261367eb7/886443575578.jpg',
+  'September':
+    'Music115/v4/5c/8e/19/5c8e191d-b458-fc29-54ef-bd9367835044/886447618547.jpg',
+  'Titanium':
+    'Music125/v4/77/6f/57/776f57e2-017d-ed40-8f0f-1547beb65517/190296501425.jpg',
+  'Padam Padam':
+    'Music116/v4/ce/2f/80/ce2f8070-8267-8763-a281-4b7062872d9a/4050538925289.jpg',
+  'Get Lucky':
+    'Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg',
+}
+
+function artworkFor(title: string): string | null {
+  const path = ARTWORK[title]
+  return path
+    ? `https://is1-ssl.mzstatic.com/image/thumb/${path}/300x300bb.jpg`
+    : null
+}
+
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
 export function buildSeed(): DemoDb {
@@ -220,6 +259,7 @@ export function buildSeed(): DemoDb {
           title: 'Get Lucky',
           artist: 'Daft Punk',
           sourceRequestId: null,
+          artworkUrl: artworkFor('Get Lucky'),
         },
         createdAt: minutesAgo(95),
         endedAt: null,
@@ -275,7 +315,7 @@ function req(input: {
     queuePosition: input.queuePosition ?? null,
     sourceRoundId: null,
     catalogId: null,
-    artworkUrl: null,
+    artworkUrl: artworkFor(input.title),
     catalogUrl: null,
     createdAt: minutesAgo(input.minutes),
     updatedAt: minutesAgo(input.minutes),

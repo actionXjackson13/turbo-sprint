@@ -49,6 +49,7 @@ export function toEvent(row: Row, djDisplayName?: string): EventRecord {
           title: row.now_playing_title,
           artist: row.now_playing_artist ?? '',
           sourceRequestId: row.now_playing_request_id ?? null,
+          artworkUrl: row.now_playing_artwork_url ?? null,
         }
       : null,
     createdAt: row.created_at,

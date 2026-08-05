@@ -105,6 +105,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0004_realtime.sql'))
     await db.exec(read('0005_fuzzy_dedupe.sql'))
     await db.exec(read('0006_catalog_metadata.sql'))
+    await db.exec(read('0007_now_playing_artwork.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -710,6 +711,67 @@ describe('supabase migrations', () => {
         [dedupeEventId],
       )
       expect(await findSimilar('Hello', 'Adele')).toBeNull()
+    })
+  })
+
+  describe('now playing artwork', () => {
+    it('records the cover alongside the track', async () => {
+      const res = await runAs<{
+        now_playing_title: string
+        now_playing_artwork_url: string | null
+      }>(
+        DJ,
+        `select * from public.set_now_playing($1, 'Levitating', 'Dua Lipa', null, $2)`,
+        [eventId, 'https://example.test/cover.jpg'],
+      )
+      expect(res.rows[0]!.now_playing_title).toBe('Levitating')
+      expect(res.rows[0]!.now_playing_artwork_url).toBe(
+        'https://example.test/cover.jpg',
+      )
+    })
+
+    it('defaults the cover to null, for a track typed by hand', async () => {
+      const res = await runAs<{ now_playing_artwork_url: string | null }>(
+        DJ,
+        `select * from public.set_now_playing($1, 'Free Bird', 'Lynyrd Skynyrd', null)`,
+        [eventId],
+      )
+      expect(res.rows[0]!.now_playing_artwork_url).toBeNull()
+    })
+
+    /**
+     * Adding a defaulted parameter without dropping the old signature would
+     * leave two functions of the same name, and Postgres refuses a call that
+     * matches both rather than choosing — so every existing four-argument
+     * caller would break at once.
+     */
+    it('leaves exactly one set_now_playing behind', async () => {
+      const res = await db.query<{ n: number }>(
+        `select count(*)::int as n from pg_proc
+         where proname = 'set_now_playing'`,
+      )
+      expect(res.rows[0]!.n).toBe(1)
+    })
+
+    it('still retires the request it promoted', async () => {
+      const req = await runAs<{ id: string }>(
+        GUEST_A,
+        `select * from public.create_song_request($1, 'Pepas', 'Farruko')`,
+        [eventId],
+      )
+      const requestId = req.rows[0]!.id
+
+      await runAs(
+        DJ,
+        `select * from public.set_now_playing($1, 'Pepas', 'Farruko', $2, $3)`,
+        [eventId, requestId, 'https://example.test/pepas.jpg'],
+      )
+
+      const after = await db.query<{ status: string }>(
+        `select status from public.song_requests where id = $1`,
+        [requestId],
+      )
+      expect(after.rows[0]!.status).toBe('played')
     })
   })
 

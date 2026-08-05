@@ -1,6 +1,7 @@
 export { AppButton, type AppButtonProps } from './AppButton'
 export { AppInput, type AppInputProps } from './AppInput'
 export { AppCard, type AppCardProps } from './AppCard'
+export { AlbumArt, type AlbumArtProps } from './AlbumArt'
 export { PageHeader, type PageHeaderProps } from './PageHeader'
 export {
   Section,

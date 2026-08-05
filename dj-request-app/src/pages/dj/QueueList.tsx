@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { AppButton } from '../../components'
 import { haptic } from '../../utils/haptics'
 import type { SongRequest } from '../../types/domain'
+import { AlbumArt } from '../../components'
 
 export interface QueueListProps {
   queue: SongRequest[]
@@ -172,6 +173,8 @@ export function QueueList({
                 }
                 onPick={(target) => moveTo(index, target - 1)}
               />
+
+              <AlbumArt url={request.artworkUrl} size="sm" />
 
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-row font-semibold text-fg">

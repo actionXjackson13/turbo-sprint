@@ -202,6 +202,7 @@ export class DemoService implements DataService {
       title: string
       artist: string
       sourceRequestId: string | null
+      artworkUrl?: string | null
     } | null,
   ): Promise<EventRecord> {
     await demoDelay(80)
@@ -209,6 +210,8 @@ export class DemoService implements DataService {
       (db) => {
         const event = this.requireOwnedEvent(db, eventId)
         event.nowPlaying = nowPlaying
+          ? { ...nowPlaying, artworkUrl: nowPlaying.artworkUrl ?? null }
+          : null
 
         // Promoting a request to now-playing also retires it from the queue.
         if (nowPlaying?.sourceRequestId) {

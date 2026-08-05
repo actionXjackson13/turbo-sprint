@@ -565,10 +565,36 @@ token. The trade-off is that it returns catalogue metadata only, which is all
 this app needs. Playback stays wherever the DJ already has it; each request
 carries a `music.apple.com` link.
 
+### Cover art, everywhere a song appears
+
+Artwork reached the search results and stopped there, so a song a guest had
+picked out by its sleeve arrived on every other screen as two lines of text.
+`AlbumArt` now draws it on all of them: request cards on both sides, the queue
+and its preview, the reorder list, the request detail screen, **Up next**, and
+**Now playing** — which leads with it, since a cover is what a DJ recognises
+from across a booth.
+
+The placeholder is the point rather than a fallback. Plenty of songs reach us
+without a cover — anything typed by hand, anything requested before search
+existed — and a list where only some rows carry a picture is ragged in a way
+that reads as a rendering fault. Every row reserves the same square either way,
+and a URL that fails to load falls back to it rather than leaving a broken
+image.
+
+Voting options are the one place with no cover, and deliberately so: the DJ
+types those, so no artwork exists for them anywhere in the data model, and
+squares that could never fill would be worse than none.
+
 A picked song stores `catalogId`, `artworkUrl` and `catalogUrl` alongside the
 title and artist. All three are nullable and stay that way: requests made
 before search existed have none, and neither do voting-round winners the DJ
 typed. Nothing may assume they are present.
+
+The current track keeps its own copy — `now_playing_artwork_url`, migration
+0007 — rather than reading one back through `now_playing_request_id`. A track
+can be set with no request behind it, and a request can be deleted while the
+song it named is still playing; copying the URL when the track is set keeps the
+display independent of both.
 
 ### Why there is no proxy
 

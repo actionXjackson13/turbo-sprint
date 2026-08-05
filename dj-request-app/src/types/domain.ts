@@ -40,6 +40,12 @@ export interface NowPlaying {
   artist: string
   /** Set when the track was promoted from a request, so it can be marked played. */
   sourceRequestId: string | null
+  /**
+   * Copied from the request when the track was set, not read back through it —
+   * a track can have no request behind it, and a request can be deleted while
+   * its song is still playing.
+   */
+  artworkUrl: string | null
 }
 
 export interface EventRecord {

@@ -222,6 +222,7 @@ export class SupabaseService implements DataService {
       title: string
       artist: string
       sourceRequestId: string | null
+      artworkUrl?: string | null
     } | null,
   ): Promise<EventRecord> {
     const { error } = await this.db.rpc('set_now_playing', {
@@ -229,6 +230,7 @@ export class SupabaseService implements DataService {
       p_title: nowPlaying?.title ?? null,
       p_artist: nowPlaying?.artist ?? null,
       p_request_id: nowPlaying?.sourceRequestId ?? null,
+      p_artwork_url: nowPlaying?.artworkUrl ?? null,
     })
     if (error) translateError(error, 'Could not set the current song.')
 

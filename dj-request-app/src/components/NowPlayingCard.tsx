@@ -1,9 +1,14 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { AppCard } from './AppCard'
+import { AlbumArt } from './AlbumArt'
 
 export interface NowPlayingCardProps {
-  nowPlaying: { title: string; artist: string } | null
+  nowPlaying: {
+    title: string
+    artist: string
+    artworkUrl?: string | null
+  } | null
   /** Larger treatment for the screen that leads with it — the DJ's panel. */
   headline?: boolean
   /** Shown in place of a track when nothing is set. */
@@ -26,26 +31,13 @@ export function NowPlayingCard({
   return (
     <AppCard tone={nowPlaying ? 'accent' : 'raised'}>
       <div className={clsx('flex gap-3', headline ? 'items-start' : 'items-center')}>
-        <span
-          className={clsx(
-            'flex shrink-0 items-center justify-center rounded-full',
-            nowPlaying
-              ? 'bg-brand-500/20 text-brand-400'
-              : 'bg-ink-800 text-fg-subtle',
-            headline ? 'size-11' : 'size-9',
-          )}
-          aria-hidden="true"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className={headline ? 'size-5' : 'size-4'}
-          >
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
-          </svg>
-        </span>
+        {/* The sleeve, at the size the screen leads with. This is the one
+            place a picture does more than decorate: a DJ mid-set identifies
+            what is playing from across the booth by its cover. */}
+        <AlbumArt
+          url={nowPlaying?.artworkUrl}
+          size={headline ? 'xl' : 'md'}
+        />
 
         <div className="min-w-0 flex-1">
           {nowPlaying ? (

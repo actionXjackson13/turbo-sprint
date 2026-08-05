@@ -111,7 +111,12 @@ export interface DataService {
   ): Promise<EventRecord>
   setNowPlaying(
     eventId: string,
-    nowPlaying: { title: string; artist: string; sourceRequestId: string | null } | null,
+    nowPlaying: {
+      title: string
+      artist: string
+      sourceRequestId: string | null
+      artworkUrl?: string | null
+    } | null,
   ): Promise<EventRecord>
   endEvent(eventId: string): Promise<EventRecord>
   /** Event row changes (intake status, now playing, ended). */

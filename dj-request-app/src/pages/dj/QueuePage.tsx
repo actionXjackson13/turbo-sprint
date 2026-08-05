@@ -78,6 +78,9 @@ export function QueuePage() {
         title: next.title,
         artist: next.artist,
         sourceRequestId: next.id,
+        // Carried across so the cover survives the request being played and
+        // retired — the track outlives the row it came from.
+        artworkUrl: next.artworkUrl,
       })
       await Promise.all([refresh(), reload()])
       toast.success(`Now playing ${next.title}`)

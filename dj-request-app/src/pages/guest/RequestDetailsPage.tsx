@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  AlbumArt,
   AppButton,
   AppCard,
   EmptyState,
@@ -100,14 +101,20 @@ export function RequestDetailsPage() {
 
       <main className="flex-1 space-y-6 px-4 py-5">
         <AppCard emphasis>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-xl leading-tight font-bold text-fg">
-                {request.title}
-              </h2>
-              <p className="mt-1 text-base text-fg-muted">{request.artist}</p>
+          <div className="flex items-start gap-3">
+            {/* The screen devoted to one song is the one place worth giving
+                the cover real size. */}
+            <AlbumArt url={request.artworkUrl} size="xl" />
+
+            <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-xl leading-tight font-bold text-fg">
+                  {request.title}
+                </h2>
+                <p className="mt-1 text-base text-fg-muted">{request.artist}</p>
+              </div>
+              <StatusBadge status={request.status} />
             </div>
-            <StatusBadge status={request.status} />
           </div>
 
           <p className="mt-3 text-sm text-fg-subtle">

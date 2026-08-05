@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import type { SongRequest } from '../types/domain'
+import { AlbumArt } from './AlbumArt'
 import { StatusBadge } from './StatusBadge'
 import { formatRelativeTime } from '../utils/formatRelativeTime'
 
@@ -64,16 +65,9 @@ export function SongRequestCard({
           app, so every extra pixel here is multiplied down the whole list and
           is most of what made screens feel crowded. */}
       <div className="flex items-center gap-3 px-3.5 py-3">
-        {/* Artwork when the song came from search; nothing when it didn't,
-            rather than a placeholder box on every older request. */}
-        {request.artworkUrl && (
-          <img
-            src={request.artworkUrl}
-            alt=""
-            loading="lazy"
-            className="size-11 shrink-0 rounded-control bg-ink-800 object-cover"
-          />
-        )}
+        {/* Always drawn, cover or not. A list where only some rows carry a
+            picture is ragged in a way that reads as a rendering fault. */}
+        <AlbumArt url={request.artworkUrl} size="md" />
 
         {/* The tappable body is a button so keyboard users get it for free. */}
         {onOpen ? (

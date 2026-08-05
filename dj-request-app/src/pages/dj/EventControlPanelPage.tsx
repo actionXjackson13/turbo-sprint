@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AlbumArt,
   AppButton,
   AppCard,
   PartyStatus,
@@ -114,6 +115,9 @@ export function EventControlPanelPage() {
         title: upNext.title,
         artist: upNext.artist,
         sourceRequestId: upNext.id,
+        // Carried across so the cover survives the request being played and
+        // retired — the track outlives the row it came from.
+        artworkUrl: upNext.artworkUrl,
       })
       await Promise.all([refresh(), reload()])
       toast.success(`Now playing ${upNext.title}`)
@@ -158,22 +162,25 @@ export function EventControlPanelPage() {
             emptyHint="Nothing set yet."
           >
             <div className="space-y-2">
-              <div className="rounded-control bg-ink-900/60 px-3 py-2">
-                <p className="text-label text-fg-subtle uppercase">
-                  Up next
-                </p>
-                <p className="mt-0.5 truncate text-sm text-fg">
-                  {upNext ? (
-                    <>
-                      {upNext.title}{' '}
-                      <span className="text-fg-muted">— {upNext.artist}</span>
-                    </>
-                  ) : (
-                    <span className="text-fg-muted">
-                      Nothing queued. Queue a request below.
-                    </span>
-                  )}
-                </p>
+              <div className="flex items-center gap-3 rounded-control bg-ink-900/60 px-3 py-2">
+                <AlbumArt url={upNext?.artworkUrl} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-label text-fg-subtle uppercase">
+                    Up next
+                  </p>
+                  <p className="mt-0.5 truncate text-sm text-fg">
+                    {upNext ? (
+                      <>
+                        {upNext.title}{' '}
+                        <span className="text-fg-muted">— {upNext.artist}</span>
+                      </>
+                    ) : (
+                      <span className="text-fg-muted">
+                        Nothing queued. Queue a request below.
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
               <AppButton
                 size="lg"
@@ -212,6 +219,7 @@ export function EventControlPanelPage() {
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink-600 text-xs font-bold tabular-nums text-fg-muted">
                       {index + 1}
                     </span>
+                    <AlbumArt url={request.artworkUrl} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-fg">
                         {request.title}
