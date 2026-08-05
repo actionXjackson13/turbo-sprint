@@ -15,6 +15,10 @@ export interface AnnouncementBannerProps {
  * Deliberately smaller than the now-playing card it sits over. A message that
  * competed with the current track would win by novelty and lose the screen its
  * point; this is a notification, not a headline.
+ *
+ * No icon. The label already says who it is from, and a glyph beside it only
+ * repeated that in a second language while taking the width the message
+ * itself wants.
  */
 export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
   /**
@@ -29,24 +33,9 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
   return (
     <aside
       role="status"
-      className="flex gap-2.5 rounded-card border border-accent-400/45 bg-accent-500/12 p-3"
+      className="rounded-card border border-accent-400/45 bg-accent-500/12 p-3"
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="mt-0.5 size-4 shrink-0 text-accent-400"
-        aria-hidden="true"
-      >
-        <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
-        <path d="M16 8.5a4 4 0 0 1 0 7" />
-        <path d="M19 5.5a8 8 0 0 1 0 13" />
-      </svg>
-
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <p className="text-label uppercase text-accent-400">
           Message from the DJ
         </p>

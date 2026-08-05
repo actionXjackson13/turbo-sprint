@@ -21,20 +21,39 @@ export const VOTING_DURATIONS: ReadonlyArray<{
 ]
 
 /**
- * How long a DJ's message stays up.
+ * The one-tap durations for a DJ's message.
  *
- * Deliberately short options. A message that outlasts the reason for it is
- * just clutter above the thing guests actually opened the app for, and a DJ
- * mid-set will not remember to come back and clear it.
+ * Three, and all short. These are the answer nearly every time — a message is
+ * usually about something happening in the next few minutes — and a row of
+ * options wide enough to cover every case would make the common one slower to
+ * hit. Everything else lives behind **Custom**.
  */
-export const ANNOUNCEMENT_DURATIONS: ReadonlyArray<{
+export const ANNOUNCEMENT_QUICK_DURATIONS: ReadonlyArray<{
   label: string
   seconds: number
 }> = [
   { label: '1 min', seconds: 60 },
+  { label: '2 min', seconds: 120 },
   { label: '5 min', seconds: 300 },
+]
+
+/**
+ * The longer options, behind the Custom button.
+ *
+ * Still a list rather than a free-text field: a DJ picking a duration one-
+ * handed mid-set wants to tap, not type, and no party needs a message timed to
+ * the second.
+ */
+export const ANNOUNCEMENT_CUSTOM_DURATIONS: ReadonlyArray<{
+  label: string
+  seconds: number
+}> = [
+  { label: '10 min', seconds: 600 },
   { label: '15 min', seconds: 900 },
+  { label: '30 min', seconds: 1800 },
+  { label: '45 min', seconds: 2700 },
   { label: '1 hour', seconds: 3600 },
+  { label: '2 hours', seconds: 7200 },
 ]
 
 export const FIELD_LIMITS = {

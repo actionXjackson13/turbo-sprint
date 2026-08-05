@@ -591,12 +591,19 @@ that appears above the current track on every guest's phone and takes itself
 down. The DJ writes it from *Event settings → Message guests*, picks how long
 it shows for, and can replace or clear it.
 
-Two properties keep it from becoming wallpaper, and both are enforced rather
-than encouraged. It is capped at 140 characters, in the RPC as well as the
-field, so it can never become a second now-playing card. And every duration on
-offer is short: a message that outlasts the reason for it is clutter above the
-thing guests actually opened the app for, and a DJ mid-set will not remember to
-come back and clear it.
+It is capped at 140 characters, in the RPC as well as the field, so it can
+never become a second now-playing card. It carries no icon either: the label
+already says who it is from, and a glyph beside it repeated that in a second
+language while taking width the message itself wants.
+
+The duration is picked, never typed, at both levels — a DJ choosing one with a
+drink in the other hand wants to tap, and no party needs a message timed to the
+second. Three quick options (1, 2, 5 minutes) cover nearly every case, because
+a message is almost always about the next few minutes; everything longer sits
+behind **Custom**, which opens a menu and then shows the value it was given
+rather than the word, so the row still reads as an answer at a glance. A row
+wide enough to hold every option would have made the common one slower to
+reach.
 
 **The server decides when it ends.** The caller sends a *duration* and Postgres
 computes the expiry from its own clock — the same reasoning as voting rounds,

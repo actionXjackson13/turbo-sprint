@@ -3,7 +3,11 @@ import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { AppButton } from '../../components'
 import { useDialogBehavior } from '../../hooks/useDialogBehavior'
-import { ANNOUNCEMENT_DURATIONS, FIELD_LIMITS } from '../../data/constants'
+import {
+  ANNOUNCEMENT_CUSTOM_DURATIONS,
+  ANNOUNCEMENT_QUICK_DURATIONS,
+  FIELD_LIMITS,
+} from '../../data/constants'
 
 export interface MessageGuestsDialogProps {
   open: boolean
@@ -22,10 +26,13 @@ export interface MessageGuestsDialogProps {
  * mid-set with one hand, and pushing the DJ through a page transition to say
  * "last orders in ten minutes" would be the wrong weight of ceremony.
  *
- * The duration is picked, never typed. Every option is short — a message that
- * outlasts the reason for it becomes clutter above the thing guests actually
- * came to see, and a DJ running a party will not remember to come back and
- * clear it.
+ * The duration is picked, never typed, at either level. A DJ choosing one
+ * with a drink in the other hand wants to tap, and no party needs a message
+ * timed to the second.
+ *
+ * Three quick options and everything else behind **Custom**, because a message
+ * is nearly always about the next few minutes. A row wide enough to cover
+ * every case would have made the common answer slower to reach.
  */
 export function MessageGuestsDialog({
   open,
@@ -39,11 +46,15 @@ export function MessageGuestsDialog({
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const [message, setMessage] = useState('')
-  const [seconds, setSeconds] = useState(ANNOUNCEMENT_DURATIONS[1]!.seconds)
+  const [seconds, setSeconds] = useState(ANNOUNCEMENT_QUICK_DURATIONS[1]!.seconds)
+  const [pickingCustom, setPickingCustom] = useState(false)
 
   // Start from whatever is up, so editing a live message is the obvious move.
   useEffect(() => {
-    if (open) setMessage(current?.message ?? '')
+    if (open) {
+      setMessage(current?.message ?? '')
+      setPickingCustom(false)
+    }
   }, [open, current])
 
   useDialogBehavior({
@@ -57,6 +68,9 @@ export function MessageGuestsDialog({
 
   const trimmed = message.trim()
   const remaining = FIELD_LIMITS.announcement - message.length
+  const custom = ANNOUNCEMENT_CUSTOM_DURATIONS.find(
+    (option) => option.seconds === seconds,
+  )
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -105,22 +119,60 @@ export function MessageGuestsDialog({
             Show for
           </legend>
           <div className="mt-2 grid grid-cols-4 gap-2">
-            {ANNOUNCEMENT_DURATIONS.map((option) => (
-              <button
+            {ANNOUNCEMENT_QUICK_DURATIONS.map((option) => (
+              <DurationChip
                 key={option.seconds}
-                type="button"
-                aria-pressed={seconds === option.seconds}
-                onClick={() => setSeconds(option.seconds)}
-                className={clsx(
-                  'min-h-11 rounded-control border text-meta font-medium transition-colors',
-                  seconds === option.seconds
-                    ? 'border-brand-500 bg-brand-500/20 text-fg'
-                    : 'border-hairline bg-ink-900 text-fg-muted',
-                )}
-              >
-                {option.label}
-              </button>
+                label={option.label}
+                selected={seconds === option.seconds}
+                onClick={() => {
+                  setSeconds(option.seconds)
+                  setPickingCustom(false)
+                }}
+              />
             ))}
+
+            {/* The overflow. Shows the chosen value rather than the word
+                "Custom" once one is picked, so the row still reads as an
+                answer to "show for" at a glance. */}
+            <div className="relative">
+              <DurationChip
+                label={custom?.label ?? 'Custom'}
+                selected={custom !== undefined}
+                menu
+                expanded={pickingCustom}
+                onClick={() => setPickingCustom((v) => !v)}
+              />
+
+              {pickingCustom && (
+                <div
+                  role="menu"
+                  aria-label="Choose how long to show the message"
+                  // Opens upward: this sheet sits at the bottom of the screen,
+                  // so anything below the row is off it.
+                  className="absolute right-0 bottom-full z-10 mb-1 w-max rounded-card border border-hairline-strong bg-ink-700 p-1.5 shadow-xl shadow-black/60"
+                >
+                  {ANNOUNCEMENT_CUSTOM_DURATIONS.map((option) => (
+                    <button
+                      key={option.seconds}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSeconds(option.seconds)
+                        setPickingCustom(false)
+                      }}
+                      className={clsx(
+                        'block min-h-11 w-full rounded-control px-4 text-sm font-medium transition-colors',
+                        seconds === option.seconds
+                          ? 'bg-brand-500/20 text-brand-400'
+                          : 'text-fg hover:bg-ink-600',
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </fieldset>
 
@@ -161,5 +213,59 @@ export function MessageGuestsDialog({
       </div>
     </div>,
     document.body,
+  )
+}
+
+interface DurationChipProps {
+  label: string
+  selected: boolean
+  /** Draws the caret and wires the menu semantics. */
+  menu?: boolean
+  expanded?: boolean
+  onClick: () => void
+}
+
+/** One duration option. Shared so the Custom button matches the quick ones. */
+function DurationChip({
+  label,
+  selected,
+  menu = false,
+  expanded = false,
+  onClick,
+}: DurationChipProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={menu ? undefined : selected}
+      aria-haspopup={menu ? 'menu' : undefined}
+      aria-expanded={menu ? expanded : undefined}
+      onClick={onClick}
+      className={clsx(
+        'flex min-h-11 w-full items-center justify-center gap-0.5 rounded-control border px-1',
+        'text-meta font-medium transition-colors',
+        selected || expanded
+          ? 'border-brand-500 bg-brand-500/20 text-fg'
+          : 'border-hairline bg-ink-900 text-fg-muted',
+      )}
+    >
+      <span className="truncate">{label}</span>
+      {menu && (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={clsx(
+            'size-3 shrink-0 transition-transform',
+            expanded && 'rotate-180',
+          )}
+          aria-hidden="true"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      )}
+    </button>
   )
 }
