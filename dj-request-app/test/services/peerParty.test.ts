@@ -16,8 +16,10 @@ import {
 import { ServiceError } from '../../src/services/types'
 import {
   __resetPartySession,
+  getPartyState,
   isRemoteCode,
   startHosting,
+  stopHosting,
 } from '../../src/services/partySession'
 
 /**
@@ -315,5 +317,113 @@ describe('the sample event is never hosted', () => {
     expect(isRemoteCode(DEMO_EVENT_CODE)).toBe(false)
     expect(isRemoteCode(DEMO_EVENT_CODE.toLowerCase())).toBe(false)
     expect(isRemoteCode('PRGU')).toBe(true)
+  })
+})
+
+/**
+ * Which event the device is actually serving.
+ *
+ * The guard here used to ask whether *anything* was being hosted rather than
+ * whether *this* was, so a DJ who created a second event stayed registered
+ * under the first one's code for the rest of the session. The relay had nobody
+ * under the code on their screen, so every guest who tried it was told no such
+ * party existed — while the DJ was shown a confident "party is open".
+ */
+describe('hosting follows the event on screen', () => {
+  let built: string[]
+
+  beforeEach(() => {
+    links.clear()
+    __resetPartySession()
+    built = []
+    __setPeerTransportFactory((id, events) => {
+      built.push(id)
+      return new LoopbackLink(id, events)
+    })
+  })
+
+  afterEach(() => {
+    stopHosting()
+    __setPeerTransportFactory(null)
+    __resetPartySession()
+    links.clear()
+  })
+
+  it('does not re-register when the same event asks again', async () => {
+    await startHosting('event-1', 'AAAA')
+    await startHosting('event-1', 'AAAA')
+    await startHosting('event-1', 'AAAA')
+
+    // Every DJ screen asks on mount; connected guests must not be dropped.
+    expect(built).toEqual(['soundboard-AAAA'])
+  })
+
+  it('hands the device over when a second event opens', async () => {
+    await startHosting('event-1', 'AAAA')
+    await startHosting('event-2', 'BBBB')
+
+    expect(built).toEqual(['soundboard-AAAA', 'soundboard-BBBB'])
+    expect(getPartyState().hostedEventId).toBe('event-2')
+    // The old registration is gone, so its code cannot look live.
+    expect(links.has('soundboard-AAAA')).toBe(false)
+    expect(links.has('soundboard-BBBB')).toBe(true)
+  })
+
+  it('reports which event is open, not merely that one is', async () => {
+    await startHosting('event-1', 'AAAA')
+    expect(getPartyState()).toMatchObject({
+      mode: 'hosting',
+      hostedEventId: 'event-1',
+    })
+
+    stopHosting()
+    expect(getPartyState()).toMatchObject({
+      mode: 'sandbox',
+      hostedEventId: null,
+    })
+  })
+
+  /**
+   * Registering takes a round trip and the DJ can move on during it. A slow
+   * start for the event they just left must not land afterwards and install
+   * itself as the live host, undoing the handover that superseded it.
+   */
+  it('discards a start that finished after the DJ moved on', async () => {
+    // A holder rather than a bare variable: TypeScript's flow analysis cannot
+    // see the assignment inside the promise callback and narrows it to never.
+    const gate: { release?: () => void } = {}
+    __setPeerTransportFactory((id, events) => {
+      built.push(id)
+      const link = new LoopbackLink(id, events)
+      if (id === 'soundboard-AAAA') {
+        // Hold the first registration open until the second has landed.
+        link.connect = () =>
+          new Promise<void>((resolve) => {
+            gate.release = resolve
+          })
+      }
+      return link
+    })
+
+    const slow = startHosting('event-1', 'AAAA')
+    await startHosting('event-2', 'BBBB')
+
+    expect(getPartyState().hostedEventId).toBe('event-2')
+
+    gate.release?.()
+    await slow.catch(() => {})
+    await new Promise((r) => setTimeout(r, 20))
+
+    // The latecomer must not have taken the device back.
+    expect(getPartyState().hostedEventId).toBe('event-2')
+    expect(links.has('soundboard-AAAA')).toBe(false)
+  })
+
+  it('re-registers when the same event comes back with a new code', async () => {
+    await startHosting('event-1', 'AAAA')
+    await startHosting('event-1', 'CCCC')
+
+    expect(built).toEqual(['soundboard-AAAA', 'soundboard-CCCC'])
+    expect(links.has('soundboard-CCCC')).toBe(true)
   })
 })

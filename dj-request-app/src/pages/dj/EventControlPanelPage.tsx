@@ -277,7 +277,7 @@ export function EventControlPanelPage() {
 
         {/* Set-up details: needed once at the start, not all night. */}
         <Section title="Event">
-          <PartyStatus code={event.code} className="mb-3" />
+          <PartyStatus eventId={eventId} code={event.code} className="mb-3" />
 
           <AppCard>
             <div className="flex items-center justify-between gap-3">

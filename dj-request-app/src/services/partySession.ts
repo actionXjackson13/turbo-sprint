@@ -27,6 +27,15 @@ export type PartyMode = 'supabase' | 'sandbox' | 'hosting' | 'joined'
 
 export interface PartyState {
   mode: PartyMode
+  /**
+   * Which event is currently open to other phones.
+   *
+   * Surfaced because "am I hosting" is not the question a screen needs
+   * answered — "is *this* event the one being hosted" is. A DJ with more than
+   * one event could otherwise be shown a confident "party is open" while the
+   * code on screen belonged to a different party entirely.
+   */
+  hostedEventId: string | null
   /** Live only while hosting. */
   guestCount: number
   /** Set when a party ended badly, for the UI to explain. */
@@ -38,11 +47,14 @@ type Listener = () => void
 const listeners = new Set<Listener>()
 
 let host: PeerHost | null = null
+/** What `host` (or `starting`) is for, so a different event can take over. */
+let hostedTarget: { eventId: string; code: string } | null = null
 /** A registration in flight, so concurrent callers share one attempt. */
 let starting: Promise<void> | null = null
 let guestService: PeerGuestService | null = null
 let state: PartyState = {
   mode: isDemoMode() ? 'sandbox' : 'supabase',
+  hostedEventId: null,
   guestCount: 0,
   error: null,
 }
@@ -148,37 +160,80 @@ export async function startHosting(
    */
   if (!isRemoteCode(code)) return
 
-  if (host) return
+  /**
+   * Already serving exactly this event: nothing to do.
+   *
+   * Every DJ screen asks to host on mount, so navigating between the control
+   * panel, the queue and the invite screen must not tear down a working party
+   * and hand every connected guest a reconnect.
+   */
+  const sameTarget =
+    hostedTarget?.eventId === eventId && hostedTarget?.code === code
+  if (sameTarget && (host || starting)) return starting ?? undefined
 
   /**
-   * Registering takes a round trip, and every DJ screen asks to host on mount.
-   * Guarding on `host` alone would only catch the ones that arrive after the
-   * first has finished — the rest would each open their own socket, and the
-   * relay refuses a duplicate id, so the DJ's own second screen would be what
-   * knocked the party down. Callers await the attempt already in flight.
+   * A *different* event wants the device. Hand it over.
+   *
+   * This is what was broken: the guard used to be `if (host) return`, which
+   * asked whether anything was being hosted rather than whether *this* was.
+   * A DJ who created a second event stayed registered under the first one's
+   * code for the rest of the session — the relay had nobody under the code on
+   * their screen, so every guest who tried it was told no such party existed,
+   * while the DJ was shown a confident "party is open".
    */
-  if (starting) return starting
+  if (!sameTarget && (host || starting)) {
+    stopHosting()
+  }
 
   const next = new PeerHost(getDataService(), eventId, {
     onGuestCountChange: (count) => setState({ guestCount: count }),
     onError: (error) => setState({ error: error.message }),
   })
 
+  const target = { eventId, code }
+  hostedTarget = target
+
+  /**
+   * Only commit if this is still the event being asked for.
+   *
+   * Registering takes a round trip, and the DJ can move on during it — a slow
+   * start for the event they just left would otherwise land afterwards and
+   * install itself as the live host, undoing the handover it was superseded
+   * by. Identity comparison, not equality: `hostedTarget` is replaced whole,
+   * so a later call cannot be mistaken for this one.
+   */
+  const superseded = () => hostedTarget !== target
+
   starting = (async () => {
     try {
       await next.start(code)
+
+      if (superseded()) {
+        next.stop()
+        return
+      }
+
       host = next
       writeResume({ role: 'host', code, eventId })
-      setState({ mode: 'hosting', guestCount: 0, error: null })
+      setState({
+        mode: 'hosting',
+        hostedEventId: eventId,
+        guestCount: 0,
+        error: null,
+      })
     } catch (err) {
       const message =
         err instanceof PeerError
           ? err.message
           : 'Could not open the party to other phones.'
-      setState({ mode: 'sandbox', error: message })
+      if (!superseded()) {
+        hostedTarget = null
+        setState({ mode: 'sandbox', hostedEventId: null, error: message })
+      }
       throw err
     } finally {
-      starting = null
+      // Only clear the in-flight handle if it is still ours to clear.
+      if (!superseded()) starting = null
     }
   })()
 
@@ -188,9 +243,10 @@ export async function startHosting(
 export function stopHosting(): void {
   host?.stop()
   host = null
+  hostedTarget = null
   starting = null
   if (readResume()?.role === 'host') writeResume(null)
-  setState({ mode: 'sandbox', guestCount: 0 })
+  setState({ mode: 'sandbox', hostedEventId: null, guestCount: 0 })
 }
 
 // ---- Joining ---------------------------------------------------------------
@@ -215,7 +271,7 @@ export async function joinParty(code: string): Promise<void> {
 
   guestService = service
   writeResume({ role: 'guest', code })
-  setState({ mode: 'joined', error: null })
+  setState({ mode: 'joined', hostedEventId: null, error: null })
 }
 
 export function leaveParty(): void {
@@ -248,10 +304,12 @@ export async function resumeParty(): Promise<void> {
 /** Test hook — drops any live party without touching the transport. */
 export function __resetPartySession(): void {
   host = null
+  hostedTarget = null
   starting = null
   guestService = null
   state = {
     mode: isDemoMode() ? 'sandbox' : 'supabase',
+    hostedEventId: null,
     guestCount: 0,
     error: null,
   }

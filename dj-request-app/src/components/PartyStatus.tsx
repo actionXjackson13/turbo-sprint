@@ -12,20 +12,27 @@ import { canRunPeerParty, isRemoteCode } from '../services/partySession'
  * assumed.
  */
 export interface PartyStatusProps {
+  /** The event this is reporting on. */
+  eventId: string
   /** The event's join code, which decides whether it can be hosted. */
   code: string
   className?: string
 }
 
-export function PartyStatus({ code, className }: PartyStatusProps) {
-  const { mode, guestCount, error } = useParty()
+export function PartyStatus({ eventId, code, className }: PartyStatusProps) {
+  const { mode, hostedEventId, guestCount, error } = useParty()
 
   // With Supabase configured the party is always reachable, and this would be
   // noise on every screen it appears on.
   if (!canRunPeerParty()) return null
 
   const sample = !isRemoteCode(code)
-  const open = !sample && mode === 'hosting'
+  /**
+   * Open *for this event*, not merely hosting something. A DJ with more than
+   * one event was previously shown a confident "party is open" over a code
+   * nobody was listening on.
+   */
+  const open = !sample && mode === 'hosting' && hostedEventId === eventId
 
   return (
     <div

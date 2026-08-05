@@ -126,7 +126,16 @@ its transport generalised: `services/peer/signalling.ts`.
 
 The DJ hosts automatically: `DjEventProvider` calls `useHostParty`, so the
 party is open wherever the DJ is in the app, and `PartyStatus` says whether it
-actually is. The sample event is deliberately never hosted — one code shared by
+actually is — for *that* event specifically.
+
+That distinction is load-bearing. The guard was once `if (host) return`, which
+asks whether anything is being hosted rather than whether *this* is, so a DJ
+who created a second event stayed registered under the first one's code for the
+rest of the session: the relay had nobody listening on the code they were
+holding up, every guest who typed it was told no such party existed, and the
+screen said "party is open" throughout. Hosting now follows the event, hands
+the device over when a different one opens, and discards a slow registration
+that lands after the DJ has already moved on. The sample event is deliberately never hosted — one code shared by
 every install would mean the first person to open the demo took the id and
 everyone else collided with them.
 

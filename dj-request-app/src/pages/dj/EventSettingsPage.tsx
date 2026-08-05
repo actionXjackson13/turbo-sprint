@@ -20,6 +20,7 @@ import { FIELD_LIMITS } from '../../data/constants'
 import { getErrorMessage } from '../../utils/errors'
 import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
+import { stopHosting } from '../../services/partySession'
 import { MessageGuestsDialog } from './MessageGuestsDialog'
 
 export function EventSettingsPage() {
@@ -107,6 +108,9 @@ export function EventSettingsPage() {
     setEnding(true)
     try {
       await service.endEvent(eventId)
+      // Stop answering for it too. Leaving the code registered would keep a
+      // finished party reachable, and hold the relay id against the next one.
+      stopHosting()
       toast.success('Event ended.')
       navigate(routes.dj.dashboard, { replace: true })
     } catch (err) {

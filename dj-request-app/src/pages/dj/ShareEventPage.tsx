@@ -81,7 +81,7 @@ function ShareEventContent() {
         {/* Before the code, not after it: the whole screen is an invitation,
             and someone about to hold it up to a room needs to know first
             whether the code they are showing actually works. */}
-        <PartyStatus code={event.code} className="w-full" />
+        <PartyStatus eventId={eventId} code={event.code} className="w-full" />
 
         <div className="text-center">
           <p className="text-label text-fg-subtle uppercase">Join code</p>
