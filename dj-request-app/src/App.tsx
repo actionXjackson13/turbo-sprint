@@ -1,7 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { LoadingSkeleton } from './components'
+import { LoadingSkeleton, RotateGate } from './components'
 import { ToastProvider } from './contexts/ToastProvider'
 import { ServiceProvider } from './contexts/ServiceProvider'
 import { DjAuthProvider } from './contexts/DjAuthProvider'
@@ -60,6 +60,11 @@ function RequireDj({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <ErrorBoundary>
+      {/* Outside the providers and above everything: it needs no data, and a
+          phone turned sideways should be told so even if the app behind it is
+          mid-load or has fallen over. */}
+      <RotateGate />
+
       <ServiceProvider>
         <ToastProvider>
           {/*

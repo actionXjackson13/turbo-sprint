@@ -100,6 +100,9 @@
 
   body {
     margin: 0;
+    /* Removes double-tap-to-zoom (and its 300ms click delay) without touching
+       scrolling. Honoured by both engines, unlike the viewport meta. */
+    touch-action: manipulation;
     background-color: var(--color-ink-950);
     color: var(--color-fg);
     font-family: var(--font-sans);
@@ -152,6 +155,21 @@
   .eq-bar {
     transform-origin: bottom;
     animation: eq-bounce 900ms ease-in-out infinite;
+  }
+
+  /* The "turn your phone upright" screen. Driven by a media query rather than
+     by JS, so it is correct before React has rendered anything.
+
+     The height bound keeps it off tablets and laptops: a phone on its side is
+     under 500px tall and nothing else is, and a DJ on a laptop must not be
+     told to rotate a screen that does not turn. */
+  .rotate-gate {
+    display: none;
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .rotate-gate {
+      display: flex;
+    }
   }
 
   /* Hide scrollbars on horizontal card rails without disabling scrolling */

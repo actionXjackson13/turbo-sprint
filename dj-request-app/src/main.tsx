@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { resumeParty } from './services/partySession'
+import { lockViewport } from './lib/viewportLock'
 
 /**
  * Reconnect before the first render if this tab was in a party.
@@ -13,6 +14,10 @@ import { resumeParty } from './services/partySession'
  * fills in behind them.
  */
 void resumeParty()
+
+// Before the first render: the listeners must be in place for a pinch that
+// happens while the app is still loading.
+lockViewport()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

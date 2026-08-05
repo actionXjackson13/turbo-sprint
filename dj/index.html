@@ -4,10 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/turbo-sprint/dj/favicon.svg" />
     <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to real
-         values on notched iPhones; without it the insets are always 0. -->
+         values on notched iPhones; without it the insets are always 0.
+
+         maximum-scale + user-scalable stop the accidental pinch-zoom that a
+         phone held in one hand invites. Android honours them; iOS Safari has
+         ignored user-scalable since iOS 10, which is what the gesture
+         handlers in lib/viewportLock.ts are for. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#0b0b12" />
     <meta name="description" content="Request songs from the DJ at your event." />
@@ -17,8 +22,8 @@
     <meta name="apple-mobile-web-app-title" content="SoundBoard" />
     <link rel="apple-touch-icon" href="/turbo-sprint/dj/icons/apple-touch-icon.png" />
     <title>SoundBoard — DJ Song Requests</title>
-    <script type="module" crossorigin src="/turbo-sprint/dj/assets/index-BHzohNsw.js"></script>
-    <link rel="stylesheet" crossorigin href="/turbo-sprint/dj/assets/index-B7VueGzV.css">
+    <script type="module" crossorigin src="/turbo-sprint/dj/assets/index-DQadrhJk.js"></script>
+    <link rel="stylesheet" crossorigin href="/turbo-sprint/dj/assets/index-Bk_YrZyF.css">
   <link rel="manifest" href="/turbo-sprint/dj/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/turbo-sprint/dj/registerSW.js"></script></head>
   <body>
     <div id="root"></div>

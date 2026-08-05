@@ -584,6 +584,39 @@ token. The trade-off is that it returns catalogue metadata only, which is all
 this app needs. Playback stays wherever the DJ already has it; each request
 carries a `music.apple.com` link.
 
+## Upright, and at one scale
+
+People were pinch-zooming by accident — a phone held loosely in one hand gets
+squeezed by the palm holding it — and having the screen flip mid-request when
+they leaned over a table. Neither is a thing anyone meant to do, and on a phone
+the way back is not obvious.
+
+Four layers, because each one is ignored somewhere:
+
+| | Stops | Honoured by |
+| --- | --- | --- |
+| `user-scalable=no` (index.html) | pinch zoom | Android; **ignored by iOS since iOS 10** |
+| `touch-action: manipulation` (index.css) | double-tap zoom | both |
+| `gesture*` handlers (`lib/viewportLock.ts`) | pinch zoom | WebKit — this is what works on iPhone |
+| `orientation: portrait` (manifest) + `screen.orientation.lock` | rotation | installed Android / fullscreen; **not iOS** |
+
+Nothing can stop an iPhone rotating, so `RotateGate` stops the app *being*
+sideways instead — a full-screen "turn your phone upright", shown by media
+query rather than by listening for resize, so it is right before React has
+rendered anything. Its `max-height: 500px` bound is what keeps it off tablets
+and laptops: a phone on its side is under 500px tall and nothing else is, and a
+DJ running the queue on a laptop must not be told to rotate a screen that does
+not turn.
+
+Only *multi-touch* moves are swallowed. A blanket `preventDefault` on touchmove
+would take scrolling and the queue's drag-to-reorder with it, which is the
+obvious way to get this wrong, so there is a test for the single-finger case.
+
+The honest cost: pinch-to-zoom is an accessibility affordance and this removes
+it. It is a deliberate trade for a screen people hold in a crowd — the app's
+own type scale is large and its targets are 44px, so nothing here needs zoom to
+be usable.
+
 ## Messaging the room
 
 A short note from the DJ — last orders, requests closing, happy birthday Sam —
