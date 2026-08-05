@@ -34,16 +34,46 @@ export function selectMostWanted(
 /**
  * The newest requests, as the room would see them.
  *
- * Declined requests are left out: the guest who sent one is told on their own
- * "Mine" screen, but the DJ turning something down is not news the rest of the
- * party needs a feed of.
+ * Two exclusions, for different reasons:
+ *
+ * - **Declined.** The guest who sent one is told on their own "Mine" screen,
+ *   but the DJ turning something down is not news the rest of the party needs
+ *   a feed of.
+ * - **Played.** These have their own list now — see `selectRecentlyPlayed`.
+ *   Leaving them here meant one screen answering two questions at once: a
+ *   guest scanning for what has just been asked for had to read past songs
+ *   that already happened, and the same song appeared under both headings.
  */
 export function selectRecent(
   requests: SongRequest[],
   limit: number = REQUEST_LIST_LIMIT,
 ): SongRequest[] {
   return requests
-    .filter((r) => r.status !== 'declined')
+    .filter((r) => r.status !== 'declined' && r.status !== 'played')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit)
+}
+
+/**
+ * What the DJ has already played, most recent first.
+ *
+ * Ordered by `updatedAt` rather than `createdAt`: this list is a history of
+ * the *set*, not of the asking. A song requested at the start of the night and
+ * played an hour later belongs where it was played, not where it was asked
+ * for — and both backends keep `updatedAt` honest when a status changes.
+ *
+ * The track currently playing is deliberately excluded. Promoting a request to
+ * now-playing marks it played, so without this it would head the "recently
+ * played" list while still audible, which reads as the app being a step behind
+ * the room.
+ */
+export function selectRecentlyPlayed(
+  requests: SongRequest[],
+  limit: number = REQUEST_LIST_LIMIT,
+  nowPlayingRequestId?: string | null,
+): SongRequest[] {
+  return requests
+    .filter((r) => r.status === 'played' && r.id !== nowPlayingRequestId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit)
 }

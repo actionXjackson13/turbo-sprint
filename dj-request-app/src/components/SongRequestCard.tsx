@@ -24,6 +24,15 @@ export interface SongRequestCardProps {
   /** Makes the card body activate this handler (navigate to details). */
   onOpen?: () => void
   showStatus?: boolean
+  /**
+   * Which moment the row is about.
+   *
+   * `requested` everywhere by default. The recently-played list is ordered by
+   * when the DJ played each song, so showing when it was *asked for* there
+   * would caption the rows with times that disagree with the order they are
+   * in — which reads as a sorting bug rather than as two different facts.
+   */
+  timestamp?: 'requested' | 'played'
   /** Opens the overflow sheet. Rendered as a quiet trailing control. */
   onMore?: () => void
   /**
@@ -44,6 +53,7 @@ export function SongRequestCard({
   onVoteToggle,
   onOpen,
   showStatus = true,
+  timestamp = 'requested',
   onMore,
   actions,
   className,
@@ -78,11 +88,19 @@ export function SongRequestCard({
             // the two lines of text only need 40.
             className="flex min-h-11 min-w-0 flex-1 flex-col justify-center text-left"
           >
-            <RequestBody request={request} showStatus={showStatus} />
+            <RequestBody
+              request={request}
+              showStatus={showStatus}
+              timestamp={timestamp}
+            />
           </button>
         ) : (
           <div className="min-w-0 flex-1">
-            <RequestBody request={request} showStatus={showStatus} />
+            <RequestBody
+              request={request}
+              showStatus={showStatus}
+              timestamp={timestamp}
+            />
           </div>
         )}
 
@@ -175,9 +193,11 @@ function VoteArrow({ filled = false }: { filled?: boolean }) {
 function RequestBody({
   request,
   showStatus,
+  timestamp,
 }: {
   request: SongRequest
   showStatus: boolean
+  timestamp: 'requested' | 'played'
 }) {
   return (
     <>
@@ -196,7 +216,9 @@ function RequestBody({
         <span aria-hidden="true"> · </span>
         {request.guestDisplayName}
         <span aria-hidden="true"> · </span>
-        {formatRelativeTime(request.createdAt)}
+        {formatRelativeTime(
+          timestamp === 'played' ? request.updatedAt : request.createdAt,
+        )}
       </p>
     </>
   )

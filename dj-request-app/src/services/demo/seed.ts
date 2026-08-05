@@ -57,6 +57,10 @@ const ARTWORK: Record<string, string> = {
     'Music125/v4/77/6f/57/776f57e2-017d-ed40-8f0f-1547beb65517/190296501425.jpg',
   'Padam Padam':
     'Music116/v4/ce/2f/80/ce2f8070-8267-8763-a281-4b7062872d9a/4050538925289.jpg',
+  "Don't Stop Me Now":
+    'Music115/v4/4d/08/2a/4d082a9e-7898-1aa1-a02f-339810058d9e/14DMGIM05632.rgb.jpg',
+  'Uptown Funk':
+    'Music115/v4/7e/30/c5/7e30c572-aa47-5f7b-c6fd-42d50cd2c56d/886444959797.jpg',
   'Get Lucky':
     'Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg',
 }
@@ -160,6 +164,30 @@ export function buildSeed(): DemoDb {
       artist: 'Boney M.',
       status: 'played',
       minutes: 40,
+      playedMinutes: 9,
+    }),
+    // Enough history for "Recents" to look like a set rather than one row —
+    // and asked for well before they were played, which is the whole reason
+    // that list is ordered by when it happened.
+    req({
+      id: 'demo-req-8',
+      guestId: 'demo-guest-row-3',
+      guestDisplayName: 'Ellie',
+      title: "Don't Stop Me Now",
+      artist: 'Queen',
+      status: 'played',
+      minutes: 52,
+      playedMinutes: 17,
+    }),
+    req({
+      id: 'demo-req-9',
+      guestId: 'demo-guest-row-5',
+      guestDisplayName: 'Jess',
+      title: 'Uptown Funk',
+      artist: 'Mark Ronson',
+      status: 'played',
+      minutes: 61,
+      playedMinutes: 26,
     }),
   ]
 
@@ -302,6 +330,11 @@ function req(input: {
   status: SongRequest['status']
   queuePosition?: number
   minutes: number
+  /**
+   * How long ago the DJ played it, when that differs from when it was asked
+   * for — which it always does. "Recently played" orders by this.
+   */
+  playedMinutes?: number
 }): SongRequest {
   return {
     id: input.id,
@@ -318,7 +351,7 @@ function req(input: {
     artworkUrl: artworkFor(input.title),
     catalogUrl: null,
     createdAt: minutesAgo(input.minutes),
-    updatedAt: minutesAgo(input.minutes),
+    updatedAt: minutesAgo(input.playedMinutes ?? input.minutes),
   }
 }
 

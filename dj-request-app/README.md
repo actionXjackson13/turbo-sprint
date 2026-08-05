@@ -282,8 +282,8 @@ back to demo mode.
    `The Weeknd`. See [Duplicate detection](#duplicate-detection).
 6. Tap the vote pill on any request to add or remove your vote. Your own
    request's founding vote is locked.
-7. **Requests** is one list — toggle it between **Most wanted** and
-   **Newest**. See [Request lists](#request-lists).
+7. **Requests** is one list — toggle it between **Most wanted**, **Newest**
+   and **Recents**. See [Request lists](#request-lists).
 8. **My Songs** shows your requests and their live status.
 9. **Vote** shows the active round; pick a song, then pick another to change
    your vote — the total does not increase.
@@ -397,8 +397,27 @@ with a toggle, rather than stacking several sections that repeat the same
 songs under different headings. Both read `features/requests/requestLists.ts`,
 so the DJ is never looking at a different room than the one in front of them.
 
-- Guests toggle **Most wanted** / **Newest**.
+- Guests toggle **Most wanted** / **Newest** / **Recents**.
 - The DJ toggles **New** (pending, the inbox) / **Most wanted**.
+
+**Recents** is the set so far, and it exists because "Newest" was answering two
+questions at once: a guest scanning for what has just been asked for had to
+read past songs that already happened, and the same song appeared under both
+headings. So played songs left **Newest** entirely when they gained a list of
+their own.
+
+It is ordered by `updatedAt` rather than `createdAt` — a history of the *set*,
+not of the asking, so a song requested at the start of the night and played an
+hour later sits where it was played. The rows are captioned with that same
+moment, since times that disagreed with the order they were in would read as a
+sorting bug rather than as two different facts. The track currently playing is
+excluded: promoting a request to now-playing marks it played, so it would
+otherwise head the list while still audible.
+
+The guest's home screen links straight to it from under the now-playing card,
+which is where the question comes from — someone who has just heard something
+end wants to know what it was. The link carries `?view=played`, so the section
+survives a refresh and can be shared.
 
 **Where the numbers come from.** Every request carries a `voteCount` derived
 from rows in `request_votes`, kept current by a Postgres trigger (`DemoService`

@@ -3,6 +3,7 @@ import {
   REQUEST_LIST_LIMIT,
   selectMostWanted,
   selectRecent,
+  selectRecentlyPlayed,
 } from '../../src/features/requests/requestLists'
 import type { RequestStatus, SongRequest } from '../../src/types/domain'
 
@@ -18,6 +19,8 @@ function request(
   votes: number,
   status: RequestStatus = 'pending',
   minutesAgo = seq++,
+  /** When the status last changed — when a played song was played. */
+  updatedMinutesAgo = minutesAgo,
 ): SongRequest {
   return {
     id: `req-${votes}-${status}-${minutesAgo}`,
@@ -34,7 +37,7 @@ function request(
     artworkUrl: null,
     catalogUrl: null,
     createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
-    updatedAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+    updatedAt: new Date(Date.now() - updatedMinutesAgo * 60_000).toISOString(),
   }
 }
 
@@ -104,13 +107,17 @@ describe('selectRecent', () => {
     ])
   })
 
-  it('keeps played requests but hides declined ones', () => {
+  /**
+   * Played songs moved to their own section. Leaving them here made one list
+   * answer two questions, and put the same song under two headings.
+   */
+  it('hides both played and declined requests', () => {
     const ranked = selectRecent([
       request(1, 'played', 30),
       request(1, 'declined', 20),
       request(1, 'queued', 10),
     ])
-    expect(ranked.map((r) => r.status)).toEqual(['queued', 'played'])
+    expect(ranked.map((r) => r.status)).toEqual(['queued'])
   })
 
   it('caps the list and leaves the input alone', () => {
@@ -118,6 +125,59 @@ describe('selectRecent', () => {
     const snapshot = many.map((r) => r.id)
     expect(selectRecent(many)).toHaveLength(REQUEST_LIST_LIMIT)
     expect(selectRecent(many, 2)).toHaveLength(2)
+    expect(many.map((r) => r.id)).toEqual(snapshot)
+  })
+})
+
+describe('selectRecentlyPlayed', () => {
+  it('keeps only what has been played', () => {
+    const played = selectRecentlyPlayed([
+      request(1, 'played', 30),
+      request(1, 'declined', 20),
+      request(1, 'queued', 10),
+      request(1, 'pending', 5),
+    ])
+    expect(played.map((r) => r.status)).toEqual(['played'])
+  })
+
+  /**
+   * Ordered by when it was *played*, not when it was asked for. A song
+   * requested at the start of the night and played an hour later belongs
+   * where it was played — this is a history of the set.
+   */
+  it('orders by when it was played, not when it was requested', () => {
+    const askedFirstPlayedLast = request(1, 'played', 90, 5)
+    const askedLastPlayedFirst = request(1, 'played', 20, 40)
+
+    const played = selectRecentlyPlayed([
+      askedLastPlayedFirst,
+      askedFirstPlayedLast,
+    ])
+    expect(played.map((r) => r.id)).toEqual([
+      askedFirstPlayedLast.id,
+      askedLastPlayedFirst.id,
+    ])
+  })
+
+  /**
+   * Promoting a request to now-playing marks it played, so without this the
+   * song currently audible would head the "recently played" list.
+   */
+  it('leaves out the track that is playing right now', () => {
+    const playing = request(1, 'played', 10, 1)
+    const earlier = request(1, 'played', 40, 20)
+
+    const played = selectRecentlyPlayed([playing, earlier], 5, playing.id)
+    expect(played.map((r) => r.id)).toEqual([earlier.id])
+  })
+
+  it('caps the list and leaves the input alone', () => {
+    const many = Array.from({ length: 9 }, (_, i) =>
+      request(0, 'played', i, i),
+    )
+    const snapshot = many.map((r) => r.id)
+    expect(selectRecentlyPlayed(many)).toHaveLength(REQUEST_LIST_LIMIT)
+    expect(selectRecentlyPlayed(many, 2)).toHaveLength(2)
     expect(many.map((r) => r.id)).toEqual(snapshot)
   })
 })

@@ -92,10 +92,27 @@ export function EventHomePage() {
           nowPlaying={event?.nowPlaying ?? null}
           emptyHint="The DJ hasn't set a track yet."
         >
-          <UpNextRow
-            request={upNext}
-            emptyText="Nothing queued yet — request something."
-          />
+          <div className="space-y-1.5">
+            <UpNextRow
+              request={upNext}
+              emptyText="Nothing queued yet — request something."
+            />
+
+            {/* Attached to the current track rather than to the request list,
+                because that is where the question comes from: someone who has
+                just heard something end wants to know what it was. */}
+            <div className="flex justify-end">
+              <SectionLink
+                onClick={() =>
+                  navigate(
+                    `${routes.guest.requests(eventId)}?view=played`,
+                  )
+                }
+              >
+                Recently played
+              </SectionLink>
+            </div>
+          </div>
         </NowPlayingCard>
 
         {activeRound && (
