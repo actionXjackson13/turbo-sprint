@@ -119,6 +119,17 @@ export interface DataService {
     } | null,
   ): Promise<EventRecord>
   endEvent(eventId: string): Promise<EventRecord>
+  /**
+   * DJ-only. Posts a message to every guest for `durationSeconds`, or clears
+   * the current one when passed null.
+   *
+   * The caller sends a duration rather than an expiry so the server's clock
+   * decides when it ends — the same reasoning as voting rounds.
+   */
+  setAnnouncement(
+    eventId: string,
+    input: { message: string; durationSeconds: number } | null,
+  ): Promise<EventRecord>
   /** Event row changes (intake status, now playing, ended). */
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe
 

@@ -39,6 +39,7 @@ import {
   trigramSimilarity,
 } from '../../utils/similarity'
 import {
+  FIELD_LIMITS,
   MAX_ACTIVE_REQUESTS_PER_GUEST,
   MAX_VOTING_OPTIONS,
   MIN_VOTING_OPTIONS,
@@ -148,6 +149,7 @@ export class DemoService implements DataService {
         status: 'active',
         requestStatus: 'open',
         nowPlaying: null,
+        announcement: null,
         createdAt: nowIso(),
         endedAt: null,
       }
@@ -228,6 +230,43 @@ export class DemoService implements DataService {
       },
       channels.event(eventId),
       channels.requests(eventId),
+    )
+  }
+
+  async setAnnouncement(
+    eventId: string,
+    input: { message: string; durationSeconds: number } | null,
+  ): Promise<EventRecord> {
+    await demoDelay(80)
+    return mutate(
+      (db) => {
+        const event = this.requireOwnedEvent(db, eventId)
+        const message = input?.message.trim() ?? ''
+
+        if (!input || !message) {
+          event.announcement = null
+        } else {
+          if (input.durationSeconds <= 0) {
+            throw new ServiceError(
+              'invalid_input',
+              'Choose how long the message should show for.',
+            )
+          }
+          if (message.length > FIELD_LIMITS.announcement) {
+            throw new ServiceError('invalid_input', 'That message is too long.')
+          }
+          event.announcement = {
+            message,
+            // Mirrors the RPC, which computes the expiry from the server's own
+            // clock rather than trusting a caller's.
+            expiresAt: new Date(
+              Date.now() + input.durationSeconds * 1000,
+            ).toISOString(),
+          }
+        }
+        return clone(event)
+      },
+      channels.event(eventId),
     )
   }
 

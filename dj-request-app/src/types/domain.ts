@@ -48,6 +48,13 @@ export interface NowPlaying {
   artworkUrl: string | null
 }
 
+/** A short, timed note from the DJ to everyone in the room. */
+export interface Announcement {
+  message: string
+  /** When it stops being shown. Set by the server from a duration. */
+  expiresAt: string
+}
+
 export interface EventRecord {
   id: string
   djId: string
@@ -59,6 +66,11 @@ export interface EventRecord {
   status: EventStatus
   requestStatus: RequestIntakeStatus
   nowPlaying: NowPlaying | null
+  /**
+   * Present whether or not it has expired — screens decide that against the
+   * clock, so a message ending does not need a round trip to notice.
+   */
+  announcement: Announcement | null
   createdAt: string
   endedAt: string | null
 }

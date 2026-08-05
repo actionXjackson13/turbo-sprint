@@ -106,6 +106,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0005_fuzzy_dedupe.sql'))
     await db.exec(read('0006_catalog_metadata.sql'))
     await db.exec(read('0007_now_playing_artwork.sql'))
+    await db.exec(read('0008_announcements.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -772,6 +773,83 @@ describe('supabase migrations', () => {
         [requestId],
       )
       expect(after.rows[0]!.status).toBe('played')
+    })
+  })
+
+  describe('announcements', () => {
+    it('posts a message and dates it from the server clock', async () => {
+      const res = await runAs<{
+        announcement_text: string
+        announcement_expires_at: string
+      }>(DJ, `select * from public.set_announcement($1, 'Last orders!', 300)`, [
+        eventId,
+      ])
+
+      expect(res.rows[0]!.announcement_text).toBe('Last orders!')
+      const ms =
+        new Date(res.rows[0]!.announcement_expires_at).getTime() - Date.now()
+      // Five minutes out, give or take the round trip.
+      expect(ms).toBeGreaterThan(4 * 60_000)
+      expect(ms).toBeLessThan(6 * 60_000)
+    })
+
+    it('clears both halves together', async () => {
+      await runAs(DJ, `select * from public.set_announcement($1, 'Hi', 60)`, [
+        eventId,
+      ])
+      const res = await runAs<{
+        announcement_text: string | null
+        announcement_expires_at: string | null
+      }>(DJ, `select * from public.set_announcement($1, null, null)`, [eventId])
+
+      expect(res.rows[0]!.announcement_text).toBeNull()
+      expect(res.rows[0]!.announcement_expires_at).toBeNull()
+    })
+
+    it('treats a blank message as clearing it', async () => {
+      const res = await runAs<{ announcement_text: string | null }>(
+        DJ,
+        `select * from public.set_announcement($1, '   ', 60)`,
+        [eventId],
+      )
+      expect(res.rows[0]!.announcement_text).toBeNull()
+    })
+
+    it('refuses a message with no duration to expire it', async () => {
+      await expect(
+        runAs(DJ, `select * from public.set_announcement($1, 'Forever', null)`, [
+          eventId,
+        ]),
+      ).rejects.toThrow(/duration/i)
+    })
+
+    it('refuses one too long to sit above the current track', async () => {
+      await expect(
+        runAs(DJ, `select * from public.set_announcement($1, $2, 60)`, [
+          eventId,
+          'x'.repeat(141),
+        ]),
+      ).rejects.toThrow(/too long/i)
+    })
+
+    /** The room can read the DJ's message; only the DJ can write one. */
+    it('lets a guest read it but not post one', async () => {
+      await runAs(DJ, `select * from public.set_announcement($1, 'Hello', 60)`, [
+        eventId,
+      ])
+
+      const read = await runAs<{ announcement_text: string }>(
+        GUEST_A,
+        `select announcement_text from public.events where id = $1`,
+        [eventId],
+      )
+      expect(read.rows[0]!.announcement_text).toBe('Hello')
+
+      await expect(
+        runAs(GUEST_A, `select * from public.set_announcement($1, 'Mine', 60)`, [
+          eventId,
+        ]),
+      ).rejects.toThrow(/forbidden/i)
     })
   })
 

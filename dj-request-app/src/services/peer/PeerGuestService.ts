@@ -390,6 +390,10 @@ export class PeerGuestService implements DataService {
   endEvent(): Promise<EventRecord> {
     return this.djOnly()
   }
+  setAnnouncement(): Promise<EventRecord> {
+    // Guests read the DJ's message off the event record; they never write one.
+    return this.djOnly()
+  }
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe {
     return this.listen(channels.event(eventId), onChange)
   }

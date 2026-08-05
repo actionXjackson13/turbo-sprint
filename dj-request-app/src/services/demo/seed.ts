@@ -289,6 +289,7 @@ export function buildSeed(): DemoDb {
           sourceRequestId: null,
           artworkUrl: artworkFor('Get Lucky'),
         },
+        announcement: null,
         createdAt: minutesAgo(95),
         endedAt: null,
       },

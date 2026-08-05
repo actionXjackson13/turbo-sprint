@@ -248,6 +248,22 @@ export class SupabaseService implements DataService {
     return event
   }
 
+  async setAnnouncement(
+    eventId: string,
+    input: { message: string; durationSeconds: number } | null,
+  ): Promise<EventRecord> {
+    const { error } = await this.db.rpc('set_announcement', {
+      p_event_id: eventId,
+      p_message: input?.message ?? null,
+      p_duration_seconds: input?.durationSeconds ?? null,
+    })
+    if (error) translateError(error, 'Could not send that message.')
+
+    const event = await this.getEventById(eventId)
+    if (!event) throw new ServiceError('not_found', 'Event not found.')
+    return event
+  }
+
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe {
     return this.channel(`event:${eventId}`, onChange, (channel) =>
       channel.on(

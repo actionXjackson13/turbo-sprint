@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AnnouncementBanner,
   AppButton,
   AppCard,
   NowPlayingCard,
@@ -84,6 +85,10 @@ export function EventHomePage() {
             You're offline. Updates will resume when you reconnect.
           </div>
         )}
+
+        {/* Above the current track, because it is the one thing a DJ would
+            interrupt it to say. */}
+        <AnnouncementBanner announcement={event?.announcement ?? null} />
 
         {/* The card names itself, so no heading above it — this is the first
             thing on the screen and should lead, not follow a label. Drawn

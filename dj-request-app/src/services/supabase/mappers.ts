@@ -52,6 +52,12 @@ export function toEvent(row: Row, djDisplayName?: string): EventRecord {
           artworkUrl: row.now_playing_artwork_url ?? null,
         }
       : null,
+    announcement: row.announcement_text
+      ? {
+          message: row.announcement_text,
+          expiresAt: row.announcement_expires_at ?? '',
+        }
+      : null,
     createdAt: row.created_at,
     endedAt: row.ended_at ?? null,
   }

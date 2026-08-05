@@ -584,6 +584,38 @@ token. The trade-off is that it returns catalogue metadata only, which is all
 this app needs. Playback stays wherever the DJ already has it; each request
 carries a `music.apple.com` link.
 
+## Messaging the room
+
+A short note from the DJ — last orders, requests closing, happy birthday Sam —
+that appears above the current track on every guest's phone and takes itself
+down. The DJ writes it from *Event settings → Message guests*, picks how long
+it shows for, and can replace or clear it.
+
+Two properties keep it from becoming wallpaper, and both are enforced rather
+than encouraged. It is capped at 140 characters, in the RPC as well as the
+field, so it can never become a second now-playing card. And every duration on
+offer is short: a message that outlasts the reason for it is clutter above the
+thing guests actually opened the app for, and a DJ mid-set will not remember to
+come back and clear it.
+
+**The server decides when it ends.** The caller sends a *duration* and Postgres
+computes the expiry from its own clock — the same reasoning as voting rounds,
+so a phone with a skewed clock cannot post a message that outlives what the DJ
+chose. The text and the expiry are set and cleared together, and a check
+constraint keeps them that way: a message with no expiry would stay up all
+night, and an expiry with no message is nothing at all.
+
+**Whether one is *showing* is a question about the clock, not the data.** The
+row keeps the last message it was given, and `AnnouncementBanner` ticks against
+`expiresAt` — which is what lets a message disappear on time rather than
+whenever the next refresh happens to land. The DJ's settings screen applies the
+same test before offering to clear one.
+
+Guests read it off the event record they already load and subscribe to, so it
+needs no new plumbing and arrives over WebRTC in a peer party exactly as it
+does over Supabase realtime. Posting one is DJ-only on both: an RPC that checks
+ownership, and absent from the peer host's guest allowlist.
+
 ### Now playing
 
 The current track is what the app is arranged around — a guest opening their
