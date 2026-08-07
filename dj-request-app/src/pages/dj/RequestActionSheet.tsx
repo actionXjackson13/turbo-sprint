@@ -1,4 +1,9 @@
 import { ActionSheet, type ActionSheetItem } from '../../components'
+import {
+  appleMusicLinkFor,
+  canHandOff,
+  handOffToAppleMusic,
+} from '../../features/appleMusic/handoff'
 import { cardActionLabels } from './cardActionLabels'
 import type { RequestStatus, SongRequest } from '../../types/domain'
 
@@ -33,6 +38,25 @@ export function RequestActionSheet({
   if (!request) return null
 
   const items: ActionSheetItem[] = []
+
+  /**
+   * Getting the song into the DJ's own player. First in the list because on a
+   * night that is running well it is the only thing they want from this sheet.
+   */
+  if (canHandOff()) {
+    items.push({
+      label: 'Add to Apple Music',
+      onSelect: () => handOffToAppleMusic(request),
+    })
+  }
+
+  const appleLink = appleMusicLinkFor(request)
+  if (appleLink) {
+    items.push({
+      label: 'Open in Apple Music',
+      onSelect: () => window.open(appleLink, '_blank', 'noopener'),
+    })
+  }
   const { status } = request
   const onCard = cardActionLabels(status)
 

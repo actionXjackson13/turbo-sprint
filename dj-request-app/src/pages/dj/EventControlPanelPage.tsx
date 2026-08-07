@@ -27,6 +27,10 @@ import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
 import { getErrorMessage } from '../../utils/errors'
+import {
+  canHandOff,
+  handOffToAppleMusic,
+} from '../../features/appleMusic/handoff'
 import type {
   RequestIntakeStatus,
   RequestStatus,
@@ -122,6 +126,13 @@ export function EventControlPanelPage() {
       })
       await Promise.all([refresh(), reload()])
       toast.success(`Now playing ${upNext.title}`)
+
+      // The DJ's tap already meant "play this one". Handing it to Apple
+      // Music is the same intention carried out, not a second decision — so
+      // it rides along rather than becoming a fourth button on a row that
+      // cannot hold one.
+      if (canHandOff()) handOffToAppleMusic(upNext)
+
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {

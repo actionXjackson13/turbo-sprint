@@ -16,6 +16,10 @@ import { usePlayNext } from '../../features/requests/usePlayNext'
 import { QueueList } from './QueueList'
 import { getErrorMessage } from '../../utils/errors'
 import type { SongRequest } from '../../types/domain'
+import {
+  canHandOff,
+  handOffToAppleMusic,
+} from '../../features/appleMusic/handoff'
 
 /**
  * The play queue.
@@ -84,6 +88,13 @@ export function QueuePage() {
       })
       await Promise.all([refresh(), reload()])
       toast.success(`Now playing ${next.title}`)
+
+      // The DJ's tap already meant "play this one". Handing it to Apple
+      // Music is the same intention carried out, not a second decision — so
+      // it rides along rather than becoming a fourth button on a row that
+      // cannot hold one.
+      if (canHandOff()) handOffToAppleMusic(next)
+
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {

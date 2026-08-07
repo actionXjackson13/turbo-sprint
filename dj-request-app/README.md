@@ -626,6 +626,36 @@ it. It is a deliberate trade for a screen people hold in a crowd — the app's
 own type scale is large and its targets are 44px, so nothing here needs zoom to
 be usable.
 
+## Playing the music
+
+The app tracks what the room wants; the DJ still has to play it. Playing songs
+*inside* the app would mean MusicKit, which is licensed under the Apple
+Developer Program — 99 USD a year for the right to play music the DJ already
+subscribes to. Spotify's queue API is free to build against but requires the
+DJ to hold Premium. Neither is a good trade for a party app.
+
+So the app hands the song across instead of becoming a player.
+`features/appleMusic/handoff.ts` builds a `shortcuts://x-callback-url/…` link
+that runs a Shortcut on the DJ's phone, which searches Apple Music and adds the
+song to Up Next. Whatever is playing keeps playing; the request lands behind
+it. No developer membership, no second player, no ads — the subscription they
+already pay for.
+
+It rides on **Play next song** rather than adding a button. The DJ's tap
+already meant "play this one", so handing it over is the same intention carried
+out rather than a second decision — and the request rows genuinely cannot hold
+a fourth control at 390px, which was tried and made every card taller.
+
+Two things keep it honest. The button only appears where a Shortcut can
+actually run (iOS and iPadOS, which reports itself as a Mac with touch points),
+because a control that could never work is worse than none. And the setup
+screen has a **Test** button, since the failure mode on a phone is *silence* —
+a wrong Shortcut name does nothing at all, which is indistinguishable from a
+broken app if you find out mid-party.
+
+`Open in Apple Music` is the no-setup fallback, using the `music.apple.com`
+link every catalogue-picked request already stores.
+
 ## Messaging the room
 
 A short note from the DJ — last orders, requests closing, happy birthday Sam —

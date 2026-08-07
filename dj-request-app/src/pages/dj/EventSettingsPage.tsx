@@ -22,6 +22,7 @@ import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
 import { stopHosting } from '../../services/partySession'
 import { MessageGuestsDialog } from './MessageGuestsDialog'
+import { AppleMusicSetup } from './AppleMusicSetup'
 
 export function EventSettingsPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -176,6 +177,11 @@ export function EventSettingsPage() {
             </div>
           </dl>
         </AppCard>
+
+        {/* The thing that turns a queue into music actually playing. */}
+        <Section title="Apple Music">
+          <AppleMusicSetup />
+        </Section>
 
         {/* Above the guest list, because it is the other thing a DJ does to
             the room rather than to the queue. */}
