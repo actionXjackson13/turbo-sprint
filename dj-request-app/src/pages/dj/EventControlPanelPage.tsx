@@ -188,6 +188,15 @@ export function EventControlPanelPage() {
               >
                 Play next song
               </AppButton>
+              {/* The other way to run the night: let the app play the queue
+                  itself rather than the DJ announcing each track by hand. */}
+              <AppButton
+                variant="secondary"
+                fullWidth
+                onClick={() => navigate(routes.dj.player(eventId))}
+              >
+                Play in the app
+              </AppButton>
             </div>
           </NowPlayingCard>
         </div>

@@ -42,9 +42,11 @@ export function DemoSwitcher({ eventId, view }: DemoSwitcherProps) {
 
   return (
     <>
-      {/* Sits above the bottom navigation, inside the phone-width column. */}
+      {/* Sits above the bottom navigation, inside the phone-width column —
+          and above the player transport too, which occupies the same strip
+          whenever the app is playing the queue. */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-shell">
-        <div className="flex justify-end px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
+        <div className="flex justify-end px-4 pb-[calc(9rem+env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={() => setOpen(true)}

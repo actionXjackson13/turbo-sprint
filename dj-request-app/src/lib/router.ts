@@ -29,6 +29,8 @@ export const routes = {
     share: (eventId = ':eventId') => `/dj/events/${eventId}/share`,
     requests: (eventId = ':eventId') => `/dj/events/${eventId}/requests`,
     queue: (eventId = ':eventId') => `/dj/events/${eventId}/queue`,
+    /** The in-app player. Reached from the now-playing card, not the nav. */
+    player: (eventId = ':eventId') => `/dj/events/${eventId}/player`,
     createVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote/new`,
     activeVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote`,
     settings: (eventId = ':eventId') => `/dj/events/${eventId}/settings`,

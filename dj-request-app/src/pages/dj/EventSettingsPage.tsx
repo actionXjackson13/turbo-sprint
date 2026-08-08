@@ -23,6 +23,7 @@ import { resetDemoDb } from '../../services/demo/demoStore'
 import { stopHosting } from '../../services/partySession'
 import { MessageGuestsDialog } from './MessageGuestsDialog'
 import { AppleMusicSetup } from './AppleMusicSetup'
+import { PlayerSetup } from './PlayerSetup'
 
 export function EventSettingsPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -179,6 +180,10 @@ export function EventSettingsPage() {
         </AppCard>
 
         {/* The thing that turns a queue into music actually playing. */}
+        <Section title="Play in the app">
+          <PlayerSetup />
+        </Section>
+
         <Section title="Apple Music">
           <AppleMusicSetup />
         </Section>

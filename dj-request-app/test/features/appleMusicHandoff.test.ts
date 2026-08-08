@@ -1,26 +1,23 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  DEFAULT_SHORTCUT_NAME,
   appleMusicLinkFor,
+  appleMusicSearchUrl,
   canHandOff,
-  getShortcutName,
   isHandoffEnabled,
   searchTermFor,
   setHandoffEnabled,
-  setShortcutName,
-  shortcutUrlFor,
-  supportsShortcuts,
 } from '../../src/features/appleMusic/handoff'
 import type { SongRequest } from '../../src/types/domain'
 
 /**
- * The hand-off exists so the DJ can play requests on the subscription they
- * already pay for, instead of $99 a year for the licence to play them inside
- * this app.
+ * Opening a song in Apple Music, for a DJ who would rather play it on the
+ * subscription they already pay for than through the app's YouTube player.
  *
- * The URL is the part worth pinning. A wrong one fails *silently* on a phone —
- * iOS simply does nothing — so a typo here would surface as "the button does
- * nothing" mid-party, with no way to tell it from an unset Shortcut.
+ * This replaced a Shortcut-driven version that could never have worked: Apple's
+ * Shortcuts app has no action that searches the Apple Music catalogue, so the
+ * shortcut the setup screen described was unbuildable. The URL is the part
+ * worth pinning now — a malformed one fails as "nothing happens" on a phone,
+ * which is indistinguishable from the feature being off.
  */
 
 function request(overrides: Partial<SongRequest> = {}): SongRequest {
@@ -44,22 +41,8 @@ function request(overrides: Partial<SongRequest> = {}): SongRequest {
   }
 }
 
-function pretendUserAgent(ua: string, touchPoints = 0) {
-  vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
-  // jsdom does not define maxTouchPoints at all, so it cannot be spied on —
-  // which is also why the code under test must tolerate it being undefined.
-  Object.defineProperty(navigator, 'maxTouchPoints', {
-    value: touchPoints,
-    configurable: true,
-  })
-}
-
 beforeEach(() => {
   localStorage.clear()
-})
-
-afterEach(() => {
-  vi.restoreAllMocks()
 })
 
 describe('the search term handed over', () => {
@@ -71,89 +54,68 @@ describe('the search term handed over', () => {
   })
 })
 
-describe('the Shortcut link', () => {
-  it('runs the named shortcut with the song as its input', () => {
+describe('the Apple Music link', () => {
+  it('opens a search for the song', () => {
     const url = new URL(
-      shortcutUrlFor({ title: 'Levitating', artist: 'Dua Lipa' }, 'Queue Song'),
+      appleMusicSearchUrl({ title: 'Levitating', artist: 'Dua Lipa' }),
     )
 
-    expect(url.protocol).toBe('shortcuts:')
-    // The x-callback form is what returns to this app afterwards, rather than
-    // leaving the DJ sitting in Shortcuts.
-    expect(url.pathname + url.host).toContain('run-shortcut')
-    expect(url.searchParams.get('name')).toBe('Queue Song')
-    expect(url.searchParams.get('input')).toBe('text')
-    expect(url.searchParams.get('text')).toBe('Levitating Dua Lipa')
+    expect(url.host).toBe('music.apple.com')
+    expect(url.pathname).toBe('/search')
+    expect(url.searchParams.get('term')).toBe('Levitating Dua Lipa')
   })
 
   it('escapes a title that would otherwise break the URL', () => {
     const url = new URL(
-      shortcutUrlFor({ title: 'Ain’t It Fun & Loud?', artist: 'A/B' }),
+      appleMusicSearchUrl({ title: 'Ain’t It Fun & Loud?', artist: 'A/B' }),
     )
-    expect(url.searchParams.get('text')).toBe('Ain’t It Fun & Loud? A/B')
+    expect(url.searchParams.get('term')).toBe('Ain’t It Fun & Loud? A/B')
   })
 
-  it('uses whatever the DJ named their shortcut', () => {
-    setShortcutName('Party Queue')
-    expect(getShortcutName()).toBe('Party Queue')
-    expect(
-      new URL(shortcutUrlFor({ title: 'A', artist: 'B' })).searchParams.get(
-        'name',
-      ),
-    ).toBe('Party Queue')
-  })
-
-  it('falls back to the name the instructions give', () => {
-    expect(getShortcutName()).toBe(DEFAULT_SHORTCUT_NAME)
-    setShortcutName('   ')
-    expect(getShortcutName()).toBe(DEFAULT_SHORTCUT_NAME)
+  /**
+   * https rather than the music:// scheme, so the same link opens the app on a
+   * phone and the web player on a laptop instead of failing at a scheme nothing
+   * has registered.
+   */
+  it('is a universal link, not a custom scheme', () => {
+    expect(appleMusicSearchUrl({ title: 'A', artist: 'B' })).toMatch(/^https:/)
   })
 })
 
-describe('where the button is offered', () => {
-  it('is available on an iPhone', () => {
-    pretendUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)')
-    expect(supportsShortcuts()).toBe(true)
+describe('which link a request gets', () => {
+  it('uses the song’s own Apple Music page when the catalogue gave one', () => {
+    expect(appleMusicLinkFor(request())).toBe(
+      'https://music.apple.com/us/album/levitating/1?i=2',
+    )
   })
 
-  it('is available on an iPad, which claims to be a Mac', () => {
-    pretendUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)
-    expect(supportsShortcuts()).toBe(true)
+  /**
+   * Songs found through Deezer or typed in by hand have no Apple page, and
+   * used to get no button at all — but "search Apple Music for this" works
+   * perfectly well for them, so the button stays useful either way.
+   */
+  it('falls back to a search for a song from somewhere else', () => {
+    const link = appleMusicLinkFor(
+      request({ catalogUrl: 'https://www.deezer.com/track/1' }),
+    )
+    expect(link).toContain('music.apple.com/search')
+    expect(link).toContain('Levitating')
+
+    expect(appleMusicLinkFor(request({ catalogUrl: null }))).toContain(
+      'music.apple.com/search',
+    )
   })
+})
 
-  /** A control that could never do anything is worse than no control. */
-  it('is not offered on a laptop, where Shortcuts cannot run', () => {
-    pretendUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0)
-    expect(supportsShortcuts()).toBe(false)
-
-    pretendUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
-    expect(supportsShortcuts()).toBe(false)
-  })
-
-  it('needs both a capable device and the DJ having turned it on', () => {
-    pretendUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)')
+describe('whether it is offered', () => {
+  it('follows the DJ’s choice, and is off until they make it', () => {
     expect(isHandoffEnabled()).toBe(false)
     expect(canHandOff()).toBe(false)
 
     setHandoffEnabled(true)
     expect(canHandOff()).toBe(true)
 
-    pretendUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+    setHandoffEnabled(false)
     expect(canHandOff()).toBe(false)
-  })
-})
-
-describe('the no-setup fallback link', () => {
-  it('uses the song’s own Apple Music page', () => {
-    expect(appleMusicLinkFor(request())).toContain('music.apple.com')
-  })
-
-  it('is absent for a song that came from somewhere else', () => {
-    expect(
-      appleMusicLinkFor(
-        request({ catalogUrl: 'https://www.deezer.com/track/1' }),
-      ),
-    ).toBeNull()
-    expect(appleMusicLinkFor(request({ catalogUrl: null }))).toBeNull()
   })
 })

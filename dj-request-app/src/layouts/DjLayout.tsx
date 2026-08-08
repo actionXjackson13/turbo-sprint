@@ -12,6 +12,7 @@ import {
 import { routes } from '../lib/router'
 import { useParty } from '../hooks/useParty'
 import { DjEventProvider } from '../contexts/DjEventProvider'
+import { PartyPlayerProvider } from '../contexts/PartyPlayerProvider'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -50,13 +51,16 @@ export function DjLayout() {
 
   return (
     <DjEventProvider eventId={eventId}>
-      <RootLayout hasBottomNav>
-        <DjEventGate>
-          <Outlet />
-        </DjEventGate>
-        <DjNav eventId={eventId} />
-        {sandbox && <DemoSwitcher eventId={eventId} view="dj" />}
-      </RootLayout>
+      {/* Above the outlet, so the music survives the DJ changing screens. */}
+      <PartyPlayerProvider eventId={eventId}>
+        <RootLayout hasBottomNav>
+          <DjEventGate>
+            <Outlet />
+          </DjEventGate>
+          <DjNav eventId={eventId} />
+          {sandbox && <DemoSwitcher eventId={eventId} view="dj" />}
+        </RootLayout>
+      </PartyPlayerProvider>
     </DjEventProvider>
   )
 }
