@@ -23,6 +23,7 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { selectMostWanted } from '../../features/requests/requestLists'
 import { usePlayNext } from '../../features/requests/usePlayNext'
+import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -60,6 +61,12 @@ export function EventControlPanelPage() {
   const [sheetFor, setSheetFor] = useState<SongRequest | null>(null)
   const [view, setView] = useState<RequestView>('new')
   const { playNext, pendingId } = usePlayNext(eventId, reload)
+
+  const player = usePartyPlayerState()
+  const playerLive =
+    player.status === 'playing' ||
+    player.status === 'paused' ||
+    player.status === 'resolving'
 
   const queue = useMemo(
     () =>
@@ -113,6 +120,17 @@ export function EventControlPanelPage() {
    * next; this starts whatever that turned out to be.
    */
   const startNextSong = async () => {
+    /**
+     * With the app playing the music, moving the now-playing row by hand would
+     * change what every guest's screen says while the speakers carried on with
+     * the previous song. So this hands over to the player instead: the button
+     * keeps its meaning — "on to the next one" — and the audio follows it.
+     */
+    if (playerLive) {
+      player.skip()
+      return
+    }
+
     if (!upNext) return
     setBusy(true)
     try {
@@ -183,19 +201,10 @@ export function EventControlPanelPage() {
               <AppButton
                 size="lg"
                 fullWidth
-                disabled={busy || !upNext}
+                disabled={busy || (!upNext && !playerLive)}
                 onClick={() => void startNextSong()}
               >
-                Play next song
-              </AppButton>
-              {/* The other way to run the night: let the app play the queue
-                  itself rather than the DJ announcing each track by hand. */}
-              <AppButton
-                variant="secondary"
-                fullWidth
-                onClick={() => navigate(routes.dj.player(eventId))}
-              >
-                Play in the app
+                {playerLive ? 'Skip to next song' : 'Play next song'}
               </AppButton>
             </div>
           </NowPlayingCard>

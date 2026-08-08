@@ -152,11 +152,6 @@
   .bottom-safe-nav {
     bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
-  /* Clears both the nav and the player bar above it, so the last row of a
-     scrolling list is not left permanently under the transport. */
-  .pb-safe-player {
-    padding-bottom: calc(8.25rem + env(safe-area-inset-bottom));
-  }
 
   /* The little dancing bars beside "now playing".
      Motion is the cheapest way to say "this is live" — a static card of the

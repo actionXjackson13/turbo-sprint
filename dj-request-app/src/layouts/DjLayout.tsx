@@ -13,6 +13,7 @@ import { routes } from '../lib/router'
 import { useParty } from '../hooks/useParty'
 import { DjEventProvider } from '../contexts/DjEventProvider'
 import { PartyPlayerProvider } from '../contexts/PartyPlayerProvider'
+import { PlayerBarSpacer } from '../features/player/PlayerBar'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -56,6 +57,8 @@ export function DjLayout() {
         <RootLayout hasBottomNav>
           <DjEventGate>
             <Outlet />
+            {/* Gives back the strip the fixed transport is sitting on. */}
+            <PlayerBarSpacer />
           </DjEventGate>
           <DjNav eventId={eventId} />
           {sandbox && <DemoSwitcher eventId={eventId} view="dj" />}

@@ -29,7 +29,7 @@ import { ShareEventPage } from './pages/dj/ShareEventPage'
 import { EventControlPanelPage } from './pages/dj/EventControlPanelPage'
 import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
-import { PlayerPage } from './pages/dj/PlayerPage'
+import { MusicSetupPage } from './pages/dj/MusicSetupPage'
 import { CreateVotingRoundPage } from './pages/dj/CreateVotingRoundPage'
 import { ActiveVotingRoundPage } from './pages/dj/ActiveVotingRoundPage'
 import { EventSettingsPage } from './pages/dj/EventSettingsPage'
@@ -132,7 +132,7 @@ export default function App() {
                   <Route index element={<EventControlPanelPage />} />
                   <Route path="requests" element={<ManageRequestsPage />} />
                   <Route path="queue" element={<QueuePage />} />
-                  <Route path="player" element={<PlayerPage />} />
+                  <Route path="music" element={<MusicSetupPage />} />
                   <Route path="vote" element={<ActiveVotingRoundPage />} />
                   <Route path="vote/new" element={<CreateVotingRoundPage />} />
                   <Route path="settings" element={<EventSettingsPage />} />

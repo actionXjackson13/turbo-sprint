@@ -48,7 +48,7 @@ export function PlayerBar({ eventId }: { eventId: string }) {
         <button
           type="button"
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          onClick={() => navigate(routes.dj.player(eventId))}
+          onClick={() => navigate(routes.dj.queue(eventId))}
         >
           <AlbumArt url={current?.artworkUrl} size="sm" />
           <span className="min-w-0 flex-1">
@@ -82,6 +82,21 @@ export function PlayerBar({ eventId }: { eventId: string }) {
       </div>
     </div>
   )
+}
+
+/**
+ * Reserves the height the transport is covering.
+ *
+ * The bar is fixed, so it floats over whatever is beneath it — which on a
+ * scrolled-to-the-bottom screen is the last guest in the list, or the last song
+ * in the queue. A spacer in normal flow is what gives those back, and it exists
+ * only while the bar does so no screen carries dead space at the end when the
+ * app is not playing.
+ */
+export function PlayerBarSpacer() {
+  const { status } = usePartyPlayerState()
+  if (status === 'idle') return null
+  return <div className="h-[3.75rem] shrink-0" aria-hidden="true" />
 }
 
 function PlayIcon() {

@@ -22,8 +22,7 @@ import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
 import { stopHosting } from '../../services/partySession'
 import { MessageGuestsDialog } from './MessageGuestsDialog'
-import { AppleMusicSetup } from './AppleMusicSetup'
-import { PlayerSetup } from './PlayerSetup'
+import { hasYouTubeKey } from '../../services/player/playerSettings'
 
 export function EventSettingsPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -179,13 +178,41 @@ export function EventSettingsPage() {
           </dl>
         </AppCard>
 
-        {/* The thing that turns a queue into music actually playing. */}
-        <Section title="Play in the app">
-          <PlayerSetup />
-        </Section>
-
-        <Section title="Apple Music">
-          <AppleMusicSetup />
+        {/*
+          One row rather than the two full cards this used to be. Both are set
+          once and never touched again, and between them they pushed everything
+          a DJ needs *during* a party below the fold.
+        */}
+        <Section title="Music">
+          <button
+            type="button"
+            className="w-full"
+            onClick={() => navigate(routes.dj.music(eventId))}
+          >
+            <AppCard className="flex items-center gap-3 text-left">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-fg">
+                  Where songs play from
+                </p>
+                <p className="mt-0.5 text-meta text-fg-muted">
+                  {hasYouTubeKey()
+                    ? 'In-app player is set up'
+                    : 'Set up the in-app player'}
+                </p>
+              </div>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                className="size-4 shrink-0 text-fg-subtle"
+                aria-hidden="true"
+              >
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </AppCard>
+          </button>
         </Section>
 
         {/* Above the guest list, because it is the other thing a DJ does to
