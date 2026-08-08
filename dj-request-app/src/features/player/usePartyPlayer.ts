@@ -7,6 +7,11 @@ import { getErrorMessage } from '../../utils/errors'
 import { resolveVideo, rejectVideo } from '../../services/player/resolveVideo'
 import { PlayerError, type VideoMatch } from '../../services/player/youtubeSearch'
 import { useYouTubePlayer } from './useYouTubePlayer'
+import {
+  clearNowPlaying,
+  publishNowPlaying,
+  setPlaybackState,
+} from './mediaSession'
 import type { SongRequest } from '../../types/domain'
 
 export type PlayerStatus =
@@ -102,6 +107,12 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
   const advanceRef = useRef<(finished: SongRequest | null) => void>(() => {})
   const endedRef = useRef<() => void>(() => {})
   const unplayableRef = useRef<() => void>(() => {})
+  /** Lock-screen buttons, which are pressed long after this render is gone. */
+  const controlsRef = useRef({
+    play: () => {},
+    pause: () => {},
+    next: () => {},
+  })
 
   const { hostRef, loadError, play, pause, resume, stop } = useYouTubePlayer({
     onEnded: () => endedRef.current(),
@@ -168,6 +179,16 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
       setMatch(video)
       setStatus('playing')
       play(video.videoId)
+
+      // Claim the phone's now-playing slot, so the lock screen shows this song
+      // and its buttons drive this queue rather than whatever app touched audio
+      // last. Handlers go through a ref because they outlive this render.
+      publishNowPlaying(request, {
+        onPlay: () => controlsRef.current.play(),
+        onPause: () => controlsRef.current.pause(),
+        onNext: () => controlsRef.current.next(),
+      })
+      setPlaybackState('playing')
     },
     [service, eventId, refresh, reload, toast, halt, play],
   )
@@ -191,6 +212,9 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
         setStatus('empty')
         setCurrent(null)
         setMatch(null)
+        // Nothing is playing, so hand the lock screen back rather than leaving
+        // a dead transport pointing at this app.
+        clearNowPlaying()
         return
       }
 
@@ -247,11 +271,32 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
     if (status === 'playing') {
       pause()
       setStatus('paused')
+      setPlaybackState('paused')
     } else if (status === 'paused') {
       resume()
       setStatus('playing')
+      setPlaybackState('playing')
     }
   }, [status, pause, resume])
+
+  /**
+   * Kept current every render so a lock-screen button pressed twenty minutes
+   * into the set drives the player as it is now, not as it was when the song
+   * started.
+   */
+  controlsRef.current = {
+    play: () => {
+      resume()
+      setStatus('playing')
+      setPlaybackState('playing')
+    },
+    pause: () => {
+      pause()
+      setStatus('paused')
+      setPlaybackState('paused')
+    },
+    next: () => skip(),
+  }
 
   const wrongSong = useCallback(() => {
     const song = currentRef.current

@@ -135,6 +135,90 @@ beforeEach(() => {
   rejectVideo.mockReturnValue(null)
 })
 
+describe('the phone’s lock screen', () => {
+  /**
+   * iOS has one "Now Playing" slot and gives it to whichever app touched audio
+   * last. Open Apple Music mid-set and it keeps that slot even while paused, so
+   * the lock screen's play button resumes *Apple Music* while the party's queue
+   * sits silent. Registering here is what claims it back — and the handlers
+   * have to reach the live player, since they are pressed long after the render
+   * that installed them.
+   */
+  const handlers = new Map<string, () => void>()
+  const metadata: unknown[] = []
+
+  beforeEach(() => {
+    handlers.clear()
+    metadata.length = 0
+    vi.stubGlobal('MediaMetadata', class {
+      constructor(init: unknown) {
+        metadata.push(init)
+      }
+    })
+    Object.defineProperty(navigator, 'mediaSession', {
+      value: {
+        playbackState: 'none',
+        set metadata(v: unknown) {
+          if (v) metadata.push(v)
+        },
+        get metadata() {
+          return null
+        },
+        setActionHandler: (action: string, fn: (() => void) | null) => {
+          if (fn) handlers.set(action, fn)
+          else handlers.delete(action)
+        },
+      },
+      configurable: true,
+    })
+  })
+
+  it('tells the lock screen which song is on', async () => {
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+
+    expect(metadata).toContainEqual(
+      expect.objectContaining({ title: 'First', artist: 'Artist' }),
+    )
+  })
+
+  it('routes the lock screen’s pause to this player, not another app', async () => {
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+
+    await act(async () => handlers.get('pause')!())
+    expect(result.current.status).toBe('paused')
+
+    await act(async () => handlers.get('play')!())
+    expect(result.current.status).toBe('playing')
+  })
+
+  it('advances the queue from the lock screen’s skip button', async () => {
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+
+    await act(async () => handlers.get('nexttrack')!())
+
+    await waitFor(() => expect(result.current.current?.id).toBe('r2'))
+  })
+
+  /** A dead transport pointing at a finished party is worse than none. */
+  it('hands the slot back when the queue runs dry', async () => {
+    store.requests = [request('r1', 'Only', 0)]
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+
+    await act(async () => playerEvents.onEnded())
+
+    await waitFor(() => expect(result.current.status).toBe('empty'))
+    expect(handlers.size).toBe(0)
+  })
+})
+
 describe('starting the queue', () => {
   it('plays the song at the front and tells the guests', async () => {
     const { result } = renderHook(() => usePartyPlayer('event-1'))
