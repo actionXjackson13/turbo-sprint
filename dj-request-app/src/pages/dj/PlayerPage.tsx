@@ -98,14 +98,28 @@ export function PlayerPage() {
             {queue.length === 0 ? 'Queue is empty' : 'Play the queue'}
           </AppButton>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <AppButton variant="secondary" onClick={wrongSong}>
-              Wrong song
-            </AppButton>
-            <AppButton variant="secondary" onClick={skip}>
-              Skip
-            </AppButton>
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <AppButton variant="secondary" onClick={wrongSong}>
+                Wrong song
+              </AppButton>
+              <AppButton variant="secondary" onClick={skip}>
+                Skip
+              </AppButton>
+            </div>
+
+            {/*
+              Said plainly, because the alternative is finding out mid-party.
+              YouTube stops playback whenever the page is backgrounded on a
+              phone — its own restriction, and the thing YouTube Premium sells —
+              so no amount of app code keeps the music going once the DJ swipes
+              away. Naming it turns a baffling failure into a known rule.
+            */}
+            <p className="text-center text-meta text-fg-subtle">
+              Keep this app open — YouTube stops the music if you switch apps or
+              lock the phone. Moving around SoundBoard is fine.
+            </p>
+          </>
         )}
 
         {/*
