@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AppButton, AppCard, AppInput } from '../../components'
 import { useToast } from '../../hooks/useToast'
 import {
@@ -20,6 +20,26 @@ import { clearVideoCache } from '../../services/player/videoCache'
  * Shortcut steps were: a setup that sends someone to another site to work it
  * out is a setup that gets abandoned halfway.
  */
+/**
+ * A step that is also the way to do it.
+ *
+ * Opened in a new tab deliberately: the DJ is coming back here to paste the
+ * key, and navigating this tab away from a running event would cost them the
+ * page they are half-way through.
+ */
+function SetupLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-semibold text-brand-400 underline underline-offset-2"
+    >
+      {children}
+    </a>
+  )
+}
+
 export function PlayerSetup() {
   const toast = useToast()
   const [key, setKey] = useState(getYouTubeKey)
@@ -44,22 +64,32 @@ export function PlayerSetup() {
         <p className="text-label uppercase text-fg-subtle">
           Get a free key, once
         </p>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-fg-muted">
+        {/*
+          Links straight to the two pages, rather than the console's front door.
+          Google's own top-of-page search looks like the obvious way in and is
+          not — it searches the console's settings and docs, so "YouTube Data"
+          returns everything except the thing you came to switch on.
+        */}
+        <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-fg-muted">
           <li>
-            Open <span className="text-fg">console.cloud.google.com</span> and
-            sign in. No card is needed.
+            <SetupLink href="https://console.cloud.google.com/projectcreate">
+              Make a project
+            </SetupLink>{' '}
+            — any name, no card needed.
           </li>
           <li>
-            Make a project — the name does not matter.
+            <SetupLink href="https://console.cloud.google.com/apis/library/youtube.googleapis.com">
+              Turn on the YouTube Data API
+            </SetupLink>{' '}
+            — check your new project is picked at the top, then press{' '}
+            <span className="text-fg">Enable</span>.
           </li>
           <li>
-            Search for <span className="text-fg">YouTube Data API v3</span> and
-            press <span className="text-fg">Enable</span>.
-          </li>
-          <li>
-            Go to <span className="text-fg">Credentials</span> →{' '}
-            <span className="text-fg">Create credentials</span> →{' '}
-            <span className="text-fg">API key</span>, and copy it.
+            <SetupLink href="https://console.cloud.google.com/apis/credentials">
+              Create the key
+            </SetupLink>{' '}
+            — <span className="text-fg">+ Create credentials</span> →{' '}
+            <span className="text-fg">API key</span>. Copy it into the box below.
           </li>
         </ol>
       </div>
