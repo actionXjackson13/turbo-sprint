@@ -325,19 +325,7 @@ export function QueuePage() {
                 onMoveGroup={(request) => void moveGroup(request)}
               />
 
-              {/*
-                The divider, and nothing more than one. Everything below plays
-                after everything above, which is the only thing it has to say.
-              */}
-              {sub.length > 0 && (
-                <div className="flex items-center gap-3 pt-1">
-                  <span className="h-px flex-1 bg-hairline-strong" />
-                  <span className="text-label uppercase text-fg-subtle">
-                    Then
-                  </span>
-                  <span className="h-px flex-1 bg-hairline-strong" />
-                </div>
-              )}
+              {sub.length > 0 && <SubgroupDivider />}
 
               {sub.length > 0 && (
                 <QueueList
@@ -362,5 +350,43 @@ export function QueuePage() {
         onLoaded={reload}
       />
     </>
+  )
+}
+
+/**
+ * Where the queue changes gear.
+ *
+ * A centred hairline was too easy to read past — it looked like the gap
+ * between two cards rather than a boundary, on the one screen where knowing
+ * which side a song is on decides whether it plays tonight.
+ *
+ * So the weight sits on the left, where the eye starts: a solid chip naming
+ * the half, with the rule growing out of it and tapering away across the
+ * screen. The taper is a clip-path wedge rather than a plain line, so the
+ * colour is thickest against the word and thins to nothing — the shape says
+ * "this is where it begins" without needing a second word to explain it.
+ *
+ * Cyan rather than the red used on requested rows: this marks structure, not
+ * ownership, and the two must not be mistaken for each other.
+ */
+function SubgroupDivider() {
+  return (
+    <div className="flex items-center pt-2 pb-1" aria-hidden="true">
+      <span
+        className={
+          'shrink-0 rounded-full border border-accent-400/60 bg-accent-500/20 ' +
+          'px-2.5 py-1 text-label uppercase text-accent-400'
+        }
+      >
+        Subgroup
+      </span>
+      <span
+        className="h-2 flex-1 bg-gradient-to-r from-accent-400 to-accent-400/0"
+        style={{
+          // Thick where it meets the chip, tapering to a hairline as it goes.
+          clipPath: 'polygon(0 0, 100% 44%, 100% 56%, 0 100%)',
+        }}
+      />
+    </div>
   )
 }
