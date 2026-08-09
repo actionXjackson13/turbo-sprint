@@ -29,6 +29,8 @@ export const routes = {
     share: (eventId = ':eventId') => `/dj/events/${eventId}/share`,
     requests: (eventId = ':eventId') => `/dj/events/${eventId}/requests`,
     queue: (eventId = ':eventId') => `/dj/events/${eventId}/queue`,
+    /** The DJ dropping their own songs in. Reached from the queue. */
+    addSong: (eventId = ':eventId') => `/dj/events/${eventId}/add`,
     /** Where songs play from. Set once, so it sits behind Settings. */
     music: (eventId = ':eventId') => `/dj/events/${eventId}/music`,
     createVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote/new`,

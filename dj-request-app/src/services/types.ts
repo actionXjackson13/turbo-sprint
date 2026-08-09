@@ -63,6 +63,17 @@ export interface CreateRequestInput {
   catalogUrl?: string | null
 }
 
+/** A song the DJ is adding themselves, rather than a guest requesting one. */
+export interface DjSongInput {
+  eventId: string
+  title: string
+  artist: string
+  /** Carried through when the song came from search — see CatalogSong. */
+  catalogId?: string | null
+  artworkUrl?: string | null
+  catalogUrl?: string | null
+}
+
 export interface VotingOptionInput {
   title: string
   artist: string
@@ -177,6 +188,15 @@ export interface DataService {
   ): Promise<SongRequest | null>
   /** Creates the request and the submitter's founding vote atomically. */
   createSongRequest(input: CreateRequestInput): Promise<SongRequest>
+  /**
+   * DJ-only. Puts one of the DJ's own songs straight into the queue.
+   *
+   * Skips 'pending' deliberately: a request is pending because someone has to
+   * approve it, and here that someone is whoever just added it. It carries no
+   * guest and no founding vote — it is not the room asking, so it should not
+   * appear to have been asked for.
+   */
+  addDjSong(input: DjSongInput): Promise<SongRequest>
   /** DJ-only. */
   updateRequestStatus(
     requestId: string,

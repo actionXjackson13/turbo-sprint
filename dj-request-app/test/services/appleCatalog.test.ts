@@ -372,3 +372,57 @@ describe('MusicBrainz ranking', () => {
     expect(songs.filter((s) => s.artist === 'The Killers')).toHaveLength(1)
   })
 })
+
+/**
+ * Picking a catalogue by hand.
+ *
+ * The whole value of choosing is that the app stops choosing for you — so the
+ * one behaviour that must not happen is a quiet fallback. Someone who picked
+ * Deezer because Apple is rate-limited at this venue, and then gets Apple's
+ * results anyway, has been ignored; someone who gets MusicBrainz's bare rows
+ * back while the control still reads "Apple" has been misled about where the
+ * results came from.
+ */
+describe('searching one named catalogue', () => {
+  it('uses Apple and reports Apple', async () => {
+    mockFetch({})
+    const results = await searchCatalog('mr brightside', { source: 'apple' })
+
+    expect(results.source).toBe('apple')
+    expect(results.songs[0]?.title).toBe('Mr. Brightside')
+  })
+
+  it('does not fall back to another catalogue when Apple fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('refused'))
+
+    // Automatic mode would reach Deezer, then MusicBrainz. Named mode must not:
+    // it reports that the chosen source is unavailable and stops.
+    await expect(
+      searchCatalog('mr brightside', { source: 'apple' }),
+    ).rejects.toBeInstanceOf(ServiceError)
+  })
+
+  it('says which catalogue is unavailable, by name', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('refused'))
+
+    await expect(
+      searchCatalog('mr brightside', { source: 'deezer' }),
+    ).rejects.toThrow(/Deezer/)
+  })
+
+  it('still explains an Apple failure specifically', async () => {
+    // Apple is the one source that can say *why* from the searcher's own
+    // phone — blocked here, rate-limited there — and those have different fixes.
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('refused'))
+
+    await expect(
+      searchCatalog('mr brightside', { source: 'apple' }),
+    ).rejects.toThrow(/Apple|blocking|network|offline/i)
+  })
+
+  it('leaves automatic mode alone', async () => {
+    mockFetch({})
+    const results = await searchCatalog('mr brightside')
+    expect(results.source).toBe('apple')
+  })
+})

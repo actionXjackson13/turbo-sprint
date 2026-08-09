@@ -13,6 +13,7 @@ import type {
 import {
   ServiceError,
   type CreateRequestInput,
+  type DjSongInput,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -438,6 +439,30 @@ export class SupabaseService implements DataService {
       .single()
 
     if (error) translateError(error, 'Could not send your request.')
+    return toSongRequest(asRow(data))
+  }
+
+  /**
+   * The DJ's own song, straight into the queue.
+   *
+   * An RPC rather than a plain insert: guest_id must be null and the status
+   * must be 'queued' from the outset, and the row-level policy that lets a
+   * guest insert their own request is deliberately not wide enough to allow
+   * either. Ownership is checked server-side, as it is for every DJ action.
+   */
+  async addDjSong(input: DjSongInput): Promise<SongRequest> {
+    const { data, error } = await this.db
+      .rpc('add_dj_song', {
+        p_event_id: input.eventId,
+        p_title: input.title.trim(),
+        p_artist: input.artist.trim(),
+        p_catalog_id: input.catalogId ?? null,
+        p_artwork_url: input.artworkUrl ?? null,
+        p_catalog_url: input.catalogUrl ?? null,
+      })
+      .single()
+
+    if (error) translateError(error, 'Could not add that song.')
     return toSongRequest(asRow(data))
   }
 

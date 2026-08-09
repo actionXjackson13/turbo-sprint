@@ -7,6 +7,7 @@ import {
   NowPlayingCard,
   PageHeader,
   Section,
+  SectionLink,
   SongRequestListSkeleton,
 } from '../../components'
 import { routes } from '../../lib/router'
@@ -232,7 +233,14 @@ export function QueuePage() {
           </AppCard>
         )}
 
-        <Section title="Up next">
+        <Section
+          title="Up next"
+          action={
+            <SectionLink onClick={() => navigate(routes.dj.addSong(eventId))}>
+              Add a song
+            </SectionLink>
+          }
+        >
           {loading && requests.length === 0 ? (
             <SongRequestListSkeleton count={2} />
           ) : queue.length === 0 ? (

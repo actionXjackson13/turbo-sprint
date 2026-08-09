@@ -128,6 +128,36 @@ export interface CatalogResults {
   appleFailure?: AppleFailure
 }
 
+/**
+ * Which catalogue to ask.
+ *
+ * `auto` is the chain below and the right default — it finds the best answer
+ * available without anyone having to know why Apple sometimes goes quiet. The
+ * named ones exist because the automatic choice is not always the wanted one: a
+ * venue whose WiFi Apple has rate-limited all night gets better results going
+ * straight to Deezer than paying the timeout on every search first, and someone
+ * who knows a track is on one service and not another should be able to say so.
+ *
+ * A named source is asked *only* that source. Falling back silently would make
+ * the choice a suggestion rather than an instruction, and leave the searcher
+ * looking at results from somewhere they did not pick.
+ */
+export type CatalogChoice = 'auto' | CatalogSource
+
+/** What to call each one where a person will read it. */
+export function catalogLabel(source: CatalogChoice): string {
+  switch (source) {
+    case 'auto':
+      return 'Automatic'
+    case 'apple':
+      return 'Apple Music'
+    case 'deezer':
+      return 'Deezer'
+    case 'musicbrainz':
+      return 'Basic'
+  }
+}
+
 /** Tiny, on the same host, and not part of the search rate limit. */
 const PROBE_URL = 'https://itunes.apple.com/robots.txt'
 const PROBE_TIMEOUT_MS = 4_000
@@ -199,8 +229,11 @@ function upscaleArtwork(url: string | undefined): string | null {
  */
 export async function searchCatalog(
   term: string,
-  opts?: { signal?: AbortSignal; limit?: number },
+  opts?: { signal?: AbortSignal; limit?: number; source?: CatalogChoice },
 ): Promise<CatalogResults> {
+  const choice = opts?.source ?? 'auto'
+  if (choice !== 'auto') return searchOneSource(choice, term, opts)
+
   try {
     return { songs: await searchApple(term, opts), source: 'apple' }
   } catch (err) {
@@ -257,6 +290,55 @@ export async function searchCatalog(
       // that names the actual problem rather than the generic first failure.
       throw new ServiceError('network', appleFailureMessage(await diagnosis))
     }
+  }
+}
+
+/**
+ * Ask exactly one catalogue, and say so plainly when it cannot answer.
+ *
+ * The point of picking a source is that the app stops choosing for you, so a
+ * failure here is reported rather than routed around. Apple gets its two
+ * transports — plain fetch and JSONP — because those are one source reached two
+ * ways, not two sources.
+ */
+async function searchOneSource(
+  source: CatalogSource,
+  term: string,
+  opts?: { signal?: AbortSignal; limit?: number },
+): Promise<CatalogResults> {
+  const rethrowAborts = (err: unknown) => {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+  }
+
+  try {
+    if (source === 'apple') {
+      try {
+        return { songs: await searchApple(term, opts), source }
+      } catch (err) {
+        rethrowAborts(err)
+        return { songs: await searchAppleJsonp(term, opts), source }
+      }
+    }
+    if (source === 'deezer') {
+      return { songs: await searchDeezer(term, opts), source }
+    }
+    return { songs: await searchMusicBrainz(term, opts), source }
+  } catch (err) {
+    rethrowAborts(err)
+
+    // Apple can say *why* from the guest's own phone, and the remedies differ
+    // enough to be worth the extra request. Nothing else can, so nothing else
+    // pretends to.
+    if (source === 'apple') {
+      throw new ServiceError(
+        'network',
+        appleFailureMessage(await probeApple(opts?.signal)),
+      )
+    }
+    throw new ServiceError(
+      'network',
+      `${catalogLabel(source)} search isn’t responding right now. Try another source, or type the song in below.`,
+    )
   }
 }
 

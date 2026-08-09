@@ -108,6 +108,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0007_now_playing_artwork.sql'))
     await db.exec(read('0008_announcements.sql'))
     await db.exec(read('0009_voting_option_catalog.sql'))
+    await db.exec(read('0010_dj_added_songs.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -632,6 +633,72 @@ describe('supabase migrations', () => {
           roundId,
           optionIds[0],
         ]),
+      ).rejects.toThrow(/forbidden/)
+    })
+  })
+
+  /**
+   * The DJ's own songs.
+   *
+   * Same shape as a pushed vote winner — queued, no guest, no founding vote —
+   * because it is the same kind of row: something that reached the queue
+   * without anybody requesting it. The guest-facing insert policy is
+   * deliberately too narrow to produce one, so this is a security-definer
+   * function and the ownership check is the only thing standing in front of it.
+   */
+  describe('add_dj_song', () => {
+    it('queues an unowned, unvoted request named after the DJ', async () => {
+      const res = await runAs<{
+        status: string
+        guest_id: string | null
+        guest_display_name: string
+        queue_position: number | null
+        catalog_id: string | null
+      }>(
+        DJ,
+        `select * from public.add_dj_song($1, 'Blue Monday', 'New Order', '123', 'https://art.test/x.jpg', null)`,
+        [eventId],
+      )
+
+      const row = res.rows[0]!
+      expect(row.status).toBe('queued')
+      expect(row.guest_id).toBeNull()
+      expect(row.guest_display_name).toBeTruthy()
+      // Assigned by the same trigger every other queued row goes through.
+      expect(row.queue_position).not.toBeNull()
+      expect(row.catalog_id).toBe('123')
+    })
+
+    it('casts no founding vote', async () => {
+      const added = await runAs<{ id: string }>(
+        DJ,
+        `select * from public.add_dj_song($1, 'Voteless', 'Nobody')`,
+        [eventId],
+      )
+      const votes = await runAs<{ count: string }>(
+        DJ,
+        `select count(*) as count from public.request_votes where request_id = $1`,
+        [added.rows[0]!.id],
+      )
+      // A phantom vote would float the DJ's own pick up the most-wanted list.
+      expect(Number(votes.rows[0]!.count)).toBe(0)
+    })
+
+    it('refuses a blank title', async () => {
+      await expect(
+        runAs(DJ, `select * from public.add_dj_song($1, '   ', 'New Order')`, [
+          eventId,
+        ]),
+      ).rejects.toThrow(/invalid_input/)
+    })
+
+    it('stops a guest adding one', async () => {
+      await expect(
+        runAs(
+          GUEST_A,
+          `select * from public.add_dj_song($1, 'Blue Monday', 'New Order')`,
+          [eventId],
+        ),
       ).rejects.toThrow(/forbidden/)
     })
   })

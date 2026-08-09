@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   searchCatalog,
+  type CatalogChoice,
   type CatalogResults,
   type CatalogSong,
   type CatalogSource,
@@ -68,7 +69,10 @@ export interface CatalogSearchState {
   appleFailure: AppleFailure | null
 }
 
-export function useCatalogSearch(term: string): CatalogSearchState {
+export function useCatalogSearch(
+  term: string,
+  source: CatalogChoice = 'auto',
+): CatalogSearchState {
   const [state, setState] = useState<CatalogSearchState>({
     results: [],
     loading: false,
@@ -92,7 +96,9 @@ export function useCatalogSearch(term: string): CatalogSearchState {
       return
     }
 
-    const key = query.toLowerCase()
+    // Keyed by source as well as term: the same words asked of two catalogues
+    // are two different questions with two different answers.
+    const key = `${source}:${query.toLowerCase()}`
     const cached = cache.get(key)
     if (cached) {
       // Straight to the answer: no debounce to sit through and no spinner, so
@@ -117,6 +123,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
         try {
           const results = await searchCatalog(query, {
             signal: controller.signal,
+            source,
           })
           if (controller.signal.aborted) return
           remember(key, results)
@@ -148,7 +155,7 @@ export function useCatalogSearch(term: string): CatalogSearchState {
       // response overwrite a newer one.
       controller.abort()
     }
-  }, [term])
+  }, [term, source])
 
   return state
 }

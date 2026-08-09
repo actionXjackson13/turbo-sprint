@@ -1,10 +1,33 @@
 import clsx from 'clsx'
-import { AlbumArt, AppButton, AppInput, EmptyState, LoadingSkeleton } from '../../components'
+import {
+  AlbumArt,
+  AppButton,
+  AppInput,
+  EmptyState,
+  LoadingSkeleton,
+  SegmentedControl,
+} from '../../components'
 import { useCatalogSearch } from './useCatalogSearch'
+import { useCatalogChoice } from './catalogChoice'
 import {
   appleFailureMessage,
+  type CatalogChoice,
   type CatalogSong,
 } from '../../services/catalog/appleCatalog'
+
+/**
+ * Short enough to fit four across a phone.
+ *
+ * "Basic" rather than "MusicBrainz": the name means nothing to anyone who has
+ * not read the source, while what it *is* — text-only results, no artwork — is
+ * exactly what the word conveys.
+ */
+const SOURCE_OPTIONS: { value: CatalogChoice; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'apple', label: 'Apple' },
+  { value: 'deezer', label: 'Deezer' },
+  { value: 'musicbrainz', label: 'Basic' },
+]
 
 export interface SongSearchProps {
   term: string
@@ -41,8 +64,9 @@ export function SongSearch({
   autoFocus = false,
   pendingId = null,
 }: SongSearchProps) {
+  const [choice, setChoice] = useCatalogChoice()
   const { results, loading, error, empty, source, appleFailure } =
-    useCatalogSearch(term)
+    useCatalogSearch(term, choice)
 
   return (
     <>
@@ -58,6 +82,18 @@ export function SongSearch({
         autoComplete="off"
         autoCorrect="off"
       />
+
+      {/* Which catalogue to ask. Below the box rather than above it, so it
+          never stands between someone and the thing they came to type. */}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-meta text-fg-subtle">Search</span>
+        <SegmentedControl
+          label="Which catalogue to search"
+          value={choice}
+          onChange={setChoice}
+          options={SOURCE_OPTIONS}
+        />
+      </div>
 
       <div className="mt-3">
         {error && (
@@ -97,7 +133,10 @@ export function SongSearch({
         {/* Apple's rows carry artwork; the fallbacks' do not. Without a word of
             explanation that reads as the app having got worse, rather than as
             Apple being unreachable from this phone. */}
-        {source !== 'apple' && source !== null && results.length > 0 && (
+        {choice === 'auto' &&
+          source !== 'apple' &&
+          source !== null &&
+          results.length > 0 && (
           <p
             role="status"
             className="mb-3 rounded-control border border-status-pending/40 bg-status-pending/10 p-2.5 text-meta text-fg-muted"
@@ -108,8 +147,8 @@ export function SongSearch({
             {source === 'deezer'
               ? 'These are from Deezer instead — a cover can outrank the original, so check the artist.'
               : 'These are basic results — no artwork, and covers can outrank the original, so pick carefully.'}
-          </p>
-        )}
+            </p>
+          )}
 
         {results.length > 0 && (
           <ul className="space-y-2">

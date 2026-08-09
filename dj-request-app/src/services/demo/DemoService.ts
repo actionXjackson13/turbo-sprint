@@ -13,6 +13,7 @@ import { ACTIVE_REQUEST_STATUSES } from '../../types/domain'
 import {
   ServiceError,
   type CreateRequestInput,
+  type DjSongInput,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -519,6 +520,66 @@ export class DemoService implements DataService {
           isFoundingVote: true,
           createdAt: now,
         })
+        return clone(request)
+      },
+      channels.requests(input.eventId),
+    )
+  }
+
+  /**
+   * The DJ's own song, straight into the queue.
+   *
+   * Deliberately not createSongRequest with the DJ standing in for a guest:
+   * there is no guest row to attach, no founding vote to cast, and the
+   * per-guest request cap and the open/paused/closed gate are both about
+   * managing the room rather than the person managing it.
+   */
+  async addDjSong(input: DjSongInput): Promise<SongRequest> {
+    await demoDelay()
+    return mutate(
+      (db) => {
+        const event = this.requireOwnedEvent(db, input.eventId)
+        if (event.status === 'ended') {
+          throw new ServiceError('forbidden', 'This event has ended.')
+        }
+
+        const title = input.title.trim()
+        if (!title) {
+          throw new ServiceError('invalid_input', 'A song needs a title.')
+        }
+
+        // The back of the queue, like anything else queued.
+        const positions = db.requests
+          .filter(
+            (r) =>
+              r.eventId === input.eventId &&
+              r.status === 'queued' &&
+              r.queuePosition !== null,
+          )
+          .map((r) => r.queuePosition!)
+
+        const now = nowIso()
+        const request: SongRequest = {
+          id: `demo-req-${crypto.randomUUID().slice(0, 8)}`,
+          eventId: input.eventId,
+          guestId: null,
+          // Named, so a guest reading the queue can tell the DJ's picks from
+          // the room's.
+          guestDisplayName:
+            db.profiles.find((p) => p.id === event.djId)?.displayName ?? 'DJ',
+          title,
+          artist: input.artist.trim(),
+          voteCount: 0,
+          status: 'queued',
+          queuePosition: positions.length ? Math.max(...positions) + 1 : 0,
+          sourceRoundId: null,
+          catalogId: input.catalogId ?? null,
+          artworkUrl: input.artworkUrl ?? null,
+          catalogUrl: input.catalogUrl ?? null,
+          createdAt: now,
+          updatedAt: now,
+        }
+        db.requests.push(request)
         return clone(request)
       },
       channels.requests(input.eventId),
