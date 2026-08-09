@@ -56,14 +56,46 @@ const ACTIVE_GUEST_KEY = 'soundboard.demoActiveGuest'
 // Persistence
 // ---------------------------------------------------------------------------
 
+/**
+ * Fill in anything a stored database predates.
+ *
+ * The demo database lives in localStorage and outlives the code that wrote it:
+ * someone who used the app last week reloads it today and gets last week's
+ * shape back. Every collection added since then is simply absent, and the first
+ * write to one throws — which is exactly how sets shipped broken for anyone who
+ * had opened the app before, while working perfectly on a fresh browser.
+ *
+ * Repairing beats rejecting. The obvious alternative, bumping the storage key,
+ * would take the DJ's event, its requests, its guests and its queue with it —
+ * a working party wiped to add a feature nobody had used yet.
+ */
+function normalize(stored: Partial<DemoDb>): DemoDb {
+  const seed = buildSeed()
+  return {
+    profiles: stored.profiles ?? seed.profiles,
+    events: stored.events ?? seed.events,
+    guests: stored.guests ?? seed.guests,
+    requests: stored.requests ?? seed.requests,
+    requestVotes: stored.requestVotes ?? seed.requestVotes,
+    rounds: stored.rounds ?? seed.rounds,
+    votingOptions: stored.votingOptions ?? seed.votingOptions,
+    votingResponses: stored.votingResponses ?? seed.votingResponses,
+    // Added after the storage format was already in the wild, so it is the one
+    // most likely to be missing — and the reason this function exists.
+    djSets: stored.djSets ?? [],
+    currentDjId: stored.currentDjId ?? null,
+  }
+}
+
 function load(): DemoDb {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as DemoDb
-      // Guard against a stale shape from an earlier version of the seed.
+      const parsed = JSON.parse(raw) as Partial<DemoDb>
+      // The two that must be present for this to be a database at all rather
+      // than something else entirely; everything else is repaired above.
       if (Array.isArray(parsed.events) && Array.isArray(parsed.requests)) {
-        return parsed
+        return normalize(parsed)
       }
     }
   } catch {
