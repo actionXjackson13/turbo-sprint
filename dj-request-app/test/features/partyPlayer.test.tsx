@@ -107,6 +107,7 @@ function request(id: string, title: string, position: number): SongRequest {
     voteCount: 0,
     status: 'queued',
     queuePosition: position,
+    queueGroup: 'main',
     sourceRoundId: null,
     catalogId: null,
     artworkUrl: null,

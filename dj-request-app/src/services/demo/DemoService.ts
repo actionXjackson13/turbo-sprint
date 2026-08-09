@@ -1,5 +1,6 @@
 import type {
   DjSet,
+  QueueGroup,
   DjSetSong,
   EventGuest,
   EventRecord,
@@ -508,6 +509,7 @@ export class DemoService implements DataService {
           voteCount: 1, // the founding vote below
           status: 'pending',
           queuePosition: null,
+          queueGroup: 'main',
           sourceRoundId: null,
           catalogId: input.catalogId ?? null,
           artworkUrl: input.artworkUrl ?? null,
@@ -574,6 +576,9 @@ export class DemoService implements DataService {
           artist: input.artist.trim(),
           voteCount: 0,
           status: 'queued',
+          // One song the DJ added by hand is a decision about now, not
+          // backdrop — unlike a whole set, which lands in sub.
+          queueGroup: 'main',
           queuePosition: positions.length ? Math.max(...positions) + 1 : 0,
           sourceRoundId: null,
           catalogId: input.catalogId ?? null,
@@ -737,6 +742,8 @@ export class DemoService implements DataService {
             artist: song.artist,
             voteCount: 0,
             status: 'queued',
+            // A set is the backdrop; that is what sub means.
+            queueGroup: 'sub',
             queuePosition: next,
             sourceRoundId: null,
             catalogId: song.catalogId,
@@ -811,19 +818,46 @@ export class DemoService implements DataService {
   async reorderQueue(
     eventId: string,
     orderedRequestIds: string[],
+    mainCount?: number,
   ): Promise<void> {
-    await demoDelay(60)
+    await demoDelay(80)
     mutate(
       (db) => {
         this.requireOwnedEvent(db, eventId)
         orderedRequestIds.forEach((id, index) => {
           const request = db.requests.find(
-            (r) => r.id === id && r.eventId === eventId,
+            (r) => r.id === id && r.eventId === eventId && r.status === 'queued',
           )
-          if (request) request.queuePosition = index
+          if (!request) return
+          request.queuePosition = index
+          // Undefined means "leave the halves alone" — a caller that only
+          // wanted to reorder within what is already there.
+          if (mainCount !== undefined) {
+            request.queueGroup = index < mainCount ? 'main' : 'sub'
+          }
+          request.updatedAt = nowIso()
         })
       },
       channels.requests(eventId),
+    )
+  }
+
+  async setQueueGroup(
+    requestId: string,
+    group: QueueGroup,
+  ): Promise<SongRequest> {
+    await demoDelay(80)
+    const eventId = getDb().requests.find((r) => r.id === requestId)?.eventId
+    return mutate(
+      (db) => {
+        const request = db.requests.find((r) => r.id === requestId)
+        if (!request) throw new ServiceError('not_found', 'Request not found.')
+        this.requireOwnedEvent(db, request.eventId)
+        request.queueGroup = group
+        request.updatedAt = nowIso()
+        return clone(request)
+      },
+      channels.requests(eventId ?? ''),
     )
   }
 
@@ -1177,6 +1211,7 @@ export class DemoService implements DataService {
           voteCount: db.votingResponses.filter((r) => r.optionId === optionId)
             .length,
           status: 'queued',
+          queueGroup: 'main',
           queuePosition: positions.length > 0 ? Math.max(...positions) + 1 : 0,
           sourceRoundId: roundId,
           // The winner keeps the identity it was picked with, so the request

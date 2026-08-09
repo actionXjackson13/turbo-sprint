@@ -32,6 +32,7 @@ function request(
     voteCount: votes,
     status,
     queuePosition: null,
+    queueGroup: 'main',
     sourceRoundId: null,
     catalogId: null,
     artworkUrl: null,

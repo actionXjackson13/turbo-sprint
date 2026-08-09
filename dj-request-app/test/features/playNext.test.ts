@@ -19,6 +19,7 @@ function queued(id: string, queuePosition: number): SongRequest {
     artist: 'Artist',
     voteCount: 1,
     status: 'queued',
+    queueGroup: 'main',
     queuePosition,
     sourceRoundId: null,
     catalogId: null,

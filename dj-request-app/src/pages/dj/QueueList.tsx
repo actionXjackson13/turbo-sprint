@@ -16,6 +16,11 @@ export interface QueueListProps {
   /** Id currently being moved, so its button can show progress. */
   playNextPendingId: string | null
   onMarkPlayed: (request: SongRequest) => void
+  /**
+   * Move the song to the other half of the queue. Omitted where there is no
+   * other half to move it to.
+   */
+  onMoveGroup?: (request: SongRequest) => void
 }
 
 /**
@@ -45,6 +50,7 @@ export function QueueList({
   onPlayNext,
   playNextPendingId,
   onMarkPlayed,
+  onMoveGroup,
 }: QueueListProps) {
   const listRef = useRef<HTMLOListElement>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -265,8 +271,24 @@ export function QueueList({
                 disabled={busy || drag !== null}
                 onClick={() => onMarkPlayed(request)}
               >
-                Mark played
+                Played
               </AppButton>
+              {/*
+                Across the divider. Promoting one track out of a set is the
+                move this whole split exists for, so it is a button on the row
+                rather than something buried in a sheet.
+              */}
+              {onMoveGroup && (
+                <AppButton
+                  size="sm"
+                  variant="secondary"
+                  fullWidth
+                  disabled={busy || drag !== null}
+                  onClick={() => onMoveGroup(request)}
+                >
+                  {request.queueGroup === 'sub' ? 'Move up' : 'Move down'}
+                </AppButton>
+              )}
             </div>
           </li>
         )

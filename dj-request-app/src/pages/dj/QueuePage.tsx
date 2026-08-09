@@ -16,7 +16,11 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
-import { countRoomSongs } from '../../features/requests/queueOrdering'
+import { useEnforceQueueOrder } from '../../features/requests/useEnforceQueueOrder'
+import {
+  countRoomSongs,
+  splitQueue,
+} from '../../features/requests/queueOrdering'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
 import { QueueList } from './QueueList'
@@ -56,6 +60,8 @@ export function QueuePage() {
 
   const [loadingSet, setLoadingSet] = useState(false)
 
+  const enforceOrder = useEnforceQueueOrder(eventId)
+
   const player = usePartyPlayerState()
   /** Running, in any sense the DJ would call running. */
   const playerLive =
@@ -72,11 +78,47 @@ export function QueuePage() {
   )
 
   const requested = useMemo(() => countRoomSongs(queue), [queue])
+  const { main, sub } = useMemo(() => splitQueue(queue), [queue])
 
-  const reorder = async (orderedIds: string[]) => {
+  /**
+   * Reordering happens inside one half, but the queue is numbered end to end —
+   * so each list sends its own ids plus the other half's, unchanged, and says
+   * where the boundary now falls.
+   */
+  const reorderHalf = async (orderedIds: string[], half: 'main' | 'sub') => {
+    const full =
+      half === 'main'
+        ? [...orderedIds, ...sub.map((r) => r.id)]
+        : [...main.map((r) => r.id), ...orderedIds]
+    const mainCount = half === 'main' ? orderedIds.length : main.length
+
     setBusy(true)
     try {
-      await service.reorderQueue(eventId, orderedIds)
+      await service.reorderQueue(eventId, full, mainCount)
+      await reload()
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Across the divider.
+   *
+   * Only the half changes; the position is left alone and the reordering pass
+   * settles it. A promoted song keeps its high position, which puts it at the
+   * end of main — behind the requests already waiting, ahead of the whole set,
+   * and above every request that arrives after it.
+   */
+  const moveGroup = async (request: SongRequest) => {
+    setBusy(true)
+    try {
+      await service.setQueueGroup(
+        request.id,
+        request.queueGroup === 'sub' ? 'main' : 'sub',
+      )
+      await enforceOrder()
       await reload()
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -272,14 +314,43 @@ export function QueuePage() {
               description="Queue a request or push a vote winner here."
             />
           ) : (
-            <QueueList
-              queue={queue}
-              busy={busy}
-              onReorder={reorder}
-              onPlayNext={(request) => void playNext(request)}
-              playNextPendingId={pendingId}
-              onMarkPlayed={markPlayed}
-            />
+            <div className="space-y-3">
+              <QueueList
+                queue={main}
+                busy={busy}
+                onReorder={(ids) => reorderHalf(ids, 'main')}
+                onPlayNext={(request) => void playNext(request)}
+                playNextPendingId={pendingId}
+                onMarkPlayed={markPlayed}
+                onMoveGroup={(request) => void moveGroup(request)}
+              />
+
+              {/*
+                The divider, and nothing more than one. Everything below plays
+                after everything above, which is the only thing it has to say.
+              */}
+              {sub.length > 0 && (
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="h-px flex-1 bg-hairline-strong" />
+                  <span className="text-label uppercase text-fg-subtle">
+                    Then
+                  </span>
+                  <span className="h-px flex-1 bg-hairline-strong" />
+                </div>
+              )}
+
+              {sub.length > 0 && (
+                <QueueList
+                  queue={sub}
+                  busy={busy}
+                  onReorder={(ids) => reorderHalf(ids, 'sub')}
+                  onPlayNext={(request) => void playNext(request)}
+                  playNextPendingId={pendingId}
+                  onMarkPlayed={markPlayed}
+                  onMoveGroup={(request) => void moveGroup(request)}
+                />
+              )}
+            </div>
           )}
         </Section>
       </main>

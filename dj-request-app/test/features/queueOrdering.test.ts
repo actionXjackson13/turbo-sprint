@@ -3,19 +3,23 @@ import {
   countRoomSongs,
   isDjSong,
   isRoomSong,
-  queueOrderRoomFirst,
-  queueOrderWithRequestAhead,
+  mainCountOf,
+  queueOrderMainFirst,
+  splitQueue,
 } from '../../src/features/requests/queueOrdering'
 import type { SongRequest } from '../../src/types/domain'
 
 /**
- * The rule that keeps the app a request app.
+ * The queue in two halves, and the rule that keeps the app a request app.
  *
- * A DJ can now drop a thirty-song set into the queue in one tap. Without this,
- * a guest request queued afterwards lands at position thirty-one — two hours
- * away, which is indistinguishable from being declined. Everything the app is
- * for depends on that not happening, and it is pure arithmetic, so it is worth
- * pinning precisely.
+ * A DJ can drop a thirty-song set into the queue in one tap. If a request
+ * queued afterwards landed behind it, that request is two hours away — which is
+ * indistinguishable from being declined.
+ *
+ * The earlier version derived the answer from who added each song, which meant
+ * it could be applied but never overridden: a DJ who dragged one of their own
+ * songs up watched it sink again on the next request. Storing which half a song
+ * is in is what makes promoting a track out of a set stick.
  */
 
 let seq = 0
@@ -32,6 +36,7 @@ function song(overrides: Partial<SongRequest> = {}): SongRequest {
     voteCount: 0,
     status: 'queued',
     queuePosition: seq,
+    queueGroup: 'main',
     sourceRoundId: null,
     catalogId: null,
     artworkUrl: null,
@@ -42,9 +47,9 @@ function song(overrides: Partial<SongRequest> = {}): SongRequest {
   }
 }
 
-/** The DJ's own: nobody asked for it. */
-const djSong = (o: Partial<SongRequest> = {}) =>
-  song({ guestId: null, sourceRoundId: null, ...o })
+/** A song from a loaded set: the DJ's, and in the backdrop half. */
+const setSong = (o: Partial<SongRequest> = {}) =>
+  song({ guestId: null, sourceRoundId: null, queueGroup: 'sub', ...o })
 
 describe('telling whose song it is', () => {
   it('counts a guest request as the room’s', () => {
@@ -53,179 +58,161 @@ describe('telling whose song it is', () => {
   })
 
   it('counts a DJ-added song as the DJ’s', () => {
-    expect(isDjSong(djSong())).toBe(true)
+    expect(isDjSong(setSong())).toBe(true)
   })
 
   /**
    * A vote winner has no guest behind it either, but it is the most collective
-   * thing in the app — the whole room chose it. Filing it as filler would
-   * bury the one song everybody actually voted for.
+   * thing in the app — the whole room chose it.
    */
   it('counts a vote winner as the room’s, not the DJ’s', () => {
     const winner = song({ guestId: null, sourceRoundId: 'round-1' })
     expect(isRoomSong(winner)).toBe(true)
-    expect(isDjSong(winner)).toBe(false)
+  })
+
+  /**
+   * Whose song it is and where it plays are separate questions. A DJ song
+   * promoted into the main half is still the DJ's — which is what keeps the row
+   * colouring honest.
+   */
+  it('keeps ownership independent of which half it sits in', () => {
+    const promoted = setSong({ queueGroup: 'main' })
+    expect(isDjSong(promoted)).toBe(true)
+    expect(splitQueue([promoted]).main).toHaveLength(1)
   })
 })
 
-describe('where a newly queued request lands', () => {
-  it('goes ahead of the DJ’s songs', () => {
-    const request = song({ id: 'wanted', queuePosition: 99 })
+describe('splitting the queue', () => {
+  it('separates the two halves, each in its own order', () => {
     const queue = [
-      song({ id: 'earlier-request', queuePosition: 0 }),
-      djSong({ id: 'filler-1', queuePosition: 1 }),
-      djSong({ id: 'filler-2', queuePosition: 2 }),
-      request,
+      setSong({ id: 'f1', queuePosition: 2 }),
+      song({ id: 'r1', queuePosition: 0 }),
+      setSong({ id: 'f2', queuePosition: 3 }),
+      song({ id: 'r2', queuePosition: 1 }),
     ]
 
-    expect(queueOrderWithRequestAhead(queue, 'wanted')).toEqual([
-      'earlier-request',
-      'wanted',
-      'filler-1',
-      'filler-2',
-    ])
+    const { main, sub } = splitQueue(queue)
+    expect(main.map((r) => r.id)).toEqual(['r1', 'r2'])
+    expect(sub.map((r) => r.id)).toEqual(['f1', 'f2'])
   })
 
-  it('still queues behind requests that came first', () => {
-    // Fair is fair: the rule lifts requests above filler, not above each other.
-    const queue = [
-      song({ id: 'first', queuePosition: 0 }),
-      song({ id: 'second', queuePosition: 1 }),
-      djSong({ id: 'filler', queuePosition: 2 }),
-      song({ id: 'newest', queuePosition: 3 }),
-    ]
-
-    expect(queueOrderWithRequestAhead(queue, 'newest')).toEqual([
-      'first',
-      'second',
-      'newest',
-      'filler',
-    ])
-  })
-
-  it('changes nothing when the DJ has no songs in the queue', () => {
-    const queue = [
-      song({ id: 'a', queuePosition: 0 }),
-      song({ id: 'b', queuePosition: 1 }),
-    ]
-    expect(queueOrderWithRequestAhead(queue, 'b')).toEqual(['a', 'b'])
-  })
-
-  it('handles a set that fills the entire queue', () => {
-    // The case this exists for: thirty songs of filler, one person asking.
-    const filler = Array.from({ length: 30 }, (_, i) =>
-      djSong({ id: `f${i}`, queuePosition: i }),
-    )
-    const request = song({ id: 'heard', queuePosition: 30 })
-
-    const order = queueOrderWithRequestAhead([...filler, request], 'heard')
-    expect(order[0]).toBe('heard')
-    expect(order).toHaveLength(31)
-  })
-
-  it('places a request that is not in the queue yet', () => {
-    // The caller may reorder in the same breath as queueing, before a reload.
-    const queue = [djSong({ id: 'filler', queuePosition: 0 })]
-    expect(queueOrderWithRequestAhead(queue, 'brand-new')).toEqual([
-      'brand-new',
-      'filler',
-    ])
-  })
-
-  it('keeps a vote winner ahead of filler too', () => {
-    const queue = [
-      djSong({ id: 'filler', queuePosition: 0 }),
-      song({ id: 'winner', guestId: null, sourceRoundId: 'r1', queuePosition: 1 }),
-    ]
-    expect(queueOrderWithRequestAhead(queue, 'winner')).toEqual([
-      'winner',
-      'filler',
-    ])
+  it('treats a song with no half recorded as main', () => {
+    // Rows queued before the halves existed are due to play, not backdrop.
+    const legacy = song({ id: 'old', queueGroup: undefined as never })
+    expect(splitQueue([legacy]).main.map((r) => r.id)).toEqual(['old'])
   })
 })
 
-describe('how much of the queue the room asked for', () => {
-  it('counts requests and vote winners, not filler', () => {
+describe('the canonical order', () => {
+  it('puts the main half before the backdrop', () => {
     const queue = [
-      song(),
-      song(),
-      djSong(),
-      djSong(),
-      djSong(),
-      song({ guestId: null, sourceRoundId: 'r1' }),
-    ]
-    expect(countRoomSongs(queue)).toBe(3)
-  })
-})
-
-/**
- * The invariant, stated for the whole queue rather than for one insert.
- *
- * `queueOrderWithRequestAhead` only helps on the paths that remember to call
- * it, and one already didn't: a vote winner pushed to the queue went to the
- * back like anything else, behind whatever filler was sitting there. This is
- * the version that can be applied after *any* insert and reach the same
- * answer.
- */
-describe('the canonical queue order', () => {
-  it('puts everything the room asked for before everything the DJ added', () => {
-    const queue = [
-      djSong({ id: 'f1', queuePosition: 0 }),
+      setSong({ id: 'f1', queuePosition: 0 }),
       song({ id: 'r1', queuePosition: 1 }),
-      djSong({ id: 'f2', queuePosition: 2 }),
+      setSong({ id: 'f2', queuePosition: 2 }),
       song({ id: 'r2', queuePosition: 3 }),
     ]
 
-    expect(queueOrderRoomFirst(queue)).toEqual(['r1', 'r2', 'f1', 'f2'])
+    expect(queueOrderMainFirst(queue)).toEqual(['r1', 'r2', 'f1', 'f2'])
+    expect(mainCountOf(queue)).toBe(2)
+  })
+
+  /**
+   * The case the whole feature exists for: a new request is written at the very
+   * back of the queue, and has to end up at the end of its own half instead.
+   */
+  it('lifts a newly queued request out of the backdrop', () => {
+    const queue = [
+      song({ id: 'waiting', queuePosition: 0 }),
+      setSong({ id: 'f1', queuePosition: 1 }),
+      setSong({ id: 'f2', queuePosition: 2 }),
+      song({ id: 'newest', queuePosition: 3 }),
+    ]
+
+    expect(queueOrderMainFirst(queue)).toEqual([
+      'waiting',
+      'newest',
+      'f1',
+      'f2',
+    ])
+  })
+
+  /**
+   * The thing the derived version could not do. A DJ promotes one track out of
+   * a set; every request that arrives afterwards queues *behind* it, and it
+   * still sits ahead of the rest of the set.
+   */
+  it('keeps a promoted set song above later requests', () => {
+    const queue = [
+      song({ id: 'early', queuePosition: 0 }),
+      setSong({ id: 'promoted', queueGroup: 'main', queuePosition: 1 }),
+      setSong({ id: 'rest', queuePosition: 2 }),
+      song({ id: 'later', queuePosition: 3 }),
+    ]
+
+    expect(queueOrderMainFirst(queue)).toEqual([
+      'early',
+      'promoted',
+      'later',
+      'rest',
+    ])
   })
 
   it('rescues a vote winner that landed at the back', () => {
     const queue = [
-      djSong({ id: 'f1', queuePosition: 0 }),
-      djSong({ id: 'f2', queuePosition: 1 }),
-      song({ id: 'winner', guestId: null, sourceRoundId: 'r1', queuePosition: 2 }),
+      setSong({ id: 'f1', queuePosition: 0 }),
+      setSong({ id: 'f2', queuePosition: 1 }),
+      song({
+        id: 'winner',
+        guestId: null,
+        sourceRoundId: 'r1',
+        queuePosition: 2,
+      }),
     ]
-
-    expect(queueOrderRoomFirst(queue)[0]).toBe('winner')
+    expect(queueOrderMainFirst(queue)[0]).toBe('winner')
   })
 
-  it('keeps the order the DJ chose inside each group', () => {
-    // Dragging one request above another survives; dragging filler above a
-    // request does not, which is the whole point.
+  it('keeps the order the DJ chose inside each half', () => {
     const queue = [
       song({ id: 'second', queuePosition: 0 }),
       song({ id: 'first', queuePosition: 1 }),
-      djSong({ id: 'fB', queuePosition: 2 }),
-      djSong({ id: 'fA', queuePosition: 3 }),
+      setSong({ id: 'fB', queuePosition: 2 }),
+      setSong({ id: 'fA', queuePosition: 3 }),
     ]
-
-    expect(queueOrderRoomFirst(queue)).toEqual([
-      'second',
-      'first',
-      'fB',
-      'fA',
-    ])
+    expect(queueOrderMainFirst(queue)).toEqual(['second', 'first', 'fB', 'fA'])
   })
 
-  it('is idempotent — applying it twice changes nothing', () => {
+  it('is idempotent', () => {
     const queue = [
-      djSong({ id: 'f1', queuePosition: 0 }),
+      setSong({ id: 'f1', queuePosition: 0 }),
       song({ id: 'r1', queuePosition: 1 }),
     ]
-
-    const once = queueOrderRoomFirst(queue)
-    const reordered = once.map((id, i) => {
-      const found = queue.find((r) => r.id === id)!
-      return { ...found, queuePosition: i }
-    })
-    expect(queueOrderRoomFirst(reordered)).toEqual(once)
+    const once = queueOrderMainFirst(queue)
+    const renumbered = once.map((id, i) => ({
+      ...queue.find((r) => r.id === id)!,
+      queuePosition: i,
+    }))
+    expect(queueOrderMainFirst(renumbered)).toEqual(once)
   })
 
-  it('leaves a queue of only the DJ’s songs alone', () => {
+  it('leaves a queue that is all backdrop alone', () => {
     const queue = [
-      djSong({ id: 'a', queuePosition: 0 }),
-      djSong({ id: 'b', queuePosition: 1 }),
+      setSong({ id: 'a', queuePosition: 0 }),
+      setSong({ id: 'b', queuePosition: 1 }),
     ]
-    expect(queueOrderRoomFirst(queue)).toEqual(['a', 'b'])
+    expect(queueOrderMainFirst(queue)).toEqual(['a', 'b'])
+    expect(mainCountOf(queue)).toBe(0)
+  })
+})
+
+describe('how much of the queue the room asked for', () => {
+  it('counts requests and vote winners, wherever they sit', () => {
+    const queue = [
+      song(),
+      song(),
+      setSong(),
+      setSong(),
+      song({ guestId: null, sourceRoundId: 'r1' }),
+    ]
+    expect(countRoomSongs(queue)).toBe(3)
   })
 })

@@ -87,6 +87,8 @@ export function toSongRequest(row: Row): SongRequest {
     voteCount: row.vote_count ?? 0,
     status: row.status,
     queuePosition: row.queue_position ?? null,
+    // Rows written before the queue had halves come back without one.
+    queueGroup: row.queue_group === 'sub' ? 'sub' : 'main',
     sourceRoundId: row.source_round_id ?? null,
     catalogId: row.catalog_id ?? null,
     artworkUrl: row.artwork_url ?? null,

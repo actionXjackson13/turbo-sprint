@@ -1,27 +1,30 @@
 import type { SongRequest } from '../../types/domain'
 
 /**
- * Who a queued song belongs to, and what that means for its place in the queue.
+ * The queue in two halves.
  *
- * Sets made the queue lopsided. A DJ can now drop thirty songs into it in one
- * tap, and a guest request queued afterwards would land at position thirty-one
- * — two hours away, which is the same as never. The entire point of the app is
- * that the room gets heard, so the arithmetic cannot be left to chance.
+ * **main** is what plays next. **sub** is the backdrop — where a loaded set
+ * lands. New requests join the end of main, so they play ahead of the whole set
+ * without ever jumping the queue on requests already waiting.
  *
- * The rule is one sentence: **a request never queues behind the DJ's own
- * songs.** The set is the floor of the night, not a wall in front of it.
+ * The earlier version derived this: anything with no guest and no vote behind
+ * it was filler, and filler sorted last. That rule could be applied but never
+ * overridden — a DJ who dragged one of their own songs up watched the next
+ * request land above it and their song sink back, because the rule kept
+ * recomputing the same answer. Which half a song is in is now a fact stored
+ * about the song, so promoting one track out of a set makes it stick.
  *
- * It is deliberately a *default*, not a lock. The DJ can still drag anything
- * anywhere afterwards — this only decides where a song lands when nobody has
- * said otherwise, which is the case that was getting it wrong.
+ * Who *asked* for a song is a separate question from where it plays, and stays
+ * separate: `isDjSong` still drives the colour of the row, and a DJ song
+ * promoted into main is still visibly the DJ's.
  */
 
 /**
  * The DJ's own song: nobody asked for it.
  *
- * Two nulls, and the second one matters. A vote winner also has no guest
- * behind it, but it is the most collective thing in the app — the whole room
- * chose it — so it belongs with the requests, not with the filler.
+ * Two nulls, and the second one matters. A vote winner also has no guest behind
+ * it, but it is the most collective thing in the app — the whole room chose it
+ * — so it reads as the room's, not as filler.
  */
 export function isDjSong(request: SongRequest): boolean {
   return request.guestId === null && request.sourceRoundId === null
@@ -36,56 +39,43 @@ function byPosition(a: SongRequest, b: SongRequest): number {
   return (a.queuePosition ?? 0) - (b.queuePosition ?? 0)
 }
 
-/**
- * The queue's ids with `requestId` placed at the back of the room's songs and
- * ahead of the DJ's — the position a request would have had if the DJ's filler
- * were not there at all.
- *
- * Pure, so the ordering is testable without a component or a service.
- */
-export function queueOrderWithRequestAhead(
-  queued: SongRequest[],
-  requestId: string,
-): string[] {
-  const others = queued.filter((r) => r.id !== requestId).sort(byPosition)
-  const moving = queued.find((r) => r.id === requestId)
-
-  const room = others.filter(isRoomSong)
-  const dj = others.filter(isDjSong)
-
-  return [
-    ...room.map((r) => r.id),
-    // The song being queued goes here whether or not it is in `queued` yet —
-    // the caller may be moving a request that has only just become queued.
-    ...(moving || !queued.some((r) => r.id === requestId) ? [requestId] : []),
-    ...dj.map((r) => r.id),
-  ]
+export interface SplitQueue {
+  /** Plays first. Requests append to the end of this. */
+  main: SongRequest[]
+  /** The backdrop. A loaded set appends to the end of this. */
+  sub: SongRequest[]
 }
 
-/**
- * The whole queue, room first, DJ's own after — the canonical order.
- *
- * `queueOrderWithRequestAhead` fixes the position of one song as it is queued,
- * which only helps on the paths that remember to call it. This states the rule
- * for the entire queue instead, so it can be applied after *any* insert and get
- * the same answer: whatever the room asked for plays before whatever the DJ
- * added to fill the gaps.
- *
- * Relative order inside each group is preserved, so a DJ who drags one request
- * above another, or reorders their own set, keeps that. What it will not keep
- * is filler dragged above a request — which is the point.
- */
-export function queueOrderRoomFirst(queued: SongRequest[]): string[] {
+/** The queue as the DJ sees it: two lists, each in its own order. */
+export function splitQueue(queued: SongRequest[]): SplitQueue {
   const ordered = [...queued].sort(byPosition)
-  return [
-    ...ordered.filter(isRoomSong).map((r) => r.id),
-    ...ordered.filter(isDjSong).map((r) => r.id),
-  ]
+  return {
+    main: ordered.filter((r) => r.queueGroup !== 'sub'),
+    sub: ordered.filter((r) => r.queueGroup === 'sub'),
+  }
 }
 
 /**
- * How many of the room's songs are waiting, for the badge that tells the DJ
- * whether they need to look. Filler is not news.
+ * The whole queue as one list of ids, main first — the canonical order.
+ *
+ * Applied after anything lands in the queue, so a song inserted at the very
+ * back by the database still ends up at the end of *its own half* rather than
+ * behind the backdrop. Relative order inside each half is untouched, which is
+ * what lets a manual drag survive.
+ */
+export function queueOrderMainFirst(queued: SongRequest[]): string[] {
+  const { main, sub } = splitQueue(queued)
+  return [...main, ...sub].map((r) => r.id)
+}
+
+/** How many of the ordered ids belong to main — what `reorderQueue` needs. */
+export function mainCountOf(queued: SongRequest[]): number {
+  return splitQueue(queued).main.length
+}
+
+/**
+ * How many of the room's songs are waiting, for the line that tells the DJ
+ * whether they need to look. Backdrop is not news.
  */
 export function countRoomSongs(queued: SongRequest[]): number {
   return queued.filter(isRoomSong).length

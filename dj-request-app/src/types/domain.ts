@@ -99,9 +99,11 @@ export interface SongRequest {
   status: RequestStatus
   /**
    * Manual ordering within the queue. Only meaningful when status is 'queued';
-   * null otherwise. Lower sorts first.
+   * null otherwise. Lower sorts first, within the song's group.
    */
   queuePosition: number | null
+  /** Which half of the queue this sits in. Only meaningful while queued. */
+  queueGroup: QueueGroup
   /** Set when this row was created by promoting a voting-round winner. */
   sourceRoundId: string | null
   /**
@@ -208,6 +210,16 @@ export interface VotingRoundResults {
   /** The current guest's choice, if they have voted. */
   myOptionId: string | null
 }
+
+/**
+ * Which half of the queue a song sits in.
+ *
+ * `main` is what plays next; `sub` is the backdrop a loaded set lands in.
+ * Stored rather than derived from who added the song, so a DJ who promotes one
+ * track out of a set has it stay promoted — above every request that arrives
+ * afterwards, and still behind the ones already waiting.
+ */
+export type QueueGroup = 'main' | 'sub'
 
 /** Sort orders offered on the request lists. */
 export type RequestSort = 'newest' | 'votes'

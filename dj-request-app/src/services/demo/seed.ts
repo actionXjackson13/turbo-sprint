@@ -392,6 +392,9 @@ function req(input: {
     voteCount: 0,
     status: input.status,
     queuePosition: input.queuePosition ?? null,
+    // Everything seeded was asked for, so it all belongs in the half that
+    // plays next. The backdrop half only fills when a set is loaded.
+    queueGroup: 'main',
     sourceRoundId: null,
     catalogId: null,
     artworkUrl: artworkFor(input.title),

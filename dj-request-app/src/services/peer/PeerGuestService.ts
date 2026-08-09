@@ -497,6 +497,9 @@ export class PeerGuestService implements DataService {
   finalizeVotingRoundIfExpired(roundId: string): Promise<VotingRound | null> {
     return this.call('finalizeVotingRoundIfExpired', roundId)
   }
+  setQueueGroup(): Promise<SongRequest> {
+    return this.djOnly()
+  }
   addDjSong(): Promise<SongRequest> {
     return this.djOnly()
   }

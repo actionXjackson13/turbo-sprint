@@ -31,6 +31,7 @@ function request(overrides: Partial<SongRequest> = {}): SongRequest {
     voteCount: 1,
     status: 'queued',
     queuePosition: 0,
+    queueGroup: 'main',
     sourceRoundId: null,
     catalogId: '1',
     artworkUrl: null,

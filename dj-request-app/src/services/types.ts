@@ -1,5 +1,6 @@
 import type {
   DjSet,
+  QueueGroup,
   EventGuest,
   EventRecord,
   Profile,
@@ -237,8 +238,21 @@ export interface DataService {
   ): Promise<SongRequest>
   /** DJ-only. */
   deleteRequest(requestId: string): Promise<void>
-  /** DJ-only. Persists a new manual ordering of the queue. */
-  reorderQueue(eventId: string, orderedRequestIds: string[]): Promise<void>
+  /**
+   * DJ-only. Persists a new manual ordering of the queue.
+   *
+   * `mainCount` says how many of the leading ids belong to the main half; the
+   * rest fall into sub. Sent together rather than as a second call so a reorder
+   * stays one write — a queue caught between the two would show songs in one
+   * half ordered by the other's numbering. Omit it to leave the halves alone.
+   */
+  reorderQueue(
+    eventId: string,
+    orderedRequestIds: string[],
+    mainCount?: number,
+  ): Promise<void>
+  /** DJ-only. Moves one queued song between the halves. */
+  setQueueGroup(requestId: string, group: QueueGroup): Promise<SongRequest>
   subscribeSongRequests(eventId: string, onChange: () => void): Unsubscribe
 
   // ---- Request voting ----------------------------------------------------

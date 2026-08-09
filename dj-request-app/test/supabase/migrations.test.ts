@@ -110,6 +110,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0009_voting_option_catalog.sql'))
     await db.exec(read('0010_dj_added_songs.sql'))
     await db.exec(read('0011_dj_sets.sql'))
+    await db.exec(read('0012_queue_groups.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -780,6 +781,151 @@ describe('supabase migrations', () => {
         [setId],
       )
       expect(orphans.rows).toHaveLength(0)
+    })
+  })
+
+  /**
+   * The queue's two halves.
+   *
+   * Which half a song is in is stored rather than derived, and that is the
+   * whole point: a derived rule could be applied but never overridden, so a DJ
+   * who promoted one track out of a set watched it sink again on the next
+   * request.
+   */
+  describe('queue groups', () => {
+    let setId: string
+    let promotedId: string
+
+    it('lands a loaded set in the backdrop half', async () => {
+      const created = await runAs<{ id: string }>(
+        DJ,
+        `insert into public.dj_sets (dj_id, name) values ($1, 'Backdrop')
+         returning id`,
+        [DJ],
+      )
+      setId = created.rows[0]!.id
+      await runAs(
+        DJ,
+        `insert into public.dj_set_songs (set_id, title, artist, display_order)
+         values ($1, 'Filler One', 'Nobody', 0), ($1, 'Filler Two', 'Nobody', 1)`,
+        [setId],
+      )
+
+      await runAs(DJ, `select public.load_set_into_queue($1, $2)`, [
+        eventId,
+        setId,
+      ])
+
+      const rows = await runAs<{ title: string; queue_group: string }>(
+        DJ,
+        `select title, queue_group from public.song_requests
+          where event_id = $1 and title like 'Filler%'`,
+        [eventId],
+      )
+      expect(rows.rows).toHaveLength(2)
+      expect(rows.rows.every((r) => r.queue_group === 'sub')).toBe(true)
+    })
+
+    it('puts a song the DJ adds by hand in the half that plays next', async () => {
+      const added = await runAs<{ id: string; queue_group: string }>(
+        DJ,
+        `select id, queue_group from public.add_dj_song($1, 'By Hand', 'Someone')`,
+        [eventId],
+      )
+      expect(added.rows[0]!.queue_group).toBe('main')
+    })
+
+    it('moves one song across the divider, and it stays', async () => {
+      const filler = await runAs<{ id: string }>(
+        DJ,
+        `select id from public.song_requests
+          where event_id = $1 and title = 'Filler One'`,
+        [eventId],
+      )
+      promotedId = filler.rows[0]!.id
+
+      const moved = await runAs<{ queue_group: string }>(
+        DJ,
+        `select queue_group from public.set_queue_group($1, 'main')`,
+        [promotedId],
+      )
+      expect(moved.rows[0]!.queue_group).toBe('main')
+
+      // Re-read rather than trusting the return value: the point is that it
+      // persisted, not that the function said so.
+      const after = await runAs<{ queue_group: string }>(
+        DJ,
+        `select queue_group from public.song_requests where id = $1`,
+        [promotedId],
+      )
+      expect(after.rows[0]!.queue_group).toBe('main')
+    })
+
+    it('rejects a half that does not exist', async () => {
+      await expect(
+        runAs(DJ, `select public.set_queue_group($1, 'sideways')`, [promotedId]),
+      ).rejects.toThrow(/invalid_input/)
+    })
+
+    it('stops a guest moving songs between halves', async () => {
+      await expect(
+        runAs(GUEST_A, `select public.set_queue_group($1, 'sub')`, [
+          promotedId,
+        ]),
+      ).rejects.toThrow(/forbidden/)
+    })
+
+    it('settles both halves in one reorder', async () => {
+      const queued = await runAs<{ id: string }>(
+        DJ,
+        `select id from public.song_requests
+          where event_id = $1 and status = 'queued'
+          order by queue_position`,
+        [eventId],
+      )
+      const ids = queued.rows.map((r) => r.id)
+      // Everything into main except the last one.
+      await runAs(DJ, `select public.reorder_queue($1, $2::uuid[], $3)`, [
+        eventId,
+        ids,
+        ids.length - 1,
+      ])
+
+      const after = await runAs<{ id: string; queue_group: string }>(
+        DJ,
+        `select id, queue_group from public.song_requests
+          where event_id = $1 and status = 'queued'
+          order by queue_position`,
+        [eventId],
+      )
+      expect(after.rows.slice(0, -1).every((r) => r.queue_group === 'main')).toBe(
+        true,
+      )
+      expect(after.rows.at(-1)!.queue_group).toBe('sub')
+    })
+
+    /** A null count means "reorder, but leave the halves as they are". */
+    it('leaves the halves alone when the count is null', async () => {
+      const before = await runAs<{ id: string; queue_group: string }>(
+        DJ,
+        `select id, queue_group from public.song_requests
+          where event_id = $1 and status = 'queued'
+          order by queue_position`,
+        [eventId],
+      )
+      await runAs(DJ, `select public.reorder_queue($1, $2::uuid[], null)`, [
+        eventId,
+        before.rows.map((r) => r.id),
+      ])
+
+      const after = await runAs<{ id: string; queue_group: string }>(
+        DJ,
+        `select id, queue_group from public.song_requests
+          where event_id = $1 and status = 'queued'
+          order by queue_position`,
+        [eventId],
+      )
+      expect(after.rows).toEqual(before.rows)
     })
   })
 

@@ -1,6 +1,7 @@
 import type { RealtimeChannel, SupabaseClient, User } from '@supabase/supabase-js'
 import type {
   DjSet,
+  QueueGroup,
   EventGuest,
   EventRecord,
   Profile,
@@ -610,12 +611,28 @@ export class SupabaseService implements DataService {
   async reorderQueue(
     eventId: string,
     orderedRequestIds: string[],
+    mainCount?: number,
   ): Promise<void> {
     const { error } = await this.db.rpc('reorder_queue', {
       p_event_id: eventId,
       p_request_ids: orderedRequestIds,
+      // Null tells the function to leave the halves as they are.
+      p_main_count: mainCount ?? null,
     })
+
     if (error) translateError(error, 'Could not reorder the queue.')
+  }
+
+  async setQueueGroup(
+    requestId: string,
+    group: QueueGroup,
+  ): Promise<SongRequest> {
+    const { data, error } = await this.db
+      .rpc('set_queue_group', { p_request_id: requestId, p_group: group })
+      .single()
+
+    if (error) translateError(error, 'Could not move that song.')
+    return toSongRequest(asRow(data))
   }
 
   subscribeSongRequests(eventId: string, onChange: () => void): Unsubscribe {
