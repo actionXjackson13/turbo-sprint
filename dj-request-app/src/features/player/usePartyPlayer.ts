@@ -68,7 +68,7 @@ const MAX_CONSECUTIVE_SKIPS = 3
 export function usePartyPlayer(eventId: string): PartyPlayerState {
   const service = useService()
   const toast = useToast()
-  const { refresh } = useDjEvent()
+  const { event, refresh } = useDjEvent()
   const { requests, loading, reload } = useEventRequests(eventId)
 
   const [status, setStatus] = useState<PlayerStatus>('idle')
@@ -95,6 +95,16 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
 
   const currentRef = useRef<SongRequest | null>(null)
   currentRef.current = current
+
+  /**
+   * Everything, not just the queue — the song shown as now-playing has already
+   * left the queue, and starting playback needs to be able to find it again.
+   */
+  const requestsRef = useRef<SongRequest[]>(requests)
+  requestsRef.current = requests
+
+  const nowPlayingRef = useRef(event?.nowPlaying ?? null)
+  nowPlayingRef.current = event?.nowPlaying ?? null
 
   /** Stops the end-of-song event racing an already-running advance. */
   const busyRef = useRef(false)
@@ -130,7 +140,7 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
    * is never announced to the room as playing.
    */
   const playRequest = useCallback(
-    async (request: SongRequest) => {
+    async (request: SongRequest, announce = true) => {
       busyRef.current = true
       setStatus('resolving')
       setFailure(null)
@@ -161,13 +171,19 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
       try {
         // The same write the manual "Play next song" button makes: it retires
         // the request from the queue and tells the guests what is on.
-        await service.setNowPlaying(eventId, {
-          title: request.title,
-          artist: request.artist,
-          sourceRequestId: request.id,
-          artworkUrl: request.artworkUrl,
-        })
-        await Promise.all([refresh(), reload()])
+        //
+        // Skipped when picking up the song already showing as now-playing:
+        // that row is correct and its request is already retired, so writing it
+        // again would only re-announce what the room can already see.
+        if (announce) {
+          await service.setNowPlaying(eventId, {
+            title: request.title,
+            artist: request.artist,
+            sourceRequestId: request.id,
+            artworkUrl: request.artworkUrl,
+          })
+          await Promise.all([refresh(), reload()])
+        }
       } catch (err) {
         busyRef.current = false
         halt(getErrorMessage(err))
@@ -250,15 +266,70 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
     advance(song)
   }
 
+  /**
+   * The song the screen already says is on, as something the player can play.
+   *
+   * Its request has been retired from the queue, so the row itself is looked up
+   * by id where there is one. A now-playing set by hand has no request behind
+   * it at all, which is what the stand-in covers — the player resolves a song
+   * from its title and artist, so that is all it genuinely needs.
+   */
+  const nowPlayingAsRequest = useCallback((): SongRequest | null => {
+    const nowPlaying = nowPlayingRef.current
+    if (!nowPlaying) return null
+
+    const source = nowPlaying.sourceRequestId
+      ? requestsRef.current.find((r) => r.id === nowPlaying.sourceRequestId)
+      : undefined
+    if (source) return source
+
+    const now = new Date().toISOString()
+    return {
+      id: `now-playing:${nowPlaying.title}`,
+      eventId,
+      guestId: null,
+      guestDisplayName: '',
+      title: nowPlaying.title,
+      artist: nowPlaying.artist,
+      voteCount: 0,
+      status: 'played',
+      queuePosition: null,
+      queueGroup: 'main',
+      sourceRoundId: null,
+      catalogId: null,
+      artworkUrl: nowPlaying.artworkUrl,
+      catalogUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    }
+  }, [eventId])
+
+  /**
+   * Start playing.
+   *
+   * Picks up whatever the screen already says is on, rather than the top of the
+   * queue. Those are different songs — promoting a track to now-playing retires
+   * its request — so starting from the queue skipped the song the DJ was
+   * looking at, which reads as the app losing a track the moment you press
+   * play.
+   */
   const start = useCallback(() => {
+    skipsRef.current = 0
+
+    const showing = nowPlayingAsRequest()
+    if (showing) {
+      // Already announced; playing it must not re-announce it.
+      void playRequest(showing, false)
+      return
+    }
+
     const next = queueRef.current[0]
     if (!next) {
       setStatus('empty')
       return
     }
-    skipsRef.current = 0
     void playRequest(next)
-  }, [playRequest])
+  }, [playRequest, nowPlayingAsRequest])
 
   const skip = useCallback(() => {
     stop()

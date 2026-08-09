@@ -47,8 +47,13 @@ vi.mock('../../src/hooks/useService', () => ({
   useService: () => ({ setNowPlaying }),
 }))
 
+const store2 = { nowPlaying: null as null | Record<string, unknown> }
+
 vi.mock('../../src/hooks/useDjEvent', () => ({
-  useDjEvent: () => ({ refresh: async () => {} }),
+  useDjEvent: () => ({
+    event: { nowPlaying: store2.nowPlaying },
+    refresh: async () => {},
+  }),
 }))
 
 vi.mock('../../src/hooks/useToast', () => ({
@@ -123,6 +128,7 @@ beforeEach(() => {
     request('r2', 'Second', 1),
     request('r3', 'Third', 2),
   ]
+  store2.nowPlaying = null
   forceReload = null
   play.mockClear()
   stop.mockClear()
@@ -234,6 +240,78 @@ describe('starting the queue', () => {
       'event-1',
       expect.objectContaining({ sourceRequestId: 'r1', title: 'First' }),
     )
+  })
+
+  /**
+   * Promoting a track to now-playing retires its request, so the song on the
+   * screen and the top of the queue are different songs. Starting from the
+   * queue skipped the one the DJ was looking at — which reads as the app
+   * losing a track the moment you press play.
+   */
+  it('picks up the song already showing as now playing', async () => {
+    const showing = request('np', 'Already On', 0)
+    store2.nowPlaying = {
+      title: 'Already On',
+      artist: 'Artist',
+      sourceRequestId: 'np',
+      artworkUrl: null,
+    }
+    // Its request has been retired, exactly as the real write leaves it.
+    store2.nowPlaying = { ...store2.nowPlaying, sourceRequestId: 'np' }
+    store.requests = [{ ...showing, status: 'played' }, request('r9', 'Next', 1)]
+
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+    expect(play).toHaveBeenCalledWith('video-for-Already On')
+    expect(result.current.current?.title).toBe('Already On')
+  })
+
+  /** It is already announced; saying it again is noise for every guest. */
+  it('does not re-announce the song it picked up', async () => {
+    store2.nowPlaying = {
+      title: 'Already On',
+      artist: 'Artist',
+      sourceRequestId: null,
+      artworkUrl: null,
+    }
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+
+    await act(async () => result.current.start())
+
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+    expect(setNowPlaying).not.toHaveBeenCalled()
+  })
+
+  it('plays a now-playing the DJ set by hand, with no request behind it', async () => {
+    store2.nowPlaying = {
+      title: 'Typed In',
+      artist: 'Nobody',
+      sourceRequestId: null,
+      artworkUrl: null,
+    }
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+
+    await act(async () => result.current.start())
+
+    await waitFor(() => expect(play).toHaveBeenCalledWith('video-for-Typed In'))
+  })
+
+  it('moves on to the queue once that song ends', async () => {
+    store2.nowPlaying = {
+      title: 'Already On',
+      artist: 'Artist',
+      sourceRequestId: null,
+      artworkUrl: null,
+    }
+    const { result } = renderHook(() => usePartyPlayer('event-1'))
+    await act(async () => result.current.start())
+    await waitFor(() => expect(result.current.status).toBe('playing'))
+
+    await act(async () => playerEvents.onEnded())
+
+    await waitFor(() => expect(result.current.current?.id).toBe('r1'))
   })
 
   it('says the queue is empty rather than pretending to play', async () => {
