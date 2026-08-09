@@ -38,15 +38,19 @@ function request(overrides: Partial<SongRequest> = {}): SongRequest {
   }
 }
 
+/** Nothing is blocked in these tests unless a test says so. */
+const decline = vi.fn(async () => {})
+
 beforeEach(() => {
   localStorage.clear()
   seq = 0
+  decline.mockClear()
 })
 
 describe('while it is off', () => {
   it('queues nothing', async () => {
     const queue = vi.fn(async () => {})
-    renderHook(() => useAutoAccept('event-1', [request(), request()], queue))
+    renderHook(() => useAutoAccept('event-1', [request(), request()], queue, decline))
 
     await new Promise((r) => setTimeout(r, 20))
     expect(queue).not.toHaveBeenCalled()
@@ -55,23 +59,23 @@ describe('while it is off', () => {
   it('starts off, and remembers being turned on', async () => {
     const queue = vi.fn(async () => {})
     const { result, unmount } = renderHook(() =>
-      useAutoAccept('event-1', [], queue),
+      useAutoAccept('event-1', [], queue, decline),
     )
 
     expect(result.current.on).toBe(false)
     act(() => result.current.setOn(true))
     unmount()
 
-    const second = renderHook(() => useAutoAccept('event-1', [], queue))
+    const second = renderHook(() => useAutoAccept('event-1', [], queue, decline))
     expect(second.result.current.on).toBe(true)
   })
 
   it('is remembered per event, not for every party at once', () => {
     const queue = vi.fn(async () => {})
-    const first = renderHook(() => useAutoAccept('event-1', [], queue))
+    const first = renderHook(() => useAutoAccept('event-1', [], queue, decline))
     act(() => first.result.current.setOn(true))
 
-    const other = renderHook(() => useAutoAccept('event-2', [], queue))
+    const other = renderHook(() => useAutoAccept('event-2', [], queue, decline))
     expect(other.result.current.on).toBe(false)
   })
 })
@@ -82,7 +86,7 @@ describe('while it is on', () => {
     localStorage.setItem('soundboard.autoAccept.event-1', 'true')
 
     const waiting = [request(), request(), request()]
-    renderHook(() => useAutoAccept('event-1', waiting, queue))
+    renderHook(() => useAutoAccept('event-1', waiting, queue, decline))
 
     await waitFor(() => expect(queue).toHaveBeenCalledTimes(3))
   })
@@ -92,7 +96,7 @@ describe('while it is on', () => {
     localStorage.setItem('soundboard.autoAccept.event-1', 'true')
 
     renderHook(() =>
-      useAutoAccept('event-1', [request({ status: 'accepted' })], queue),
+      useAutoAccept('event-1', [request({ status: 'accepted' })], queue, decline),
     )
 
     await waitFor(() => expect(queue).toHaveBeenCalledTimes(1))
@@ -111,6 +115,7 @@ describe('while it is on', () => {
           request({ status: 'declined' }),
         ],
         queue,
+        decline,
       ),
     )
 
@@ -129,7 +134,7 @@ describe('while it is on', () => {
 
     const stubborn = [request()]
     const { rerender } = renderHook(
-      ({ list }) => useAutoAccept('event-1', list, queue),
+      ({ list }) => useAutoAccept('event-1', list, queue, decline),
       { initialProps: { list: stubborn } },
     )
 
@@ -149,7 +154,7 @@ describe('while it is on', () => {
 
     const first = request()
     const { rerender } = renderHook(
-      ({ list }) => useAutoAccept('event-1', list, queue),
+      ({ list }) => useAutoAccept('event-1', list, queue, decline),
       { initialProps: { list: [first] } },
     )
     await waitFor(() => expect(queue).toHaveBeenCalledTimes(1))
@@ -174,7 +179,7 @@ describe('while it is on', () => {
 
     const stuck = [request()]
     const { rerender } = renderHook(
-      ({ list }) => useAutoAccept('event-1', list, queue),
+      ({ list }) => useAutoAccept('event-1', list, queue, decline),
       { initialProps: { list: stuck } },
     )
     await waitFor(() => expect(queue).toHaveBeenCalledTimes(1))
@@ -208,7 +213,7 @@ describe('while it is on', () => {
     })
 
     const { rerender } = renderHook(
-      ({ items }) => useAutoAccept('event-1', items, queue),
+      ({ items }) => useAutoAccept('event-1', items, queue, decline),
       { initialProps: { items: list } },
     )
     render = () => rerender({ items: list })
@@ -223,7 +228,7 @@ describe('while it is on', () => {
 
     const items: SongRequest[] = []
     const { rerender } = renderHook(
-      ({ list }) => useAutoAccept('event-1', list, queue),
+      ({ list }) => useAutoAccept('event-1', list, queue, decline),
       { initialProps: { list: items as SongRequest[] } },
     )
 
@@ -234,10 +239,30 @@ describe('while it is on', () => {
     }
   })
 
+  /**
+   * The blocklist is what makes leaving this switch on safe: without it,
+   * "accept everything" really does mean everything.
+   */
+  it('declines a blocked song instead of queueing it', async () => {
+    localStorage.setItem('soundboard.autoAccept.event-1', 'true')
+    localStorage.setItem(
+      'soundboard.blocklist',
+      JSON.stringify([{ text: 'Baby Shark', key: 'baby shark' }]),
+    )
+    const queue = vi.fn(async () => {})
+
+    const banned = request({ title: 'Baby Shark (Dance Remix)' })
+    renderHook(() => useAutoAccept('event-1', [banned], queue, decline))
+
+    await waitFor(() => expect(decline).toHaveBeenCalledTimes(1))
+    expect(decline).toHaveBeenCalledWith(banned)
+    expect(queue).not.toHaveBeenCalled()
+  })
+
   it('stops as soon as it is switched off', async () => {
     const queue = vi.fn(async () => {})
     const { result, rerender } = renderHook(
-      ({ list }) => useAutoAccept('event-1', list, queue),
+      ({ list }) => useAutoAccept('event-1', list, queue, decline),
       { initialProps: { list: [] as SongRequest[] } },
     )
 

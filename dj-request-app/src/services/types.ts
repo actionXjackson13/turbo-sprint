@@ -65,6 +65,13 @@ export interface CreateRequestInput {
   catalogUrl?: string | null
 }
 
+/** What a set load actually did. */
+export interface SetLoadResult {
+  added: number
+  /** Already on tonight, so left alone. */
+  skipped: number
+}
+
 /** One song going into a set. Same shape a catalogue result arrives in. */
 export interface DjSetSongInput {
   title: string
@@ -226,11 +233,31 @@ export interface DataService {
   addSongToSet(setId: string, song: DjSetSongInput): Promise<DjSet>
   removeSongFromSet(setId: string, songId: string): Promise<DjSet>
   /**
-   * Copy a whole set into an event's queue as the DJ's own songs. Returns how
-   * many landed. Copies rather than links, so editing the set later cannot
-   * rewrite a night already played.
+   * Persist a new order for a set's songs, first to last.
+   *
+   * A set plays in the order it is stored, so being able only to append meant
+   * the running order was whatever order the DJ happened to think of the songs
+   * in.
    */
-  loadSetIntoQueue(eventId: string, setId: string): Promise<number>
+  reorderSetSongs(setId: string, orderedSongIds: string[]): Promise<DjSet>
+  /**
+   * Copy a set, songs and all.
+   *
+   * Most sets are a variation on another — the same warm-up with three swaps
+   * for a different room — and rebuilding one from nothing to change three
+   * songs is the work this avoids.
+   */
+  duplicateDjSet(setId: string, name: string): Promise<DjSet>
+  /**
+   * Copy a whole set into an event's queue as the DJ's own songs.
+   *
+   * Copies rather than links, so editing the set later cannot rewrite a night
+   * already played. Songs the night already has are skipped — loading the same
+   * set twice is a common slip and used to duplicate every track in it — and
+   * both counts come back, because a set of twenty that adds three is alarming
+   * unless you can see why.
+   */
+  loadSetIntoQueue(eventId: string, setId: string): Promise<SetLoadResult>
   /** DJ-only. */
   updateRequestStatus(
     requestId: string,

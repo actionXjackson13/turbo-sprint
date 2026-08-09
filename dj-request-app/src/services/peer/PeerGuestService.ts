@@ -11,6 +11,7 @@ import type {
 } from '../../types/domain'
 import {
   ServiceError,
+  type SetLoadResult,
   type CreateRequestInput,
   type CreateVotingRoundInput,
   type DataService,
@@ -525,7 +526,13 @@ export class PeerGuestService implements DataService {
   removeSongFromSet(): Promise<DjSet> {
     return this.djOnly()
   }
-  loadSetIntoQueue(): Promise<number> {
+  reorderSetSongs(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  duplicateDjSet(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  loadSetIntoQueue(): Promise<SetLoadResult> {
     return this.djOnly()
   }
   pushWinnerToQueue(): Promise<SongRequest> {

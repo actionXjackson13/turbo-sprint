@@ -5,8 +5,9 @@ import { useEventRequests } from '../../features/requests/useEventRequests'
 import { VotePanel } from './panels/VotePanel'
 import { SetsPanel } from './panels/SetsPanel'
 import { MessagePanel } from './panels/MessagePanel'
+import { BlockedPanel } from './panels/BlockedPanel'
 
-type Feature = 'vote' | 'sets' | 'message'
+type Feature = 'vote' | 'sets' | 'message' | 'blocked'
 
 /**
  * Everything the DJ can do that is not the queue itself.
@@ -42,6 +43,7 @@ export function FeaturesPage() {
             { value: 'vote', label: 'Vote' },
             { value: 'sets', label: 'Sets' },
             { value: 'message', label: 'Message' },
+            { value: 'blocked', label: 'Blocked' },
           ]}
         />
 
@@ -53,6 +55,8 @@ export function FeaturesPage() {
         {feature === 'sets' && <SetsPanel eventId={eventId} onLoaded={reload} />}
 
         {feature === 'message' && <MessagePanel />}
+
+        {feature === 'blocked' && <BlockedPanel />}
       </main>
     </>
   )

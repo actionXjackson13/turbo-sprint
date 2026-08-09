@@ -11,6 +11,7 @@ import { routes } from '../../../lib/router'
 import { useService } from '../../../hooks/useService'
 import { useToast } from '../../../hooks/useToast'
 import { useAsyncData } from '../../../hooks/useAsyncData'
+import { skippedMessage } from '../../../features/requests/duplicates'
 import { getErrorMessage } from '../../../utils/errors'
 
 export interface SetsPanelProps {
@@ -62,12 +63,14 @@ export function SetsPanel({ eventId, onLoaded }: SetsPanelProps) {
     if (!eventId) return
     setPendingId(setId)
     try {
-      const added = await service.loadSetIntoQueue(eventId, setId)
+      const { added, skipped } = await service.loadSetIntoQueue(eventId, setId)
       await onLoaded?.()
+      const note = skippedMessage(added, skipped)
       toast.success(
-        added === 0
-          ? `${setName} is empty — nothing to add.`
-          : `${added} ${added === 1 ? 'song' : 'songs'} from ${setName} added.`,
+        note ??
+          (added === 0
+            ? `${setName} is empty — nothing to add.`
+            : `${added} ${added === 1 ? 'song' : 'songs'} from ${setName} added.`),
       )
     } catch (err) {
       toast.error(getErrorMessage(err))

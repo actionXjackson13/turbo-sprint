@@ -5,6 +5,7 @@ import { routes } from '../../lib/router'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useAsyncData } from '../../hooks/useAsyncData'
+import { skippedMessage } from '../../features/requests/duplicates'
 import { getErrorMessage } from '../../utils/errors'
 
 export interface LoadSetDialogProps {
@@ -40,12 +41,16 @@ export function LoadSetDialog({
   const load = async (setId: string, name: string) => {
     setPendingId(setId)
     try {
-      const added = await service.loadSetIntoQueue(eventId, setId)
+      const { added, skipped } = await service.loadSetIntoQueue(eventId, setId)
       await onLoaded()
+      // Say what was skipped as well as what landed: a set of twenty that adds
+      // three is alarming unless you can see why.
+      const note = skippedMessage(added, skipped)
       toast.success(
-        added === 0
-          ? `${name} is empty — nothing to add.`
-          : `${added} ${added === 1 ? 'song' : 'songs'} from ${name} added.`,
+        note ??
+          (added === 0
+            ? `${name} is empty — nothing to add.`
+            : `${added} ${added === 1 ? 'song' : 'songs'} from ${name} added.`),
       )
       onClose()
     } catch (err) {

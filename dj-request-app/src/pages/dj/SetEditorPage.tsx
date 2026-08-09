@@ -67,6 +67,26 @@ export function SetEditorPage() {
     setRenaming(false)
   }
 
+  /** Swap two neighbours and persist the whole order. */
+  const move = async (from: number, to: number) => {
+    if (!set || to < 0 || to >= set.songs.length) return
+    const ids = set.songs.map((s) => s.id)
+    const [moved] = ids.splice(from, 1)
+    ids.splice(to, 0, moved!)
+    await apply(() => service.reorderSetSongs(setId, ids))
+  }
+
+  const duplicate = async () => {
+    if (!set) return
+    try {
+      const copy = await service.duplicateDjSet(setId, `${set.name} copy`)
+      toast.success(`Copied to “${copy.name}”.`)
+      navigate(routes.dj.set(copy.id))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    }
+  }
+
   const remove = async () => {
     setDeleting(true)
     try {
@@ -178,25 +198,59 @@ export function SetEditorPage() {
                         {song.artist}
                       </p>
                     </div>
-                    <AppButton
-                      size="sm"
-                      variant="ghost"
-                      loading={pendingId === song.id}
-                      onClick={() =>
-                        void apply(
-                          () => service.removeSongFromSet(setId, song.id),
-                          song.id,
-                        )
-                      }
-                    >
-                      Remove
-                    </AppButton>
+                    {/*
+                      Up and down rather than a drag: a set is built sitting
+                      down, between nights, where precision beats speed — and
+                      the hold-then-drag the live queue uses exists to survive
+                      a moving list, which this is not.
+                    */}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <AppButton
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Move ${song.title} up`}
+                        disabled={index === 0 || pendingId !== null}
+                        onClick={() => void move(index, index - 1)}
+                      >
+                        ↑
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Move ${song.title} down`}
+                        disabled={
+                          index === set.songs.length - 1 || pendingId !== null
+                        }
+                        onClick={() => void move(index, index + 1)}
+                      >
+                        ↓
+                      </AppButton>
+                      <AppButton
+                        size="sm"
+                        variant="ghost"
+                        loading={pendingId === song.id}
+                        onClick={() =>
+                          void apply(
+                            () => service.removeSongFromSet(setId, song.id),
+                            song.id,
+                          )
+                        }
+                      >
+                        Remove
+                      </AppButton>
+                    </div>
                   </AppCard>
                 </li>
               ))}
             </ol>
           )}
         </section>
+
+        {/* Most sets are a variation on another — the same warm-up with three
+            swaps for a different room. */}
+        <AppButton variant="secondary" fullWidth onClick={() => void duplicate()}>
+          Duplicate this set
+        </AppButton>
 
         <AppButton
           variant="danger"

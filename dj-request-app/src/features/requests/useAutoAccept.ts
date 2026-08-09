@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SongRequest } from '../../types/domain'
+import { isBlocked } from './blocklist'
 
 /**
  * Taking every request without being asked.
@@ -57,6 +58,7 @@ export function useAutoAccept(
   eventId: string,
   requests: SongRequest[],
   queueRequest: (request: SongRequest) => Promise<void>,
+  declineRequest: (request: SongRequest) => Promise<void>,
 ): AutoAcceptState {
   const [on, setOnState] = useState(() => isAutoAcceptOn(eventId))
   const [working, setWorking] = useState(0)
@@ -94,6 +96,8 @@ export function useAutoAccept(
   requestsRef.current = requests
   const queueRef = useRef(queueRequest)
   queueRef.current = queueRequest
+  const declineRef = useRef(declineRequest)
+  declineRef.current = declineRequest
 
   const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [retryTick, setRetryTick] = useState(0)
@@ -123,10 +127,17 @@ export function useAutoAccept(
 
         handled.current.add(next.id)
         try {
-          // One at a time: each queueing reads the queue back to place the song
-          // correctly, and firing them together would have every one of them
-          // working from the same stale order.
-          await queueRef.current(next)
+          // The blocklist is what makes leaving this switch on safe: without
+          // it, "accept everything" really does mean everything, including the
+          // running joke someone has decided to request eleven times.
+          if (isBlocked(next)) {
+            await declineRef.current(next)
+          } else {
+            // One at a time: each queueing reads the queue back to place the
+            // song correctly, and firing them together would have every one of
+            // them working from the same stale order.
+            await queueRef.current(next)
+          }
           failures.current = 0
         } catch {
           // Let a later pass retry rather than dropping the song for good.

@@ -177,6 +177,17 @@ export function EventSettingsPage() {
           <GuestManager eventId={eventId} />
         </Section>
 
+        {/* Beside ending the event, because that is when a DJ wants it — and
+            after, when the queue screens have nothing left to show. */}
+        <AppButton
+          variant="secondary"
+          size="lg"
+          fullWidth
+          onClick={() => navigate(routes.dj.summary(eventId))}
+        >
+          See the night
+        </AppButton>
+
         {event.status === 'active' && (
           <AppButton
             variant="danger"

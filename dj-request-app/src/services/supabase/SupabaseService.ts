@@ -17,6 +17,7 @@ import {
   type CreateRequestInput,
   type DjSongInput,
   type DjSetSongInput,
+  type SetLoadResult,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -567,14 +568,67 @@ export class SupabaseService implements DataService {
     return this.requireSet(setId)
   }
 
-  async loadSetIntoQueue(eventId: string, setId: string): Promise<number> {
-    const { data, error } = await this.db.rpc('load_set_into_queue', {
-      p_event_id: eventId,
-      p_set_id: setId,
-    })
+  async reorderSetSongs(
+    setId: string,
+    orderedSongIds: string[],
+  ): Promise<DjSet> {
+    // One row per song. A single statement would be neater, but display_order
+    // has no unique constraint, so there is nothing to conflict on and nothing
+    // gained by the round trip it would save.
+    for (const [index, id] of orderedSongIds.entries()) {
+      const { error } = await this.db
+        .from('dj_set_songs')
+        .update({ display_order: index })
+        .eq('id', id)
+        .eq('set_id', setId)
+      if (error) translateError(error, 'Could not reorder that set.')
+    }
+    return this.requireSet(setId)
+  }
+
+  async duplicateDjSet(setId: string, name: string): Promise<DjSet> {
+    const source = await this.requireSet(setId)
+
+    const { data, error } = await this.db
+      .from('dj_sets')
+      .insert({ dj_id: source.djId, name: name.trim() })
+      .select('*, dj_set_songs(*)')
+      .single()
+    if (error) translateError(error, 'Could not copy that set.')
+
+    const copy = toDjSet(data)
+    if (source.songs.length > 0) {
+      const { error: songsError } = await this.db.from('dj_set_songs').insert(
+        source.songs.map((song, index) => ({
+          set_id: copy.id,
+          title: song.title,
+          artist: song.artist,
+          display_order: index,
+          catalog_id: song.catalogId,
+          artwork_url: song.artworkUrl,
+          catalog_url: song.catalogUrl,
+        })),
+      )
+      if (songsError) translateError(songsError, 'Could not copy those songs.')
+    }
+
+    return this.requireSet(copy.id)
+  }
+
+  async loadSetIntoQueue(
+    eventId: string,
+    setId: string,
+  ): Promise<SetLoadResult> {
+    const { data, error } = await this.db
+      .rpc('load_set_into_queue', { p_event_id: eventId, p_set_id: setId })
+      .single()
 
     if (error) translateError(error, 'Could not load that set into the queue.')
-    return typeof data === 'number' ? data : 0
+    const row = asRow(data)
+    return {
+      added: Number(row.added ?? 0),
+      skipped: Number(row.skipped ?? 0),
+    }
   }
 
   /** Re-read after a write, so callers always get the whole set back. */

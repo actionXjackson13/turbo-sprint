@@ -13,6 +13,7 @@ import { useLiveData } from '../../hooks/useAsyncData'
 import { useGuestSession } from '../../hooks/useGuestSession'
 import { ACTIVE_REQUEST_STATUSES } from '../../types/domain'
 import { MAX_ACTIVE_REQUESTS_PER_GUEST } from '../../data/constants'
+import { useQueuePositions } from '../../features/requests/useQueuePositions'
 
 /**
  * The guest's own requests, with live status. Because this subscribes to the
@@ -34,6 +35,7 @@ export function MyRequestsPage() {
   )
 
   const { data, loading, error } = useLiveData(loader, subscribe)
+  const positions = useQueuePositions(eventId)
   const requests = data ?? []
 
   const activeCount = requests.filter((r) =>
@@ -80,6 +82,8 @@ export function MyRequestsPage() {
               <SongRequestCard
                 key={request.id}
                 request={request}
+                queuePosition={positions.get(request.id)}
+                showStatus
                 onOpen={() =>
                   navigate(routes.guest.requestDetails(eventId, request.id))
                 }

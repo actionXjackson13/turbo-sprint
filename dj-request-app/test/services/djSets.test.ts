@@ -105,8 +105,11 @@ describe('the DJ’s sets', () => {
       await service.addSongToSet(set.id, { title: 'One', artist: 'A' })
       await service.addSongToSet(set.id, { title: 'Two', artist: 'B' })
 
-      const added = await service.loadSetIntoQueue(eventId, set.id)
-      expect(added).toBe(2)
+      // Both counts come back now: what landed, and what the night already had.
+      expect(await service.loadSetIntoQueue(eventId, set.id)).toEqual({
+        added: 2,
+        skipped: 0,
+      })
 
       const queue = await service.listSongRequests(eventId, {
         statuses: ['queued'],

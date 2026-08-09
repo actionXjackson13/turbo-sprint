@@ -111,6 +111,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0010_dj_added_songs.sql'))
     await db.exec(read('0011_dj_sets.sql'))
     await db.exec(read('0012_queue_groups.sql'))
+    await db.exec(read('0013_no_duplicate_songs.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -724,12 +725,12 @@ describe('supabase migrations', () => {
     })
 
     it('loads the whole set into the queue as the DJ’s own songs', async () => {
-      const count = await runAs<{ load_set_into_queue: number }>(
+      const count = await runAs<{ added: number; skipped: number }>(
         DJ,
-        `select public.load_set_into_queue($1, $2)`,
+        `select * from public.load_set_into_queue($1, $2)`,
         [eventId, setId],
       )
-      expect(Number(count.rows[0]!.load_set_into_queue)).toBe(1)
+      expect(Number(count.rows[0]!.added)).toBe(1)
 
       const queued = await runAs<{
         guest_id: string | null
@@ -753,7 +754,7 @@ describe('supabase migrations', () => {
 
     it('stops a guest loading a set', async () => {
       await expect(
-        runAs(GUEST_A, `select public.load_set_into_queue($1, $2)`, [
+        runAs(GUEST_A, `select * from public.load_set_into_queue($1, $2)`, [
           eventId,
           setId,
         ]),
@@ -766,7 +767,7 @@ describe('supabase migrations', () => {
         `select * from public.create_event('Other Party')`,
       )
       await expect(
-        runAs(OTHER_DJ, `select public.load_set_into_queue($1, $2)`, [
+        runAs(OTHER_DJ, `select * from public.load_set_into_queue($1, $2)`, [
           theirs.rows[0]!.id,
           setId,
         ]),
@@ -811,7 +812,7 @@ describe('supabase migrations', () => {
         [setId],
       )
 
-      await runAs(DJ, `select public.load_set_into_queue($1, $2)`, [
+      await runAs(DJ, `select * from public.load_set_into_queue($1, $2)`, [
         eventId,
         setId,
       ])

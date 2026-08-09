@@ -17,6 +17,7 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useEnforceQueueOrder } from '../../features/requests/useEnforceQueueOrder'
+import { useUndoLastPlayed } from '../../features/requests/useUndoLastPlayed'
 import {
   countRoomSongs,
   splitQueue,
@@ -61,6 +62,7 @@ export function QueuePage() {
   const [loadingSet, setLoadingSet] = useState(false)
 
   const enforceOrder = useEnforceQueueOrder(eventId)
+  const undoLast = useUndoLastPlayed(eventId, requests, reload)
 
   const player = usePartyPlayerState()
   /** Running, in any sense the DJ would call running. */
@@ -270,6 +272,22 @@ export function QueuePage() {
             </div>
           </NowPlayingCard>
         </div>
+
+        {/*
+          Skipping is one tap and was irreversible, and the two commonest
+          reasons to press it are both mistakes — a thumb on the wrong button,
+          and a bad YouTube match rather than a bad song.
+        */}
+        {undoLast.candidate && (
+          <button
+            type="button"
+            disabled={undoLast.busy}
+            onClick={() => void undoLast.undo()}
+            className="w-full text-center text-meta text-fg-subtle underline underline-offset-2 disabled:opacity-50"
+          >
+            Put “{undoLast.candidate.title}” back at the front
+          </button>
+        )}
 
         {player.failure && (
           <AppCard className="border-danger-500/40 bg-danger-500/10">

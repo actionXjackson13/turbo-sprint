@@ -4,6 +4,7 @@ import type { SongRequest } from '../types/domain'
 import { AlbumArt } from './AlbumArt'
 import { StatusBadge } from './StatusBadge'
 import { formatRelativeTime } from '../utils/formatRelativeTime'
+import { positionLabel } from '../features/requests/useQueuePositions'
 
 export interface SongRequestCardProps {
   request: SongRequest
@@ -33,6 +34,13 @@ export interface SongRequestCardProps {
    * in — which reads as a sorting bug rather than as two different facts.
    */
   timestamp?: 'requested' | 'played'
+  /**
+   * Where this sits in the queue, one-based.
+   *
+   * Shown to the guest who asked for it, because "when is my song on?" is the
+   * question they otherwise answer by requesting it a second time.
+   */
+  queuePosition?: number
   /** Opens the overflow sheet. Rendered as a quiet trailing control. */
   onMore?: () => void
   /**
@@ -54,6 +62,7 @@ export function SongRequestCard({
   onOpen,
   showStatus = true,
   timestamp = 'requested',
+  queuePosition,
   onMore,
   actions,
   className,
@@ -92,6 +101,7 @@ export function SongRequestCard({
               request={request}
               showStatus={showStatus}
               timestamp={timestamp}
+              queuePosition={queuePosition}
             />
           </button>
         ) : (
@@ -100,6 +110,7 @@ export function SongRequestCard({
               request={request}
               showStatus={showStatus}
               timestamp={timestamp}
+              queuePosition={queuePosition}
             />
           </div>
         )}
@@ -194,10 +205,12 @@ function RequestBody({
   request,
   showStatus,
   timestamp,
+  queuePosition,
 }: {
   request: SongRequest
   showStatus: boolean
   timestamp: 'requested' | 'played'
+  queuePosition?: number
 }) {
   return (
     <>
@@ -205,7 +218,16 @@ function RequestBody({
         <h3 className="text-row min-w-0 flex-1 truncate font-medium text-fg">
           {request.title}
         </h3>
-        {showStatus && <StatusBadge status={request.status} />}
+        {/* The position outranks the status badge when both apply: "queued"
+            is what a guest already assumes, and "3rd" is the part they came
+            for. */}
+        {queuePosition !== undefined ? (
+          <span className="shrink-0 rounded-full border border-brand-500/50 bg-brand-500/15 px-2 py-0.5 text-label uppercase text-brand-400">
+            {positionLabel(queuePosition)}
+          </span>
+        ) : (
+          showStatus && <StatusBadge status={request.status} />
+        )}
       </div>
 
       {/* Artist and provenance share a line. Three stacked lines per row made

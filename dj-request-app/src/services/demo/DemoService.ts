@@ -18,6 +18,7 @@ import {
   type CreateRequestInput,
   type DjSongInput,
   type DjSetSongInput,
+  type SetLoadResult,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -39,6 +40,11 @@ import {
   DEMO_DJ_PASSWORD,
 } from './seed'
 import { songMatchKey } from '../../utils/normalizeText'
+import {
+  isAlreadyIn,
+  partitionNew,
+  playedOrPendingKeys,
+} from '../../features/requests/duplicates'
 import {
   SIMILAR_REQUEST_THRESHOLD,
   trigramSimilarity,
@@ -553,6 +559,18 @@ export class DemoService implements DataService {
           throw new ServiceError('invalid_input', 'A song needs a title.')
         }
 
+        // The DJ pressed a button and is owed an answer; "it is already coming
+        // up" is a more useful one than a second copy in the queue.
+        const already = playedOrPendingKeys(
+          db.requests.filter((r) => r.eventId === input.eventId),
+        )
+        if (isAlreadyIn(already, { title, artist: input.artist })) {
+          throw new ServiceError(
+            'duplicate',
+            'That song is already on tonight.',
+          )
+        }
+
         // The back of the queue, like anything else queued.
         const positions = db.requests
           .filter(
@@ -699,6 +717,61 @@ export class DemoService implements DataService {
     })
   }
 
+  async reorderSetSongs(
+    setId: string,
+    orderedSongIds: string[],
+  ): Promise<DjSet> {
+    await demoDelay(80)
+    return mutate((db) => {
+      const set = this.requireOwnedSet(db, setId)
+      const byId = new Map(set.songs.map((s) => [s.id, s]))
+
+      // Anything the caller left out keeps its place at the end rather than
+      // being dropped: a stale list from another tab should not delete songs.
+      const ordered = orderedSongIds
+        .map((id) => byId.get(id))
+        .filter((s): s is DjSetSong => Boolean(s))
+      const missing = set.songs.filter((s) => !orderedSongIds.includes(s.id))
+
+      set.songs = [...ordered, ...missing].map((song, index) => ({
+        ...song,
+        displayOrder: index,
+      }))
+      set.updatedAt = nowIso()
+      return clone(set)
+    })
+  }
+
+  async duplicateDjSet(setId: string, name: string): Promise<DjSet> {
+    await demoDelay()
+    return mutate((db) => {
+      const source = this.requireOwnedSet(db, setId)
+      const trimmed = name.trim()
+      if (!trimmed) {
+        throw new ServiceError('invalid_input', 'Give the set a name.')
+      }
+
+      const now = nowIso()
+      const id = `demo-set-${crypto.randomUUID().slice(0, 8)}`
+      const copy: DjSet = {
+        id,
+        djId: source.djId,
+        name: trimmed,
+        createdAt: now,
+        updatedAt: now,
+        // Fresh ids: editing the copy must not reach back into the original.
+        songs: source.songs.map((song, index) => ({
+          ...song,
+          id: `demo-setsong-${crypto.randomUUID().slice(0, 8)}`,
+          setId: id,
+          displayOrder: index,
+        })),
+      }
+      db.djSets.push(copy)
+      return clone(copy)
+    })
+  }
+
   /**
    * The whole set into one event's queue, as the DJ's own songs.
    *
@@ -706,7 +779,10 @@ export class DemoService implements DataService {
    * renaming or deleting the set next week cannot disturb a night already
    * played.
    */
-  async loadSetIntoQueue(eventId: string, setId: string): Promise<number> {
+  async loadSetIntoQueue(
+    eventId: string,
+    setId: string,
+  ): Promise<SetLoadResult> {
     await demoDelay()
     return mutate(
       (db) => {
@@ -730,9 +806,15 @@ export class DemoService implements DataService {
           db.profiles.find((p) => p.id === event.djId)?.displayName ?? 'DJ'
         const now = nowIso()
 
-        for (const song of [...set.songs].sort(
-          (a, b) => a.displayOrder - b.displayOrder,
-        )) {
+        // Loading the same set twice is a common slip and used to duplicate
+        // every track in it. Declined songs are not counted as "already on" —
+        // turning a request down is not the same as playing it.
+        const { fresh, duplicates } = partitionNew(
+          [...set.songs].sort((a, b) => a.displayOrder - b.displayOrder),
+          db.requests.filter((r) => r.eventId === eventId),
+        )
+
+        for (const song of fresh) {
           db.requests.push({
             id: `demo-req-${crypto.randomUUID().slice(0, 8)}`,
             eventId,
@@ -755,7 +837,7 @@ export class DemoService implements DataService {
           next += 1
         }
 
-        return set.songs.length
+        return { added: fresh.length, skipped: duplicates.length }
       },
       channels.requests(eventId),
     )
