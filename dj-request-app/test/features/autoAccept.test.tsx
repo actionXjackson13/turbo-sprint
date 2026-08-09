@@ -185,6 +185,55 @@ describe('while it is on', () => {
     })
   }, 10_000)
 
+  /**
+   * The bug this shipped with. Queueing triggers a reload, so the waiting list
+   * changes after the *first* song — and the effect that started the sweep was
+   * also the one being torn down by that change, cancelling its own loop while
+   * the re-run found `busy` still set and did nothing. One song queued, then
+   * silence until the screen was reopened.
+   *
+   * Simulated the way it actually happened: each queueing removes the request
+   * from the list the watcher can see, exactly as a reload would.
+   */
+  it('drains the whole backlog, not just the first song', async () => {
+    localStorage.setItem('soundboard.autoAccept.event-1', 'true')
+
+    let list = [request(), request(), request(), request()]
+    let render: () => void = () => {}
+
+    const queue = vi.fn(async (r: SongRequest) => {
+      list = list.filter((x) => x.id !== r.id)
+      // The reload landing mid-sweep, which is what used to kill it.
+      render()
+    })
+
+    const { rerender } = renderHook(
+      ({ items }) => useAutoAccept('event-1', items, queue),
+      { initialProps: { items: list } },
+    )
+    render = () => rerender({ items: list })
+
+    await waitFor(() => expect(queue).toHaveBeenCalledTimes(4))
+    expect(list).toHaveLength(0)
+  })
+
+  it('keeps taking requests that arrive one at a time', async () => {
+    localStorage.setItem('soundboard.autoAccept.event-1', 'true')
+    const queue = vi.fn(async () => {})
+
+    const items: SongRequest[] = []
+    const { rerender } = renderHook(
+      ({ list }) => useAutoAccept('event-1', list, queue),
+      { initialProps: { list: items as SongRequest[] } },
+    )
+
+    for (let i = 0; i < 3; i++) {
+      items.push(request())
+      rerender({ list: [...items] })
+      await waitFor(() => expect(queue).toHaveBeenCalledTimes(i + 1))
+    }
+  })
+
   it('stops as soon as it is switched off', async () => {
     const queue = vi.fn(async () => {})
     const { result, rerender } = renderHook(

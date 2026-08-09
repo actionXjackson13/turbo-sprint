@@ -13,6 +13,7 @@ import { routes } from '../lib/router'
 import { useParty } from '../hooks/useParty'
 import { DjEventProvider } from '../contexts/DjEventProvider'
 import { PartyPlayerProvider } from '../contexts/PartyPlayerProvider'
+import { AutoAcceptProvider } from '../contexts/AutoAcceptProvider'
 import { PlayerBarSpacer } from '../features/player/PlayerBar'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
@@ -52,8 +53,10 @@ export function DjLayout() {
 
   return (
     <DjEventProvider eventId={eventId}>
-      {/* Above the outlet, so the music survives the DJ changing screens. */}
-      <PartyPlayerProvider eventId={eventId}>
+      {/* Both above the outlet, so the music keeps playing and requests keep
+          being taken while the DJ is looking at something else. */}
+      <AutoAcceptProvider eventId={eventId}>
+        <PartyPlayerProvider eventId={eventId}>
         <RootLayout hasBottomNav>
           <DjEventGate>
             <Outlet />
@@ -63,7 +66,8 @@ export function DjLayout() {
           <DjNav eventId={eventId} />
           {sandbox && <DemoSwitcher eventId={eventId} view="dj" />}
         </RootLayout>
-      </PartyPlayerProvider>
+        </PartyPlayerProvider>
+      </AutoAcceptProvider>
     </DjEventProvider>
   )
 }

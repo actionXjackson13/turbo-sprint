@@ -8,14 +8,13 @@ import type { SongRequest } from '../../types/domain'
  * requests one at a time is work that produces the same answer every time. This
  * turns that off: anything a guest sends is queued the moment it arrives.
  *
- * It runs on the DJ's own device, watching the same live request list the
- * screen draws — not as a rule on the server. That is a real limitation and
- * worth naming: with the app closed, nothing is auto-queued, and the backlog is
- * swept up when it next opens. A server-side rule would be a different feature,
- * and a much harder one to turn off in a hurry.
+ * It runs wherever it is mounted rather than on the requests screen, because a
+ * DJ watching the queue or running a vote is still a DJ whose guests are still
+ * asking for songs — see AutoAcceptProvider. With the app closed nothing is
+ * queued, and the backlog is swept when it next opens.
  *
- * Kept per device rather than per event for the same reason. It describes what
- * this phone does while it is awake, which is not a fact about the party.
+ * Kept per device rather than per event, honestly: it describes what this phone
+ * does while it is awake, which is not a fact about the party.
  */
 
 const KEY_PREFIX = 'soundboard.autoAccept.'
@@ -46,8 +45,12 @@ function persist(eventId: string, on: boolean): void {
 export interface AutoAcceptState {
   on: boolean
   setOn: (on: boolean) => void
-  /** How many are being swept up right now, for the label. */
+  /** How many are still to be swept up, for the label. */
   working: number
+}
+
+function isWaiting(request: SongRequest): boolean {
+  return request.status === 'pending' || request.status === 'accepted'
 }
 
 export function useAutoAccept(
@@ -67,111 +70,119 @@ export function useAutoAccept(
   )
 
   /**
-   * Queueing triggers a reload, which re-runs this effect with the same request
-   * still momentarily pending. Without a record of what has already been sent,
-   * that is an unbounded run of writes rather than a queue.
+   * Queueing triggers a reload, and for a moment the request is still pending —
+   * so without a record of what has already been sent this is an unbounded run
+   * of writes rather than a queue.
    */
   const handled = useRef<Set<string>>(new Set())
   const busy = useRef(false)
-
-  /**
-   * Bumped after a failure to wake the sweep again.
-   *
-   * Without it a request that failed once would sit unqueued until some *other*
-   * request arrived to change the waiting set — so a single network blip would
-   * quietly drop somebody's song for the rest of the night.
-   */
-  const [retryTick, setRetryTick] = useState(0)
   const failures = useRef(0)
 
-  // Both held in refs so the effect depends on neither. A fresh array or a
-  // fresh closure on every render would otherwise cancel and restart the sweep
-  // continuously — including the sweep's own `setWorking` re-render, which was
-  // enough to stop it ever reaching the first request.
+  /**
+   * Stopping is tied to unmount and to the switch, and to nothing else.
+   *
+   * It used to be tied to the effect that *starts* a sweep, which meant the
+   * list changing cancelled the very sweep that had just changed it: the first
+   * song queued, the reload landed, the effect re-ran, its cleanup cancelled
+   * the loop mid-flight, and the re-run found `busy` still true and did
+   * nothing. One song, then silence until the screen was reopened.
+   */
+  const stopped = useRef(!on)
+
+  // Held in refs so neither identity can retrigger anything.
   const requestsRef = useRef(requests)
   requestsRef.current = requests
   const queueRef = useRef(queueRequest)
   queueRef.current = queueRequest
 
-  const waitingFor = (request: SongRequest) =>
-    request.status === 'pending' || request.status === 'accepted'
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [retryTick, setRetryTick] = useState(0)
 
   /**
-   * What is waiting, as a value rather than a reference.
+   * Drain everything waiting, re-reading the list each time around.
    *
-   * The effect keys off this so it wakes when the *set* of waiting requests
-   * changes and stays asleep through every other render.
+   * Requests keep arriving during a sweep, and one that lands mid-sweep should
+   * not have to wait for the next wake-up — so this loops on live state rather
+   * than on a snapshot taken before the first write.
+   */
+  const sweep = useCallback(async () => {
+    if (busy.current || stopped.current) return
+    busy.current = true
+
+    try {
+      for (;;) {
+        if (stopped.current) break
+
+        const remaining = requestsRef.current.filter(
+          (r) => isWaiting(r) && !handled.current.has(r.id),
+        )
+        setWorking(remaining.length)
+
+        const next = remaining[0]
+        if (!next) break
+
+        handled.current.add(next.id)
+        try {
+          // One at a time: each queueing reads the queue back to place the song
+          // correctly, and firing them together would have every one of them
+          // working from the same stale order.
+          await queueRef.current(next)
+          failures.current = 0
+        } catch {
+          // Let a later pass retry rather than dropping the song for good.
+          handled.current.delete(next.id)
+          failures.current += 1
+          /**
+           * Three in a row means the connection is the problem, not the song.
+           * Backing off there stops a dead service becoming a toast every few
+           * seconds; the next request to arrive wakes it again.
+           */
+          if (failures.current < MAX_CONSECUTIVE_FAILURES) {
+            clearTimeout(retryTimer.current)
+            retryTimer.current = setTimeout(
+              () => setRetryTick((t) => t + 1),
+              RETRY_DELAY_MS,
+            )
+          }
+          break
+        }
+      }
+    } finally {
+      busy.current = false
+      if (!stopped.current) setWorking(0)
+    }
+  }, [])
+
+  /** The switch, and unmounting, are the only things that stop a sweep. */
+  useEffect(() => {
+    stopped.current = !on
+    if (!on) {
+      // Forget what was handled so switching back on re-sweeps anything that
+      // came and went while it was off.
+      handled.current.clear()
+      failures.current = 0
+      clearTimeout(retryTimer.current)
+      setWorking(0)
+    }
+    return () => {
+      stopped.current = true
+      clearTimeout(retryTimer.current)
+    }
+  }, [on])
+
+  /**
+   * What is waiting, as a value rather than a reference — so this wakes when
+   * the *set* changes and sleeps through every other render.
    */
   const waitingKey = requests
-    .filter(waitingFor)
+    .filter(isWaiting)
     .map((r) => r.id)
     .join(',')
 
   useEffect(() => {
-    if (!on || busy.current) return
-
-    let cancelled = false
-    let retryTimer: ReturnType<typeof setTimeout> | undefined
-    busy.current = true
-
-    void (async () => {
-      try {
-        // Re-read the list each time around rather than working from a snapshot
-        // taken before the first write: requests keep arriving during a sweep,
-        // and one taken mid-sweep should not have to wait for the next wake-up.
-        for (;;) {
-          if (cancelled) break
-          const remaining = requestsRef.current.filter(
-            (r) => waitingFor(r) && !handled.current.has(r.id),
-          )
-          setWorking(remaining.length)
-          const next = remaining[0]
-          if (!next) break
-
-          handled.current.add(next.id)
-          try {
-            // One at a time: each queueing reads the queue back to place the
-            // song correctly, and firing them together would have every one of
-            // them reading the same stale order.
-            await queueRef.current(next)
-            failures.current = 0
-          } catch {
-            // Let a later pass retry it rather than stalling the whole sweep.
-            handled.current.delete(next.id)
-            failures.current += 1
-            /**
-             * Three in a row means the problem is the connection, not the song.
-             * Backing off there stops a dead service turning into a toast every
-             * few seconds; the next request to arrive wakes it again.
-             */
-            if (failures.current < MAX_CONSECUTIVE_FAILURES) {
-              retryTimer = setTimeout(
-                () => setRetryTick((t) => t + 1),
-                RETRY_DELAY_MS,
-              )
-            }
-            break
-          }
-        }
-      } finally {
-        busy.current = false
-        if (!cancelled) setWorking(0)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-      clearTimeout(retryTimer)
-    }
-  }, [on, waitingKey, retryTick])
-
-  // Turning it off and on again should re-sweep anything declined in between.
-  useEffect(() => {
-    if (!on) {
-      handled.current.clear()
-      failures.current = 0
-    }
-  }, [on])
+    if (!on) return
+    void sweep()
+  }, [on, waitingKey, retryTick, sweep])
 
   return { on, setOn, working }
 }

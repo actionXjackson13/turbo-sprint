@@ -15,7 +15,7 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useQueueRequest } from '../../features/requests/useQueueRequest'
-import { useAutoAccept } from '../../features/requests/useAutoAccept'
+import { useAutoAcceptState } from '../../hooks/useAutoAcceptState'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { getErrorMessage } from '../../utils/errors'
@@ -45,7 +45,7 @@ export function ManageRequestsPage() {
   const { requests, loading, reload } = useEventRequests(eventId, { sort })
   const { playNext, pendingId } = usePlayNext(eventId, reload)
   const { queueRequest } = useQueueRequest(eventId, reload)
-  const autoAccept = useAutoAccept(eventId, requests, queueRequest)
+  const autoAccept = useAutoAcceptState()
 
   const visible = useMemo(() => {
     const statuses = filters[filterIndex]!.statuses
