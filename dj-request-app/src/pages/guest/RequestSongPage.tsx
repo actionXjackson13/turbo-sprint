@@ -137,37 +137,72 @@ export function RequestSongPage() {
   }
 
   if (duplicate) {
+    /**
+     * A song already played is a different situation from one still waiting,
+     * and the old screen treated them alike — offering to upvote a request the
+     * DJ had already acted on, where a vote changes nothing at all. Worse, it
+     * read as encouragement, when the honest answer is that a repeat is
+     * unlikely to go on.
+     */
+    const alreadyPlayed = duplicate.status === 'played'
+
+    const askAnyway = () =>
+      pending ? void send(pending, true) : void sendTyped(true)
+
     return (
       <>
-        <PageHeader title="Already asked for" showBack />
+        <PageHeader
+          title={alreadyPlayed ? 'Already played' : 'Already asked for'}
+          showBack
+        />
         <main className="flex-1 space-y-4 px-4 py-5">
           <p className="text-sm text-fg-muted">
-            Upvoting the existing request helps it rise faster than adding a
-            duplicate.
+            {alreadyPlayed
+              ? 'The DJ has already played this tonight. You can still ask for it, but a repeat is less likely to go on than something new.'
+              : 'Upvoting the existing request helps it rise faster than adding a duplicate.'}
           </p>
 
-          <SongRequestCard request={duplicate} />
+          <SongRequestCard
+            request={duplicate}
+            timestamp={alreadyPlayed ? 'played' : 'requested'}
+          />
 
           <div className="space-y-2">
-            <AppButton
-              size="lg"
-              fullWidth
-              loading={voting}
-              onClick={upvoteExisting}
-            >
-              Upvote this instead
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              size="lg"
-              fullWidth
-              loading={submittingId !== null}
-              onClick={() =>
-                pending ? void send(pending, true) : void sendTyped(true)
-              }
-            >
-              Request it anyway
-            </AppButton>
+            {/*
+              Asking anyway leads when the song has been played, because
+              upvoting is not on the table — there is nothing left for a vote to
+              move.
+            */}
+            {alreadyPlayed ? (
+              <AppButton
+                size="lg"
+                fullWidth
+                loading={submittingId !== null}
+                onClick={askAnyway}
+              >
+                Request it anyway
+              </AppButton>
+            ) : (
+              <>
+                <AppButton
+                  size="lg"
+                  fullWidth
+                  loading={voting}
+                  onClick={upvoteExisting}
+                >
+                  Upvote this instead
+                </AppButton>
+                <AppButton
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  loading={submittingId !== null}
+                  onClick={askAnyway}
+                >
+                  Request it anyway
+                </AppButton>
+              </>
+            )}
             <AppButton
               variant="ghost"
               size="lg"
@@ -177,7 +212,7 @@ export function RequestSongPage() {
                 setPending(null)
               }}
             >
-              Search again
+              {alreadyPlayed ? 'Pick something else' : 'Search again'}
             </AppButton>
           </div>
         </main>
