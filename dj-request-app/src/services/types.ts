@@ -1,4 +1,5 @@
 import type {
+  DjSet,
   EventGuest,
   EventRecord,
   Profile,
@@ -58,6 +59,15 @@ export interface CreateRequestInput {
   title: string
   artist: string
   /** Set when the song came from catalogue search rather than free text. */
+  catalogId?: string | null
+  artworkUrl?: string | null
+  catalogUrl?: string | null
+}
+
+/** One song going into a set. Same shape a catalogue result arrives in. */
+export interface DjSetSongInput {
+  title: string
+  artist: string
   catalogId?: string | null
   artworkUrl?: string | null
   catalogUrl?: string | null
@@ -197,6 +207,29 @@ export interface DataService {
    * appear to have been asked for.
    */
   addDjSong(input: DjSongInput): Promise<SongRequest>
+
+  // ---- The DJ's sets -----------------------------------------------------
+  /**
+   * Named song lists the DJ builds beforehand, so most of a night does not
+   * have to be typed in live.
+   *
+   * All DJ-only and owned by the DJ rather than an event — a set built once is
+   * meant to be used again. Mutations return the whole set because every screen
+   * that changes one immediately redraws it.
+   */
+  listDjSets(): Promise<DjSet[]>
+  getDjSet(setId: string): Promise<DjSet | null>
+  createDjSet(name: string): Promise<DjSet>
+  renameDjSet(setId: string, name: string): Promise<DjSet>
+  deleteDjSet(setId: string): Promise<void>
+  addSongToSet(setId: string, song: DjSetSongInput): Promise<DjSet>
+  removeSongFromSet(setId: string, songId: string): Promise<DjSet>
+  /**
+   * Copy a whole set into an event's queue as the DJ's own songs. Returns how
+   * many landed. Copies rather than links, so editing the set later cannot
+   * rewrite a night already played.
+   */
+  loadSetIntoQueue(eventId: string, setId: string): Promise<number>
   /** DJ-only. */
   updateRequestStatus(
     requestId: string,

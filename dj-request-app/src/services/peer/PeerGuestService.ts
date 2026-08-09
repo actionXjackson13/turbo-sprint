@@ -1,4 +1,5 @@
 import type {
+  DjSet,
   EventGuest,
   EventRecord,
   Profile,
@@ -497,6 +498,31 @@ export class PeerGuestService implements DataService {
     return this.call('finalizeVotingRoundIfExpired', roundId)
   }
   addDjSong(): Promise<SongRequest> {
+    return this.djOnly()
+  }
+  // A guest has no sets of their own and must never see the DJ's.
+  listDjSets(): Promise<DjSet[]> {
+    return this.djOnly()
+  }
+  getDjSet(): Promise<DjSet | null> {
+    return this.djOnly()
+  }
+  createDjSet(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  renameDjSet(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  deleteDjSet(): Promise<void> {
+    return this.djOnly()
+  }
+  addSongToSet(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  removeSongFromSet(): Promise<DjSet> {
+    return this.djOnly()
+  }
+  loadSetIntoQueue(): Promise<number> {
     return this.djOnly()
   }
   pushWinnerToQueue(): Promise<SongRequest> {

@@ -16,9 +16,11 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
+import { countRoomSongs } from '../../features/requests/queueOrdering'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
 import { QueueList } from './QueueList'
+import { LoadSetDialog } from './LoadSetDialog'
 import { getErrorMessage } from '../../utils/errors'
 import type { SongRequest } from '../../types/domain'
 import {
@@ -52,6 +54,8 @@ export function QueuePage() {
   const [busy, setBusy] = useState(false)
   const { playNext, pendingId } = usePlayNext(eventId, reload)
 
+  const [loadingSet, setLoadingSet] = useState(false)
+
   const player = usePartyPlayerState()
   /** Running, in any sense the DJ would call running. */
   const playerLive =
@@ -66,6 +70,8 @@ export function QueuePage() {
         .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0)),
     [requests],
   )
+
+  const requested = useMemo(() => countRoomSongs(queue), [queue])
 
   const reorder = async (orderedIds: string[]) => {
     setBusy(true)
@@ -134,7 +140,19 @@ export function QueuePage() {
 
   return (
     <>
-      <PageHeader title="Queue" subtitle={`${queue.length} up next`} />
+      {/*
+        The split, not just the total. Once a set can fill the queue, "18 up
+        next" says nothing about whether anyone has been heard — and the number
+        the DJ actually needs mid-party is how many of those the room asked for.
+      */}
+      <PageHeader
+        title="Queue"
+        subtitle={
+          requested > 0
+            ? `${queue.length} up next · ${requested} requested`
+            : `${queue.length} up next`
+        }
+      />
 
       <main className="flex-1 space-y-7 px-4 py-5">
         <div>
@@ -236,9 +254,14 @@ export function QueuePage() {
         <Section
           title="Up next"
           action={
-            <SectionLink onClick={() => navigate(routes.dj.addSong(eventId))}>
-              Add a song
-            </SectionLink>
+            <div className="flex items-center gap-3">
+              <SectionLink onClick={() => setLoadingSet(true)}>
+                Load a set
+              </SectionLink>
+              <SectionLink onClick={() => navigate(routes.dj.addSong(eventId))}>
+                Add a song
+              </SectionLink>
+            </div>
           }
         >
           {loading && requests.length === 0 ? (
@@ -260,6 +283,13 @@ export function QueuePage() {
           )}
         </Section>
       </main>
+
+      <LoadSetDialog
+        open={loadingSet}
+        eventId={eventId}
+        onClose={() => setLoadingSet(false)}
+        onLoaded={reload}
+      />
     </>
   )
 }

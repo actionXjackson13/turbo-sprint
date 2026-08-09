@@ -54,6 +54,16 @@ export function DjDashboardPage() {
           Create an event
         </AppButton>
 
+        {/* Sets belong here rather than inside a party: they are built between
+            nights, and reused across them. */}
+        <AppButton
+          variant="secondary"
+          fullWidth
+          onClick={() => navigate(routes.dj.sets)}
+        >
+          My sets
+        </AppButton>
+
         {error && (
           <p role="alert" className="text-sm text-danger-500">
             {error}

@@ -31,6 +31,8 @@ import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
 import { MusicSetupPage } from './pages/dj/MusicSetupPage'
 import { AddSongPage } from './pages/dj/AddSongPage'
+import { SetsPage } from './pages/dj/SetsPage'
+import { SetEditorPage } from './pages/dj/SetEditorPage'
 import { CreateVotingRoundPage } from './pages/dj/CreateVotingRoundPage'
 import { ActiveVotingRoundPage } from './pages/dj/ActiveVotingRoundPage'
 import { EventSettingsPage } from './pages/dj/EventSettingsPage'
@@ -118,6 +120,25 @@ export default function App() {
                     </RequireDj>
                   }
                 />
+                {/* Sets outlive any one event, so they sit beside the
+                    dashboard rather than inside a party. */}
+                <Route
+                  path="/dj/sets"
+                  element={
+                    <RequireDj>
+                      <SetsPage />
+                    </RequireDj>
+                  }
+                />
+                <Route
+                  path="/dj/sets/:setId"
+                  element={
+                    <RequireDj>
+                      <SetEditorPage />
+                    </RequireDj>
+                  }
+                />
+
                 {/* Full-screen by design — this one is meant to be held up. */}
                 <Route
                   path="/dj/events/:eventId/share"

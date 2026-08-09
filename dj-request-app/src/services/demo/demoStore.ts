@@ -1,4 +1,5 @@
 import type {
+  DjSet,
   EventGuest,
   EventRecord,
   Profile,
@@ -32,6 +33,8 @@ export interface DemoDb {
   rounds: StoredVotingRound[]
   votingOptions: VotingOption[]
   votingResponses: VotingResponse[]
+  /** The DJ's reusable song lists. Not scoped to any event. */
+  djSets: DjSet[]
   /** Signed-in DJ, persisted so a refresh keeps the demo DJ logged in. */
   currentDjId: string | null
 }

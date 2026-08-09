@@ -1,5 +1,6 @@
 import type { RealtimeChannel, SupabaseClient, User } from '@supabase/supabase-js'
 import type {
+  DjSet,
   EventGuest,
   EventRecord,
   Profile,
@@ -14,6 +15,7 @@ import {
   ServiceError,
   type CreateRequestInput,
   type DjSongInput,
+  type DjSetSongInput,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -30,6 +32,7 @@ import {
   toSongRequest,
   toVotingOption,
   toVotingRound,
+  toDjSet,
 } from './mappers'
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
 
@@ -464,6 +467,120 @@ export class SupabaseService implements DataService {
 
     if (error) translateError(error, 'Could not add that song.')
     return toSongRequest(asRow(data))
+  }
+
+  // ---- The DJ's sets -----------------------------------------------------
+
+  /**
+   * Sets and their songs are plain tables behind RLS rather than RPCs: a set is
+   * private to its DJ, and "rows where dj_id = auth.uid()" is exactly what a
+   * policy expresses best. Only loading one into a queue needs a function,
+   * because that writes to song_requests in a shape the guest-facing insert
+   * policy deliberately forbids.
+   */
+  async listDjSets(): Promise<DjSet[]> {
+    const { data, error } = await this.db
+      .from('dj_sets')
+      .select('*, dj_set_songs(*)')
+      .order('name')
+
+    if (error) translateError(error, 'Could not load your sets.')
+    return (data ?? []).map(toDjSet)
+  }
+
+  async getDjSet(setId: string): Promise<DjSet | null> {
+    const { data, error } = await this.db
+      .from('dj_sets')
+      .select('*, dj_set_songs(*)')
+      .eq('id', setId)
+      .maybeSingle()
+
+    if (error) translateError(error, 'Could not load that set.')
+    return data ? toDjSet(data) : null
+  }
+
+  async createDjSet(name: string): Promise<DjSet> {
+    const djId = (await this.getCurrentDjProfile())?.id
+    if (!djId) {
+      throw new ServiceError('unauthorized', 'Sign in to make a set.')
+    }
+
+    const { data, error } = await this.db
+      .from('dj_sets')
+      .insert({ dj_id: djId, name: name.trim() })
+      .select('*, dj_set_songs(*)')
+      .single()
+
+    if (error) translateError(error, 'Could not make that set.')
+    return toDjSet(data)
+  }
+
+  async renameDjSet(setId: string, name: string): Promise<DjSet> {
+    const { data, error } = await this.db
+      .from('dj_sets')
+      .update({ name: name.trim(), updated_at: new Date().toISOString() })
+      .eq('id', setId)
+      .select('*, dj_set_songs(*)')
+      .single()
+
+    if (error) translateError(error, 'Could not rename that set.')
+    return toDjSet(data)
+  }
+
+  async deleteDjSet(setId: string): Promise<void> {
+    const { error } = await this.db.from('dj_sets').delete().eq('id', setId)
+    if (error) translateError(error, 'Could not delete that set.')
+  }
+
+  async addSongToSet(setId: string, song: DjSetSongInput): Promise<DjSet> {
+    // Appended, so the order the DJ built is the order it plays in.
+    const { count, error: countError } = await this.db
+      .from('dj_set_songs')
+      .select('id', { count: 'exact', head: true })
+      .eq('set_id', setId)
+
+    if (countError) translateError(countError, 'Could not add that song.')
+
+    const { error } = await this.db.from('dj_set_songs').insert({
+      set_id: setId,
+      title: song.title.trim(),
+      artist: song.artist.trim(),
+      display_order: count ?? 0,
+      catalog_id: song.catalogId ?? null,
+      artwork_url: song.artworkUrl ?? null,
+      catalog_url: song.catalogUrl ?? null,
+    })
+
+    if (error) translateError(error, 'Could not add that song.')
+    return this.requireSet(setId)
+  }
+
+  async removeSongFromSet(setId: string, songId: string): Promise<DjSet> {
+    const { error } = await this.db
+      .from('dj_set_songs')
+      .delete()
+      .eq('id', songId)
+      .eq('set_id', setId)
+
+    if (error) translateError(error, 'Could not remove that song.')
+    return this.requireSet(setId)
+  }
+
+  async loadSetIntoQueue(eventId: string, setId: string): Promise<number> {
+    const { data, error } = await this.db.rpc('load_set_into_queue', {
+      p_event_id: eventId,
+      p_set_id: setId,
+    })
+
+    if (error) translateError(error, 'Could not load that set into the queue.')
+    return typeof data === 'number' ? data : 0
+  }
+
+  /** Re-read after a write, so callers always get the whole set back. */
+  private async requireSet(setId: string): Promise<DjSet> {
+    const set = await this.getDjSet(setId)
+    if (!set) throw new ServiceError('not_found', 'Set not found.')
+    return set
   }
 
   async updateRequestStatus(

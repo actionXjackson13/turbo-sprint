@@ -13,6 +13,7 @@ import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
+import { useQueueRequest } from '../../features/requests/useQueueRequest'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { getErrorMessage } from '../../utils/errors'
@@ -41,6 +42,7 @@ export function ManageRequestsPage() {
   // and the counts stay accurate.
   const { requests, loading, reload } = useEventRequests(eventId, { sort })
   const { playNext, pendingId } = usePlayNext(eventId, reload)
+  const { queueRequest } = useQueueRequest(eventId, reload)
 
   const visible = useMemo(() => {
     const statuses = filters[filterIndex]!.statuses
@@ -50,7 +52,17 @@ export function ManageRequestsPage() {
   const countFor = (index: number) =>
     requests.filter((r) => filters[index]!.statuses.includes(r.status)).length
 
+  /**
+   * Queueing is routed through `queueRequest` rather than a bare status write,
+   * so a request lands ahead of the DJ's own songs instead of behind a set that
+   * may be thirty tracks long. Every other status change is exactly what it
+   * says.
+   */
   const setStatus = async (requestId: string, status: RequestStatus) => {
+    if (status === 'queued') {
+      const request = requests.find((r) => r.id === requestId)
+      if (request) return queueRequest(request)
+    }
     try {
       await service.updateRequestStatus(requestId, status)
       await reload()

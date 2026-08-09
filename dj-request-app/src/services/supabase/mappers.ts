@@ -1,4 +1,6 @@
 import type {
+  DjSet,
+  DjSetSong,
   EventGuest,
   EventRecord,
   Profile,
@@ -119,5 +121,39 @@ export function toVotingRound(row: Row, options: VotingOption[]): VotingRound {
     endedAt: row.ended_at ?? null,
     createdAt: row.created_at,
     options: [...options].sort((a, b) => a.displayOrder - b.displayOrder),
+  }
+}
+
+/**
+ * A set with its songs, from the joined select.
+ *
+ * Postgres has no ordering guarantee on an embedded relation, so the songs are
+ * sorted here rather than trusted — a set whose order shuffled between reads
+ * would load into the queue differently every time.
+ */
+export function toDjSet(row: Row): DjSet {
+  const songs: Row[] = row.dj_set_songs ?? []
+  return {
+    id: row.id,
+    djId: row.dj_id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    songs: songs
+      .map(toDjSetSong)
+      .sort((a, b) => a.displayOrder - b.displayOrder),
+  }
+}
+
+export function toDjSetSong(row: Row): DjSetSong {
+  return {
+    id: row.id,
+    setId: row.set_id,
+    title: row.title,
+    artist: row.artist ?? '',
+    displayOrder: row.display_order ?? 0,
+    catalogId: row.catalog_id ?? null,
+    artworkUrl: row.artwork_url ?? null,
+    catalogUrl: row.catalog_url ?? null,
   }
 }

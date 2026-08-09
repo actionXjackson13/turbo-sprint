@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { AppButton } from '../../components'
 import { haptic } from '../../utils/haptics'
 import type { SongRequest } from '../../types/domain'
+import { isDjSong } from '../../features/requests/queueOrdering'
 import { AlbumArt } from '../../components'
 
 export interface QueueListProps {
@@ -174,7 +175,15 @@ export function QueueList({
                 onPick={(target) => moveTo(index, target - 1)}
               />
 
-              <AlbumArt url={request.artworkUrl} size="sm" />
+              <AlbumArt
+                url={request.artworkUrl}
+                size="sm"
+                className={clsx(
+                  // A coloured edge on the room's songs, so scanning the queue
+                  // does not mean reading every third line.
+                  !isDjSong(request) && '!border-accent-400/70',
+                )}
+              />
 
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-row font-semibold text-fg">
@@ -183,10 +192,27 @@ export function QueueList({
                 <p className="truncate text-meta text-fg-muted">
                   {request.artist}
                 </p>
-                <p className="truncate text-meta text-fg-subtle">
-                  {request.guestDisplayName} · {request.voteCount}{' '}
-                  {request.voteCount === 1 ? 'vote' : 'votes'}
-                </p>
+                {/*
+                  Whose song this is, at a glance. Once a DJ can drop a
+                  thirty-song set into the queue, most rows are their own — and
+                  the few that came from the room are the ones that need
+                  spotting while reading the list one-handed in the dark. A
+                  vote count on a song nobody voted for is noise, so the DJ's
+                  rows say what they are instead.
+                */}
+                {isDjSong(request) ? (
+                  <p className="truncate text-meta text-fg-subtle">
+                    <span className="text-brand-400">Your song</span>
+                  </p>
+                ) : (
+                  <p className="truncate text-meta text-fg-subtle">
+                    <span className="text-accent-400">
+                      {request.guestDisplayName}
+                    </span>{' '}
+                    · {request.voteCount}{' '}
+                    {request.voteCount === 1 ? 'vote' : 'votes'}
+                  </p>
+                )}
               </div>
 
               {/* Where the up/down arrows used to be. */}

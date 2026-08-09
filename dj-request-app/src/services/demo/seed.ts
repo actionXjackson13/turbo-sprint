@@ -1,4 +1,5 @@
 import type {
+  DjSetSong,
   EventGuest,
   Profile,
   RequestVote,
@@ -309,7 +310,42 @@ export function buildSeed(): DemoDb {
     rounds,
     votingOptions,
     votingResponses,
+    // A worked example, so the feature explains itself on first open rather
+    // than presenting an empty list and a "+" button.
+    djSets: [
+      {
+        id: 'demo-set-warmup',
+        djId: DJ_ID,
+        name: 'Warm-up',
+        createdAt: minutesAgo(2000),
+        updatedAt: minutesAgo(2000),
+        songs: [
+          setSong('demo-set-warmup', 0, 'Get Lucky', 'Daft Punk'),
+          setSong('demo-set-warmup', 1, 'Rather Be', 'Clean Bandit'),
+          setSong('demo-set-warmup', 2, 'Electric Feel', 'MGMT'),
+        ],
+      },
+    ],
     currentDjId: null,
+  }
+}
+
+/** One song in a seeded set. No catalogue data — these were never searched. */
+function setSong(
+  setId: string,
+  displayOrder: number,
+  title: string,
+  artist: string,
+): DjSetSong {
+  return {
+    id: `demo-setsong-${setId}-${displayOrder}`,
+    setId,
+    title,
+    artist,
+    displayOrder,
+    catalogId: null,
+    artworkUrl: null,
+    catalogUrl: null,
   }
 }
 

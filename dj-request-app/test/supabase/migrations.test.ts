@@ -109,6 +109,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0008_announcements.sql'))
     await db.exec(read('0009_voting_option_catalog.sql'))
     await db.exec(read('0010_dj_added_songs.sql'))
+    await db.exec(read('0011_dj_sets.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -142,7 +143,11 @@ describe('supabase migrations', () => {
       `insert into auth.users (id, is_anonymous) values ($1, true), ($2, true)`,
       [GUEST_A, GUEST_B],
     )
-  })
+    // Booting an in-process Postgres and applying every migration is genuinely
+    // slow, and grows with each one added. The default 10s hook budget is not
+    // a meaningful signal here — a real failure surfaces as a SQL error, not a
+    // stopwatch.
+  }, 60_000)
 
   it('creates a profile for a DJ but not for an anonymous guest', async () => {
     const profiles = await db.query<{ id: string; display_name: string }>(
@@ -646,6 +651,138 @@ describe('supabase migrations', () => {
    * deliberately too narrow to produce one, so this is a security-definer
    * function and the ownership check is the only thing standing in front of it.
    */
+  /**
+   * Sets, and the wall around them.
+   *
+   * Unlike events — which guests read by design — a set is private working
+   * material. The policies are the only thing enforcing that, so they are
+   * exercised from another DJ's session rather than trusted by inspection.
+   */
+  describe('dj_sets', () => {
+    let setId: string
+
+    it('creates a set and a song in it', async () => {
+      const created = await runAs<{ id: string; name: string }>(
+        DJ,
+        `insert into public.dj_sets (dj_id, name) values ($1, 'Warm-up')
+         returning id, name`,
+        [DJ],
+      )
+      setId = created.rows[0]!.id
+      expect(created.rows[0]!.name).toBe('Warm-up')
+
+      await runAs(
+        DJ,
+        `insert into public.dj_set_songs (set_id, title, artist, display_order)
+         values ($1, 'Get Lucky', 'Daft Punk', 0)`,
+        [setId],
+      )
+
+      const songs = await runAs<{ title: string }>(
+        DJ,
+        `select title from public.dj_set_songs where set_id = $1`,
+        [setId],
+      )
+      expect(songs.rows.map((r) => r.title)).toEqual(['Get Lucky'])
+    })
+
+    it('hides another DJ’s sets entirely', async () => {
+      const seen = await runAs<{ id: string }>(
+        OTHER_DJ,
+        `select id from public.dj_sets`,
+      )
+      expect(seen.rows).toHaveLength(0)
+    })
+
+    it('hides the songs inside another DJ’s set', async () => {
+      const seen = await runAs<{ id: string }>(
+        OTHER_DJ,
+        `select id from public.dj_set_songs where set_id = $1`,
+        [setId],
+      )
+      expect(seen.rows).toHaveLength(0)
+    })
+
+    it('stops another DJ adding songs to it', async () => {
+      await expect(
+        runAs(
+          OTHER_DJ,
+          `insert into public.dj_set_songs (set_id, title, artist, display_order)
+           values ($1, 'Sneaky', 'Nobody', 0)`,
+          [setId],
+        ),
+      ).rejects.toThrow(/row-level security|policy/i)
+    })
+
+    it('hides sets from a guest', async () => {
+      const seen = await runAs<{ id: string }>(
+        GUEST_A,
+        `select id from public.dj_sets`,
+      )
+      expect(seen.rows).toHaveLength(0)
+    })
+
+    it('loads the whole set into the queue as the DJ’s own songs', async () => {
+      const count = await runAs<{ load_set_into_queue: number }>(
+        DJ,
+        `select public.load_set_into_queue($1, $2)`,
+        [eventId, setId],
+      )
+      expect(Number(count.rows[0]!.load_set_into_queue)).toBe(1)
+
+      const queued = await runAs<{
+        guest_id: string | null
+        status: string
+        source_round_id: string | null
+        queue_position: number | null
+      }>(
+        DJ,
+        `select guest_id, status, source_round_id, queue_position
+           from public.song_requests
+          where event_id = $1 and title = 'Get Lucky'`,
+        [eventId],
+      )
+      const row = queued.rows[0]!
+      expect(row.status).toBe('queued')
+      // Both nulls are what marks a song as the DJ's rather than the room's.
+      expect(row.guest_id).toBeNull()
+      expect(row.source_round_id).toBeNull()
+      expect(row.queue_position).not.toBeNull()
+    })
+
+    it('stops a guest loading a set', async () => {
+      await expect(
+        runAs(GUEST_A, `select public.load_set_into_queue($1, $2)`, [
+          eventId,
+          setId,
+        ]),
+      ).rejects.toThrow(/forbidden/)
+    })
+
+    it('stops another DJ loading it into their own event', async () => {
+      const theirs = await runAs<{ id: string }>(
+        OTHER_DJ,
+        `select * from public.create_event('Other Party')`,
+      )
+      await expect(
+        runAs(OTHER_DJ, `select public.load_set_into_queue($1, $2)`, [
+          theirs.rows[0]!.id,
+          setId,
+        ]),
+      ).rejects.toThrow(/forbidden/)
+    })
+
+    it('takes its songs with it when deleted', async () => {
+      await runAs(DJ, `delete from public.dj_sets where id = $1`, [setId])
+      const orphans = await runAs<{ id: string }>(
+        DJ,
+        `select id from public.dj_set_songs where set_id = $1`,
+        [setId],
+      )
+      expect(orphans.rows).toHaveLength(0)
+    })
+  })
+
   describe('add_dj_song', () => {
     it('queues an unowned, unvoted request named after the DJ', async () => {
       const res = await runAs<{

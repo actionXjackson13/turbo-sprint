@@ -23,6 +23,7 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { selectMostWanted } from '../../features/requests/requestLists'
 import { usePlayNext } from '../../features/requests/usePlayNext'
+import { useQueueRequest } from '../../features/requests/useQueueRequest'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
@@ -61,6 +62,7 @@ export function EventControlPanelPage() {
   const [sheetFor, setSheetFor] = useState<SongRequest | null>(null)
   const [view, setView] = useState<RequestView>('new')
   const { playNext, pendingId } = usePlayNext(eventId, reload)
+  const { queueRequest } = useQueueRequest(eventId, reload)
 
   const player = usePartyPlayerState()
   const playerLive =
@@ -158,7 +160,16 @@ export function EventControlPanelPage() {
     }
   }
 
+  /**
+   * Queueing goes through `queueRequest`, which keeps the request ahead of the
+   * DJ's own songs — appending it behind a loaded set would be the same as
+   * declining it. Other statuses are a plain write.
+   */
   const quickAction = async (requestId: string, status: RequestStatus) => {
+    if (status === 'queued') {
+      const request = requests.find((r) => r.id === requestId)
+      if (request) return queueRequest(request)
+    }
     try {
       await service.updateRequestStatus(requestId, status)
       await reload()

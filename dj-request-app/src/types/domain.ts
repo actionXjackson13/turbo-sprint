@@ -117,6 +117,35 @@ export interface SongRequest {
   updatedAt: string
 }
 
+/** One song inside a DJ's set. */
+export interface DjSetSong {
+  id: string
+  setId: string
+  title: string
+  artist: string
+  displayOrder: number
+  /** The same catalogue trio songs carry everywhere, so artwork survives. */
+  catalogId: string | null
+  artworkUrl: string | null
+  catalogUrl: string | null
+}
+
+/**
+ * A named list of songs the DJ built ahead of time.
+ *
+ * Owned by the DJ rather than by an event, which is the whole point: a set
+ * built once is the same set next Friday. Loading it into a queue copies its
+ * songs, so editing it later never rewrites a night already played.
+ */
+export interface DjSet {
+  id: string
+  djId: string
+  name: string
+  songs: DjSetSong[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface RequestVote {
   id: string
   requestId: string

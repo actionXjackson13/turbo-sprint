@@ -1,4 +1,6 @@
 import type {
+  DjSet,
+  DjSetSong,
   EventGuest,
   EventRecord,
   Profile,
@@ -14,6 +16,7 @@ import {
   ServiceError,
   type CreateRequestInput,
   type DjSongInput,
+  type DjSetSongInput,
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
@@ -586,6 +589,171 @@ export class DemoService implements DataService {
     )
   }
 
+  // ---- The DJ's sets -----------------------------------------------------
+
+  async listDjSets(): Promise<DjSet[]> {
+    await demoDelay()
+    const db = getDb()
+    if (!db.currentDjId) return []
+    return db.djSets
+      .filter((s) => s.djId === db.currentDjId)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(clone)
+  }
+
+  async getDjSet(setId: string): Promise<DjSet | null> {
+    await demoDelay(60)
+    const db = getDb()
+    const set = db.djSets.find((s) => s.id === setId)
+    if (!set || set.djId !== db.currentDjId) return null
+    return clone(set)
+  }
+
+  async createDjSet(name: string): Promise<DjSet> {
+    await demoDelay()
+    return mutate((db) => {
+      const dj = this.requireDj(db.currentDjId, db.profiles)
+      const trimmed = name.trim()
+      if (!trimmed) {
+        throw new ServiceError('invalid_input', 'Give the set a name.')
+      }
+
+      const now = nowIso()
+      const set: DjSet = {
+        id: `demo-set-${crypto.randomUUID().slice(0, 8)}`,
+        djId: dj.id,
+        name: trimmed,
+        songs: [],
+        createdAt: now,
+        updatedAt: now,
+      }
+      db.djSets.push(set)
+      return clone(set)
+    })
+  }
+
+  async renameDjSet(setId: string, name: string): Promise<DjSet> {
+    await demoDelay(80)
+    return mutate((db) => {
+      const set = this.requireOwnedSet(db, setId)
+      const trimmed = name.trim()
+      if (!trimmed) {
+        throw new ServiceError('invalid_input', 'Give the set a name.')
+      }
+      set.name = trimmed
+      set.updatedAt = nowIso()
+      return clone(set)
+    })
+  }
+
+  async deleteDjSet(setId: string): Promise<void> {
+    await demoDelay(80)
+    mutate((db) => {
+      this.requireOwnedSet(db, setId)
+      db.djSets = db.djSets.filter((s) => s.id !== setId)
+    })
+  }
+
+  async addSongToSet(setId: string, song: DjSetSongInput): Promise<DjSet> {
+    await demoDelay(80)
+    return mutate((db) => {
+      const set = this.requireOwnedSet(db, setId)
+      const title = song.title.trim()
+      if (!title) {
+        throw new ServiceError('invalid_input', 'A song needs a title.')
+      }
+
+      const entry: DjSetSong = {
+        id: `demo-setsong-${crypto.randomUUID().slice(0, 8)}`,
+        setId,
+        title,
+        artist: song.artist.trim(),
+        displayOrder: set.songs.length,
+        catalogId: song.catalogId ?? null,
+        artworkUrl: song.artworkUrl ?? null,
+        catalogUrl: song.catalogUrl ?? null,
+      }
+      set.songs.push(entry)
+      set.updatedAt = nowIso()
+      return clone(set)
+    })
+  }
+
+  async removeSongFromSet(setId: string, songId: string): Promise<DjSet> {
+    await demoDelay(80)
+    return mutate((db) => {
+      const set = this.requireOwnedSet(db, setId)
+      set.songs = set.songs.filter((s) => s.id !== songId)
+      // Renumbered so the order stays dense — a gap would survive into the
+      // queue as an ordering nobody asked for.
+      set.songs.forEach((s, i) => {
+        s.displayOrder = i
+      })
+      set.updatedAt = nowIso()
+      return clone(set)
+    })
+  }
+
+  /**
+   * The whole set into one event's queue, as the DJ's own songs.
+   *
+   * Copied rather than referenced: a queued song has to stand on its own, so
+   * renaming or deleting the set next week cannot disturb a night already
+   * played.
+   */
+  async loadSetIntoQueue(eventId: string, setId: string): Promise<number> {
+    await demoDelay()
+    return mutate(
+      (db) => {
+        const event = this.requireOwnedEvent(db, eventId)
+        if (event.status === 'ended') {
+          throw new ServiceError('forbidden', 'This event has ended.')
+        }
+        const set = this.requireOwnedSet(db, setId)
+
+        const positions = db.requests
+          .filter(
+            (r) =>
+              r.eventId === eventId &&
+              r.status === 'queued' &&
+              r.queuePosition !== null,
+          )
+          .map((r) => r.queuePosition!)
+        let next = positions.length ? Math.max(...positions) + 1 : 0
+
+        const djName =
+          db.profiles.find((p) => p.id === event.djId)?.displayName ?? 'DJ'
+        const now = nowIso()
+
+        for (const song of [...set.songs].sort(
+          (a, b) => a.displayOrder - b.displayOrder,
+        )) {
+          db.requests.push({
+            id: `demo-req-${crypto.randomUUID().slice(0, 8)}`,
+            eventId,
+            guestId: null,
+            guestDisplayName: djName,
+            title: song.title,
+            artist: song.artist,
+            voteCount: 0,
+            status: 'queued',
+            queuePosition: next,
+            sourceRoundId: null,
+            catalogId: song.catalogId,
+            artworkUrl: song.artworkUrl,
+            catalogUrl: song.catalogUrl,
+            createdAt: now,
+            updatedAt: now,
+          })
+          next += 1
+        }
+
+        return set.songs.length
+      },
+      channels.requests(eventId),
+    )
+  }
+
   async updateRequestStatus(
     requestId: string,
     status: RequestStatus,
@@ -1046,6 +1214,16 @@ export class DemoService implements DataService {
    * Demo mode enforces DJ ownership too, so that a bug in the UI surfaces here
    * rather than silently "working" in demo and failing against real RLS.
    */
+  /** A set belongs to one DJ and is invisible to everyone else. */
+  private requireOwnedSet(db: ReturnType<typeof getDb>, setId: string): DjSet {
+    const set = db.djSets.find((s) => s.id === setId)
+    if (!set) throw new ServiceError('not_found', 'Set not found.')
+    if (!db.currentDjId || set.djId !== db.currentDjId) {
+      throw new ServiceError('forbidden', 'That set belongs to someone else.')
+    }
+    return set
+  }
+
   private requireOwnedEvent(
     db: ReturnType<typeof getDb>,
     eventId: string,
