@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import clsx from 'clsx'
 import {
   ConfirmationDialog,
+  Toggle,
   EmptyState,
   PageHeader,
   SegmentedControl,
@@ -14,6 +15,7 @@ import { useToast } from '../../hooks/useToast'
 import { useEventRequests } from '../../features/requests/useEventRequests'
 import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useQueueRequest } from '../../features/requests/useQueueRequest'
+import { useAutoAccept } from '../../features/requests/useAutoAccept'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { getErrorMessage } from '../../utils/errors'
@@ -43,6 +45,7 @@ export function ManageRequestsPage() {
   const { requests, loading, reload } = useEventRequests(eventId, { sort })
   const { playNext, pendingId } = usePlayNext(eventId, reload)
   const { queueRequest } = useQueueRequest(eventId, reload)
+  const autoAccept = useAutoAccept(eventId, requests, queueRequest)
 
   const visible = useMemo(() => {
     const statuses = filters[filterIndex]!.statuses
@@ -117,6 +120,23 @@ export function ManageRequestsPage() {
           />
         }
       />
+
+      {/*
+        Above the filter rail rather than inside it: the rail chooses what you
+        are looking at, and this decides whether you need to look at all.
+      */}
+      <div className="px-4 pt-4">
+        <Toggle
+          label="Auto accept"
+          description={
+            autoAccept.working > 0
+              ? `Queueing ${autoAccept.working}…`
+              : 'New requests go straight into the queue.'
+          }
+          checked={autoAccept.on}
+          onChange={autoAccept.setOn}
+        />
+      </div>
 
       {/* Status filter rail */}
       <div className="sticky top-14 z-10 border-b border-hairline bg-ink-950/90 backdrop-blur">
