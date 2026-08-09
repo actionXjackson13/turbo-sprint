@@ -33,6 +33,7 @@ import { MusicSetupPage } from './pages/dj/MusicSetupPage'
 import { AddSongPage } from './pages/dj/AddSongPage'
 import { FeaturesPage } from './pages/dj/FeaturesPage'
 import { NightSummaryPage } from './pages/dj/NightSummaryPage'
+import { GuestsPage } from './pages/dj/GuestsPage'
 import { SetsPage } from './pages/dj/SetsPage'
 import { SetEditorPage } from './pages/dj/SetEditorPage'
 import { CreateVotingRoundPage } from './pages/dj/CreateVotingRoundPage'
@@ -159,6 +160,7 @@ export default function App() {
                   <Route path="add" element={<AddSongPage />} />
                   <Route path="features" element={<FeaturesPage />} />
                   <Route path="summary" element={<NightSummaryPage />} />
+                  <Route path="guests" element={<GuestsPage />} />
                   <Route path="vote/new" element={<CreateVotingRoundPage />} />
                   {/* The vote tab became a panel inside Features; this keeps
                       links and back-stack entries from before it moved. */}

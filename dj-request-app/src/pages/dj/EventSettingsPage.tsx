@@ -5,9 +5,9 @@ import {
   AppCard,
   AppInput,
   ConfirmationDialog,
-  GuestManager,
   PageHeader,
-  Section,
+  SettingsGroup,
+  SettingsRow,
   StatusBadge,
 } from '../../components'
 import { routes } from '../../lib/router'
@@ -136,107 +136,75 @@ export function EventSettingsPage() {
           </dl>
         </AppCard>
 
-        {/*
-          One row rather than the two full cards this used to be. Both are set
-          once and never touched again, and between them they pushed everything
-          a DJ needs *during* a party below the fold.
-        */}
-        <Section title="Music">
-          <button
-            type="button"
-            className="w-full"
+        <SettingsGroup title="Music">
+          <SettingsRow
+            label="Where songs play from"
+            description={
+              hasYouTubeKey()
+                ? 'In-app player is set up'
+                : 'Set up the in-app player'
+            }
             onClick={() => navigate(routes.dj.music(eventId))}
-          >
-            <AppCard className="flex items-center gap-3 text-left">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-fg">
-                  Where songs play from
-                </p>
-                <p className="mt-0.5 text-meta text-fg-muted">
-                  {hasYouTubeKey()
-                    ? 'In-app player is set up'
-                    : 'Set up the in-app player'}
-                </p>
-              </div>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="size-4 shrink-0 text-fg-subtle"
-                aria-hidden="true"
-              >
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </AppCard>
-          </button>
-        </Section>
+          />
+        </SettingsGroup>
 
-        <Section title={`Guests (${guestCount})`}>
-          <GuestManager eventId={eventId} />
-        </Section>
+        <SettingsGroup title="Party">
+          <SettingsRow
+            label="Guests"
+            value={guestCount}
+            onClick={() => navigate(routes.dj.guests(eventId))}
+          />
+          <SettingsRow
+            label="The night"
+            description="What played, and what the room wanted"
+            onClick={() => navigate(routes.dj.summary(eventId))}
+          />
+        </SettingsGroup>
 
-        {/* Beside ending the event, because that is when a DJ wants it — and
-            after, when the queue screens have nothing left to show. */}
-        <AppButton
-          variant="secondary"
-          size="lg"
-          fullWidth
-          onClick={() => navigate(routes.dj.summary(eventId))}
-        >
-          See the night
-        </AppButton>
-
-        {event.status === 'active' && (
-          <AppButton
-            variant="danger"
-            size="lg"
-            fullWidth
-            onClick={() => setConfirmEnd(true)}
-          >
-            End event
-          </AppButton>
-        )}
-
-        <AppButton
-          variant="ghost"
-          size="lg"
-          fullWidth
-          onClick={() => navigate(routes.dj.dashboard)}
-        >
-          All events
-        </AppButton>
-
-        <AppButton
-          variant="ghost"
-          size="lg"
-          fullWidth
-          onClick={() => {
-            void signOut().then(() => navigate(routes.welcome))
-          }}
-        >
-          Sign out
-        </AppButton>
+        <SettingsGroup title="Account">
+          <SettingsRow
+            label="All events"
+            onClick={() => navigate(routes.dj.dashboard)}
+          />
+          <SettingsRow
+            label="Sign out"
+            showChevron={false}
+            onClick={() => {
+              void signOut().then(() => navigate(routes.welcome))
+            }}
+          />
+        </SettingsGroup>
 
         {isDemoMode() && (
-          <div className="rounded-control border border-dashed border-hairline-strong p-3">
-            <p className="mb-2 text-center text-label text-fg-subtle uppercase">
-              Demo mode
-            </p>
-            <AppButton
-              variant="secondary"
-              fullWidth
+          <SettingsGroup
+            title="Demo mode"
+            footer="Puts the sample party back the way it started."
+          >
+            <SettingsRow
+              label="Reset demo data"
+              showChevron={false}
               onClick={() => {
                 resetDemoDb()
                 toast.success('Demo data reset.')
                 navigate(routes.welcome)
               }}
-            >
-              Reset demo data
-            </AppButton>
-          </div>
+            />
+          </SettingsGroup>
         )}
+
+        {/* On its own, in red, at the bottom — the one thing here that cannot
+            be undone should not sit in a row of places to go. */}
+        {event.status === 'active' && (
+          <SettingsGroup>
+            <SettingsRow
+              label="End event"
+              destructive
+              showChevron={false}
+              onClick={() => setConfirmEnd(true)}
+            />
+          </SettingsGroup>
+        )}
+
       </main>
 
       <ConfirmationDialog
