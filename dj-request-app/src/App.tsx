@@ -31,10 +31,10 @@ import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
 import { MusicSetupPage } from './pages/dj/MusicSetupPage'
 import { AddSongPage } from './pages/dj/AddSongPage'
+import { FeaturesPage } from './pages/dj/FeaturesPage'
 import { SetsPage } from './pages/dj/SetsPage'
 import { SetEditorPage } from './pages/dj/SetEditorPage'
 import { CreateVotingRoundPage } from './pages/dj/CreateVotingRoundPage'
-import { ActiveVotingRoundPage } from './pages/dj/ActiveVotingRoundPage'
 import { EventSettingsPage } from './pages/dj/EventSettingsPage'
 
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -156,8 +156,14 @@ export default function App() {
                   <Route path="queue" element={<QueuePage />} />
                   <Route path="music" element={<MusicSetupPage />} />
                   <Route path="add" element={<AddSongPage />} />
-                  <Route path="vote" element={<ActiveVotingRoundPage />} />
+                  <Route path="features" element={<FeaturesPage />} />
                   <Route path="vote/new" element={<CreateVotingRoundPage />} />
+                  {/* The vote tab became a panel inside Features; this keeps
+                      links and back-stack entries from before it moved. */}
+                  <Route
+                    path="vote"
+                    element={<Navigate to="../features" replace />}
+                  />
                   <Route path="settings" element={<EventSettingsPage />} />
                 </Route>
 

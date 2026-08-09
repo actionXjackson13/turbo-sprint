@@ -21,7 +21,6 @@ import { getErrorMessage } from '../../utils/errors'
 import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
 import { stopHosting } from '../../services/partySession'
-import { MessageGuestsDialog } from './MessageGuestsDialog'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
 
 export function EventSettingsPage() {
@@ -37,47 +36,6 @@ export function EventSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [ending, setEnding] = useState(false)
-  const [messaging, setMessaging] = useState(false)
-  const [sendingMessage, setSendingMessage] = useState(false)
-
-  /**
-   * Whether a message is still showing, rather than merely set. The row keeps
-   * the last one it was given until it is replaced, so the dialog has to check
-   * the clock the same way the guests' banner does.
-   */
-  const liveAnnouncement =
-    event?.announcement &&
-    new Date(event.announcement.expiresAt).getTime() > Date.now()
-      ? event.announcement
-      : null
-
-  const sendMessage = async (message: string, durationSeconds: number) => {
-    setSendingMessage(true)
-    try {
-      await service.setAnnouncement(eventId, { message, durationSeconds })
-      await refresh()
-      setMessaging(false)
-      toast.success('Message sent to guests.')
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setSendingMessage(false)
-    }
-  }
-
-  const clearMessage = async () => {
-    setSendingMessage(true)
-    try {
-      await service.setAnnouncement(eventId, null)
-      await refresh()
-      setMessaging(false)
-      toast.success('Message cleared.')
-    } catch (err) {
-      toast.error(getErrorMessage(err))
-    } finally {
-      setSendingMessage(false)
-    }
-  }
 
   // Seed the field once the event arrives, without clobbering later edits.
   useEffect(() => {
@@ -215,31 +173,6 @@ export function EventSettingsPage() {
           </button>
         </Section>
 
-        {/* Above the guest list, because it is the other thing a DJ does to
-            the room rather than to the queue. */}
-        <Section title="Message guests">
-          <AppButton
-            variant={liveAnnouncement ? 'secondary' : 'primary'}
-            size="lg"
-            fullWidth
-            disabled={event.status === 'ended'}
-            onClick={() => setMessaging(true)}
-          >
-            {liveAnnouncement ? 'Change message' : 'Message guests'}
-          </AppButton>
-
-          {liveAnnouncement && (
-            <p className="mt-2 rounded-control border border-accent-400/40 bg-accent-500/10 p-2.5 text-sm text-fg-muted">
-              <span className="text-label uppercase text-accent-400">
-                Showing now
-              </span>
-              <span className="mt-1 block break-words text-fg">
-                {liveAnnouncement.message}
-              </span>
-            </p>
-          )}
-        </Section>
-
         <Section title={`Guests (${guestCount})`}>
           <GuestManager eventId={eventId} />
         </Section>
@@ -294,15 +227,6 @@ export function EventSettingsPage() {
           </div>
         )}
       </main>
-
-      <MessageGuestsDialog
-        open={messaging}
-        current={liveAnnouncement}
-        sending={sendingMessage}
-        onSend={(message, seconds) => void sendMessage(message, seconds)}
-        onClear={() => void clearMessage()}
-        onCancel={() => setMessaging(false)}
-      />
 
       <ConfirmationDialog
         open={confirmEnd}

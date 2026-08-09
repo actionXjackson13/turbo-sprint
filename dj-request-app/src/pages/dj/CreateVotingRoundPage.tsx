@@ -132,7 +132,7 @@ export function CreateVotingRoundPage() {
     try {
       await service.createVotingRound({ eventId, options, durationSeconds })
       toast.success('Vote is live.')
-      navigate(routes.dj.activeVote(eventId), { replace: true })
+      navigate(routes.dj.features(eventId), { replace: true })
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {

@@ -88,8 +88,10 @@ function DjNav({ eventId }: { eventId: string }) {
     { to: routes.dj.requests(eventId), label: 'Requests', icon: NavIcons.list },
     { to: routes.dj.queue(eventId), label: 'Queue', icon: NavIcons.queue },
     {
-      to: routes.dj.activeVote(eventId),
-      label: 'Vote',
+      // One tab for everything that is not the queue. The badge stays on it,
+      // since a running vote is still the thing most worth interrupting for.
+      to: routes.dj.features(eventId),
+      label: 'Features',
       icon: NavIcons.vote,
       badge: liveVote?.totalVotes,
       badgeLabel: 'votes cast',

@@ -48,6 +48,9 @@ export function SegmentedControl<T extends string>({
             onClick={() => onChange(option.value)}
             className={clsx(
               'text-meta relative min-h-7 rounded-full px-3 font-medium transition-colors',
+              // Shares the bar evenly when the group is stretched full width;
+              // harmless when it is inline, since there is no spare space.
+              'flex-1',
               // The chip stays visually slim while an invisible overlay gives
               // it a full 44px tap target. Thumbs need the height even when
               // the design doesn't show it.

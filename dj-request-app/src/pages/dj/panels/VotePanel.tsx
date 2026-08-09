@@ -6,18 +6,24 @@ import {
   ConfirmationDialog,
   EmptyState,
   LoadingSkeleton,
-  PageHeader,
   VotingOptionCard,
-} from '../../components'
-import { routes } from '../../lib/router'
-import { useService } from '../../hooks/useService'
-import { useToast } from '../../hooks/useToast'
-import { useVotingRound } from '../../features/voting-rounds/useVotingRound'
-import { queueOrderWithFirst } from '../../features/requests/usePlayNext'
-import { formatCountdown } from '../../utils/formatRelativeTime'
-import { getErrorMessage } from '../../utils/errors'
+} from '../../../components'
+import { routes } from '../../../lib/router'
+import { useService } from '../../../hooks/useService'
+import { useToast } from '../../../hooks/useToast'
+import { useVotingRound } from '../../../features/voting-rounds/useVotingRound'
+import { queueOrderWithFirst } from '../../../features/requests/usePlayNext'
+import { formatCountdown } from '../../../utils/formatRelativeTime'
+import { getErrorMessage } from '../../../utils/errors'
 
-export function ActiveVotingRoundPage() {
+/**
+ * Running a vote, as a panel rather than a screen of its own.
+ *
+ * Identical behaviour to the tab it replaced — the header it used to draw is
+ * now the Features screen's, and the countdown line carries what that header
+ * was saying.
+ */
+export function VotePanel() {
   const { eventId = '' } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
   const service = useService()
@@ -98,32 +104,24 @@ export function ActiveVotingRoundPage() {
 
   if (loading && !results) {
     return (
-      <>
-        <PageHeader title="Vote" />
-        <main className="flex-1 space-y-3 px-4 py-4">
-          <LoadingSkeleton className="h-20" />
-          <LoadingSkeleton className="h-20" />
-        </main>
-      </>
+      <div className="space-y-3">
+        <LoadingSkeleton className="h-20" />
+        <LoadingSkeleton className="h-20" />
+      </div>
     )
   }
 
   if (!results || !round) {
     return (
-      <>
-        <PageHeader title="Vote" />
-        <main className="flex-1">
-          <EmptyState
-            title="No vote yet"
-            description="Start one to let the crowd pick the next song."
-            action={
-              <AppButton onClick={() => navigate(routes.dj.createVote(eventId))}>
-                Create a vote
-              </AppButton>
-            }
-          />
-        </main>
-      </>
+      <EmptyState
+        title="No vote yet"
+        description="Start one to let the crowd pick the next song."
+        action={
+          <AppButton onClick={() => navigate(routes.dj.createVote(eventId))}>
+            Create a vote
+          </AppButton>
+        }
+      />
     )
   }
 
@@ -133,12 +131,11 @@ export function ActiveVotingRoundPage() {
 
   return (
     <>
-      <PageHeader
-        title={isActive ? 'Vote running' : 'Vote finished'}
-        subtitle={`${totalVotes} ${totalVotes === 1 ? 'vote' : 'votes'} cast`}
-      />
-
-      <main className="flex-1 space-y-6 px-4 py-5">
+      <div className="space-y-6">
+        <p className="text-meta text-fg-subtle">
+          {isActive ? 'Vote running' : 'Vote finished'} ·{' '}
+          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'} cast
+        </p>
         {isActive && (
           <AppCard emphasis padded={false}>
             <div className="flex items-center justify-between px-4 py-3">
@@ -224,7 +221,7 @@ export function ActiveVotingRoundPage() {
             Start another vote
           </AppButton>
         )}
-      </main>
+      </div>
 
       <ConfirmationDialog
         open={confirmCancel}

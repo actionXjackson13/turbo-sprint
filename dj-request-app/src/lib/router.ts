@@ -37,7 +37,11 @@ export const routes = {
     /** Where songs play from. Set once, so it sits behind Settings. */
     music: (eventId = ':eventId') => `/dj/events/${eventId}/music`,
     createVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote/new`,
-    activeVote: (eventId = ':eventId') => `/dj/events/${eventId}/vote`,
+    /**
+     * Everything that is not the queue: votes, sets, messaging the room. One
+     * tab with a selector, rather than three places to remember.
+     */
+    features: (eventId = ':eventId') => `/dj/events/${eventId}/features`,
     settings: (eventId = ':eventId') => `/dj/events/${eventId}/settings`,
   },
 } as const
