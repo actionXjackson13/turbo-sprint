@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useService } from '../../hooks/useService'
 import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
-import { queueOrderWithRequestAhead } from './queueOrdering'
+import { useEnforceQueueOrder } from './useEnforceQueueOrder'
 import type { SongRequest } from '../../types/domain'
 
 export interface QueueRequestState {
@@ -33,6 +33,7 @@ export function useQueueRequest(
   const service = useService()
   const toast = useToast()
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const enforceOrder = useEnforceQueueOrder(eventId)
 
   const queueRequest = useCallback(
     async (request: SongRequest) => {
@@ -42,19 +43,9 @@ export function useQueueRequest(
           await service.updateRequestStatus(request.id, 'queued')
         }
 
-        const queued = await service.listSongRequests(eventId, {
-          statuses: ['queued'],
-        })
-        const order = queueOrderWithRequestAhead(queued, request.id)
-
-        // Only worth a write when it actually changes something — a queue with
-        // no DJ songs in it is already in the right order.
-        const current = queued
-          .sort((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))
-          .map((r) => r.id)
-        if (order.join() !== current.join()) {
-          await service.reorderQueue(eventId, order)
-        }
+        // The rule lives in one place now, applied to the whole queue rather
+        // than to this one song — so it holds however the song got here.
+        await enforceOrder()
 
         await onDone()
         toast.success(`${request.title} queued.`)
@@ -64,7 +55,7 @@ export function useQueueRequest(
         setPendingId(null)
       }
     },
-    [service, eventId, onDone, toast],
+    [service, enforceOrder, onDone, toast],
   )
 
   return { queueRequest, pendingId }

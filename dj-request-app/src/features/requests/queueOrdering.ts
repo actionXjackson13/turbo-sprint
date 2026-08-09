@@ -63,6 +63,27 @@ export function queueOrderWithRequestAhead(
 }
 
 /**
+ * The whole queue, room first, DJ's own after — the canonical order.
+ *
+ * `queueOrderWithRequestAhead` fixes the position of one song as it is queued,
+ * which only helps on the paths that remember to call it. This states the rule
+ * for the entire queue instead, so it can be applied after *any* insert and get
+ * the same answer: whatever the room asked for plays before whatever the DJ
+ * added to fill the gaps.
+ *
+ * Relative order inside each group is preserved, so a DJ who drags one request
+ * above another, or reorders their own set, keeps that. What it will not keep
+ * is filler dragged above a request — which is the point.
+ */
+export function queueOrderRoomFirst(queued: SongRequest[]): string[] {
+  const ordered = [...queued].sort(byPosition)
+  return [
+    ...ordered.filter(isRoomSong).map((r) => r.id),
+    ...ordered.filter(isDjSong).map((r) => r.id),
+  ]
+}
+
+/**
  * How many of the room's songs are waiting, for the badge that tells the DJ
  * whether they need to look. Filler is not news.
  */

@@ -3,6 +3,7 @@ import {
   countRoomSongs,
   isDjSong,
   isRoomSong,
+  queueOrderRoomFirst,
   queueOrderWithRequestAhead,
 } from '../../src/features/requests/queueOrdering'
 import type { SongRequest } from '../../src/types/domain'
@@ -154,5 +155,77 @@ describe('how much of the queue the room asked for', () => {
       song({ guestId: null, sourceRoundId: 'r1' }),
     ]
     expect(countRoomSongs(queue)).toBe(3)
+  })
+})
+
+/**
+ * The invariant, stated for the whole queue rather than for one insert.
+ *
+ * `queueOrderWithRequestAhead` only helps on the paths that remember to call
+ * it, and one already didn't: a vote winner pushed to the queue went to the
+ * back like anything else, behind whatever filler was sitting there. This is
+ * the version that can be applied after *any* insert and reach the same
+ * answer.
+ */
+describe('the canonical queue order', () => {
+  it('puts everything the room asked for before everything the DJ added', () => {
+    const queue = [
+      djSong({ id: 'f1', queuePosition: 0 }),
+      song({ id: 'r1', queuePosition: 1 }),
+      djSong({ id: 'f2', queuePosition: 2 }),
+      song({ id: 'r2', queuePosition: 3 }),
+    ]
+
+    expect(queueOrderRoomFirst(queue)).toEqual(['r1', 'r2', 'f1', 'f2'])
+  })
+
+  it('rescues a vote winner that landed at the back', () => {
+    const queue = [
+      djSong({ id: 'f1', queuePosition: 0 }),
+      djSong({ id: 'f2', queuePosition: 1 }),
+      song({ id: 'winner', guestId: null, sourceRoundId: 'r1', queuePosition: 2 }),
+    ]
+
+    expect(queueOrderRoomFirst(queue)[0]).toBe('winner')
+  })
+
+  it('keeps the order the DJ chose inside each group', () => {
+    // Dragging one request above another survives; dragging filler above a
+    // request does not, which is the whole point.
+    const queue = [
+      song({ id: 'second', queuePosition: 0 }),
+      song({ id: 'first', queuePosition: 1 }),
+      djSong({ id: 'fB', queuePosition: 2 }),
+      djSong({ id: 'fA', queuePosition: 3 }),
+    ]
+
+    expect(queueOrderRoomFirst(queue)).toEqual([
+      'second',
+      'first',
+      'fB',
+      'fA',
+    ])
+  })
+
+  it('is idempotent — applying it twice changes nothing', () => {
+    const queue = [
+      djSong({ id: 'f1', queuePosition: 0 }),
+      song({ id: 'r1', queuePosition: 1 }),
+    ]
+
+    const once = queueOrderRoomFirst(queue)
+    const reordered = once.map((id, i) => {
+      const found = queue.find((r) => r.id === id)!
+      return { ...found, queuePosition: i }
+    })
+    expect(queueOrderRoomFirst(reordered)).toEqual(once)
+  })
+
+  it('leaves a queue of only the DJ’s songs alone', () => {
+    const queue = [
+      djSong({ id: 'a', queuePosition: 0 }),
+      djSong({ id: 'b', queuePosition: 1 }),
+    ]
+    expect(queueOrderRoomFirst(queue)).toEqual(['a', 'b'])
   })
 })

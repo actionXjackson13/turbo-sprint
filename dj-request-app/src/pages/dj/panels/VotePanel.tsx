@@ -13,6 +13,7 @@ import { useService } from '../../../hooks/useService'
 import { useToast } from '../../../hooks/useToast'
 import { useVotingRound } from '../../../features/voting-rounds/useVotingRound'
 import { queueOrderWithFirst } from '../../../features/requests/usePlayNext'
+import { useEnforceQueueOrder } from '../../../features/requests/useEnforceQueueOrder'
 import { formatCountdown } from '../../../utils/formatRelativeTime'
 import { getErrorMessage } from '../../../utils/errors'
 
@@ -32,6 +33,7 @@ export function VotePanel() {
   const { results, loading, reload, secondsRemaining } = useVotingRound(eventId)
   const [busy, setBusy] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const enforceOrder = useEnforceQueueOrder(eventId)
 
   const round = results?.round ?? null
   const isActive = round?.status === 'active'
@@ -87,6 +89,10 @@ export function VotePanel() {
           eventId,
           queueOrderWithFirst(inQueue, queued.id),
         )
+      } else {
+        // Otherwise it lands at the very back, behind whatever filler is
+        // sitting there — a strange fate for the one song the room voted on.
+        await enforceOrder()
       }
 
       toast.success(

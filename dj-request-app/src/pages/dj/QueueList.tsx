@@ -150,10 +150,22 @@ export function QueueList({
           <li
             key={request.id}
             className={clsx(
-              'rounded-card border bg-ink-900',
+              'rounded-card border',
+              /*
+                The room's songs are tinted, the DJ's are not. Most of the
+                queue is the DJ's own once a set is loaded, so the useful
+                signal is the exception rather than the rule — and colour
+                carries across a dark room at arm's length in a way a line of
+                small text underneath does not.
+              */
+              isDjSong(request)
+                ? 'bg-ink-900'
+                : 'bg-danger-500/12',
               lifted
                 ? 'relative z-20 border-brand-500/60 shadow-lg shadow-black/50'
-                : 'border-hairline',
+                : isDjSong(request)
+                  ? 'border-hairline'
+                  : 'border-danger-500/40',
               // Rows displaced by the drag glide; the lifted one tracks the
               // finger exactly and must not lag behind it.
               !lifted && drag && 'transition-transform duration-150',
@@ -175,15 +187,7 @@ export function QueueList({
                 onPick={(target) => moveTo(index, target - 1)}
               />
 
-              <AlbumArt
-                url={request.artworkUrl}
-                size="sm"
-                className={clsx(
-                  // A coloured edge on the room's songs, so scanning the queue
-                  // does not mean reading every third line.
-                  !isDjSong(request) && '!border-accent-400/70',
-                )}
-              />
+              <AlbumArt url={request.artworkUrl} size="sm" />
 
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-row font-semibold text-fg">
@@ -206,7 +210,7 @@ export function QueueList({
                   </p>
                 ) : (
                   <p className="truncate text-meta text-fg-subtle">
-                    <span className="text-accent-400">
+                    <span className="font-semibold text-fg">
                       {request.guestDisplayName}
                     </span>{' '}
                     · {request.voteCount}{' '}
