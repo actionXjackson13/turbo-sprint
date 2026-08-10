@@ -8,10 +8,12 @@ import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
 import { isHexColor, parseHex, toHex } from '../../features/theme/color'
 import {
+  DEFAULT_BACKGROUND,
   DEFAULT_THEME,
   THEME_PRESETS,
   derivePalette,
   presetFor,
+  themeNote,
   themeWarning,
 } from '../../features/theme/palette'
 import type { EventTheme } from '../../types/domain'
@@ -20,7 +22,7 @@ import type { EventTheme } from '../../types/domain'
  * Choosing the colours the whole room sees.
  *
  * Two things shape this screen. The first is that a DJ picking colours mid-set
- * has seconds, not minutes: six ready-made pairs come first and one tap is the
+ * has seconds, not minutes: eight ready-made sets come first and one tap is the
  * whole interaction. The second is that whatever is chosen has to stay
  * readable, which is handled where it belongs — the palette derives lightness
  * for every role, so this screen never has to refuse a colour or explain a
@@ -42,11 +44,16 @@ export function ThemePage() {
   }, [event])
 
   const saved = event?.theme ?? DEFAULT_THEME
+  const same = (a: string | undefined, b: string | undefined) =>
+    (a ?? DEFAULT_BACKGROUND).toLowerCase() ===
+    (b ?? DEFAULT_BACKGROUND).toLowerCase()
   const dirty =
     draft.primary.toLowerCase() !== saved.primary.toLowerCase() ||
-    draft.accent.toLowerCase() !== saved.accent.toLowerCase()
+    draft.accent.toLowerCase() !== saved.accent.toLowerCase() ||
+    !same(draft.background, saved.background)
 
   const warning = useMemo(() => themeWarning(draft), [draft])
+  const note = useMemo(() => themeNote(draft), [draft])
   const activePreset = presetFor(draft)
 
   /** Null means "no theme", which is not the same as "the default one stored". */
@@ -82,10 +89,13 @@ export function ThemePage() {
                 name={preset.name}
                 theme={preset}
                 selected={activePreset?.id === preset.id}
-                onSelect={() => setDraft({
-                  primary: preset.primary,
-                  accent: preset.accent,
-                })}
+                onSelect={() =>
+                  setDraft({
+                    primary: preset.primary,
+                    accent: preset.accent,
+                    background: preset.background,
+                  })
+                }
               />
             ))}
           </div>
@@ -95,9 +105,9 @@ export function ThemePage() {
           <AppCard>
             <div className="space-y-4">
               <p className="text-meta text-fg-muted">
-                Pick any two. The app adjusts how light or dark they end up so
-                text stays readable — you choose the colour, it handles the
-                rest.
+                Pick any three. The app works out how light or dark each one
+                ends up so the writing stays readable — you choose the colour,
+                it handles the rest.
               </p>
               <ColorField
                 label="Main colour"
@@ -111,6 +121,12 @@ export function ThemePage() {
                 value={draft.accent}
                 onChange={(accent) => setDraft((d) => ({ ...d, accent }))}
               />
+              <ColorField
+                label="Background"
+                hint="The page, and everything on it"
+                value={draft.background ?? DEFAULT_BACKGROUND}
+                onChange={(background) => setDraft((d) => ({ ...d, background }))}
+              />
             </div>
           </AppCard>
         </Section>
@@ -120,6 +136,7 @@ export function ThemePage() {
           {warning && (
             <p className="mt-3 text-meta text-status-pending">{warning}</p>
           )}
+          {note && <p className="mt-3 text-meta text-fg-muted">{note}</p>}
         </Section>
 
         <div className="space-y-3">
@@ -164,8 +181,8 @@ export function ThemePage() {
 }
 
 /**
- * A preset as the two colours it actually produces, not as the two colours it
- * is stored as — the swatch should match the buttons the DJ is about to get.
+ * A preset as the colours it actually produces rather than the ones stored —
+ * the swatch should match the app the DJ is about to get.
  */
 function PresetTile({
   name,
@@ -192,13 +209,19 @@ function PresetTile({
           : 'border-hairline bg-ink-900 active:bg-ink-800',
       ].join(' ')}
     >
-      <span className="flex shrink-0 items-center">
+      {/* The page is the swatch, with the two accents sitting on it — which is
+          what the DJ is actually choosing between now that a preset carries a
+          background too. */}
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-control border"
+        style={{ backgroundColor: tokens.ink950, borderColor: tokens.ink700 }}
+      >
         <span
-          className="size-7 rounded-full"
+          className="size-4 rounded-full"
           style={{ backgroundColor: tokens.brand600 }}
         />
         <span
-          className="-ml-2.5 size-7 rounded-full ring-2 ring-ink-900"
+          className="-ml-1.5 size-4 rounded-full"
           style={{ backgroundColor: tokens.accent400 }}
         />
       </span>
@@ -293,9 +316,26 @@ function ThemePreview({ theme }: { theme: EventTheme }) {
 
   return (
     <div
-      className="space-y-3 rounded-card border border-hairline p-4"
-      style={{ backgroundColor: '#191922' }}
+      className="space-y-3 rounded-card border p-4"
+      style={{ backgroundColor: t.ink950, borderColor: t.ink700 }}
     >
+      {/* A card on the page, because "can you still see a card" is the first
+          thing a background colour can quietly break. */}
+      <div
+        className="space-y-3 rounded-control border p-3"
+        style={{ backgroundColor: t.ink900, borderColor: t.ink700 }}
+      >
+        <p className="text-sm font-semibold" style={{ color: t.fg }}>
+          Blinding Lights
+        </p>
+        <p className="text-meta" style={{ color: t.fgMuted }}>
+          The Weeknd · asked for by Maya
+        </p>
+        <p className="text-meta" style={{ color: t.fgSubtle }}>
+          3 songs ahead
+        </p>
+      </div>
+
       <div className="flex items-center gap-3">
         <span
           className="inline-flex min-h-11 flex-1 items-center justify-center rounded-control px-4 text-sm font-medium"

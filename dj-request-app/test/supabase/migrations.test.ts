@@ -113,6 +113,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0012_queue_groups.sql'))
     await db.exec(read('0013_no_duplicate_songs.sql'))
     await db.exec(read('0014_event_theme.sql'))
+    await db.exec(read('0015_event_theme_background.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -128,7 +129,7 @@ describe('supabase migrations', () => {
       revoke update on public.events from app_user;
       grant update (name, request_status, now_playing_title, now_playing_artist,
                     now_playing_request_id, status, ended_at,
-                    theme_primary, theme_accent)
+                    theme_primary, theme_accent, theme_background)
         on public.events to app_user;
     `)
 
@@ -1226,10 +1227,36 @@ describe('supabase migrations', () => {
       }
     })
 
+    it('stores the page colour alongside the accents', async () => {
+      await runAs(
+        DJ,
+        `update public.events
+         set theme_primary = '#f97316', theme_accent = '#38bdf8',
+             theme_background = '#140f09'
+         where id = $1`,
+        [eventId],
+      )
+      const res = await db.query<{ b: string }>(
+        `select theme_background as b from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.b).toBe('#140f09')
+    })
+
+    it('refuses a page colour that is not a hex colour', async () => {
+      await expect(
+        db.query(
+          `update public.events set theme_background = 'dark' where id = $1`,
+          [eventId],
+        ),
+      ).rejects.toThrow()
+    })
+
     it('can be cleared back to the default colours', async () => {
       await runAs(
         DJ,
-        `update public.events set theme_primary = null, theme_accent = null
+        `update public.events
+         set theme_primary = null, theme_accent = null, theme_background = null
          where id = $1`,
         [eventId],
       )

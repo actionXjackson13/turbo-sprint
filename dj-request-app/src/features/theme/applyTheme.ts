@@ -1,5 +1,5 @@
 import type { EventTheme } from '../../types/domain'
-import { derivePalette, paletteVars } from './palette'
+import { DEFAULT_THEME, derivePalette, paletteVars } from './palette'
 
 /**
  * Painting a theme onto the running app.
@@ -27,9 +27,14 @@ export function applyTheme(theme: EventTheme | null): void {
     return
   }
 
-  for (const [name, value] of Object.entries(paletteVars(derivePalette(theme)))) {
+  const tokens = derivePalette(theme)
+  for (const [name, value] of Object.entries(paletteVars(tokens))) {
     style.setProperty(name, value)
   }
+
+  // Form controls, scrollbars and the space behind a bouncing scroll are drawn
+  // by the browser, not by us. Without this they stay dark under a light page.
+  style.setProperty('color-scheme', tokens.dark ? 'dark' : 'light')
 }
 
 /** Hands the palette back to index.css. */
@@ -37,9 +42,10 @@ export function clearTheme(): void {
   const style = rootStyle()
   if (!style) return
 
-  for (const name of Object.keys(paletteVars(derivePalette({ primary: '#000', accent: '#000' })))) {
+  for (const name of Object.keys(paletteVars(derivePalette(DEFAULT_THEME)))) {
     style.removeProperty(name)
   }
+  style.removeProperty('color-scheme')
 }
 
 /**

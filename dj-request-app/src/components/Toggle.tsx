@@ -64,7 +64,10 @@ export function Toggle({
       >
         <span
           className={clsx(
-            'absolute top-1 size-5 rounded-full bg-white transition-transform',
+            // A bordered knob rather than a bare white one: on a light theme the
+// track behind it is pale too, and an unedged white circle disappears
+// into it.
+'absolute top-1 size-5 rounded-full border border-hairline bg-white transition-transform',
             checked ? 'translate-x-6' : 'translate-x-1',
           )}
         />

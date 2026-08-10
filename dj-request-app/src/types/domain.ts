@@ -51,15 +51,22 @@ export interface NowPlaying {
 /**
  * The colours the room is wearing tonight.
  *
- * Only two are stored. Every other shade the app paints is derived from these
- * at render time, which is what keeps a DJ from choosing a pair that makes text
- * unreadable — see `features/theme/palette`.
+ * Only three are stored. Every other shade the app paints — surfaces, text,
+ * edges, button fills — is derived from these at render time, which is what
+ * keeps a DJ from choosing a set that makes text unreadable. See
+ * `features/theme/palette`.
  */
 export interface EventTheme {
   /** Buttons, links, the active tab. */
   primary: string
   /** Highlights, dividers, the second voice. */
   accent: string
+  /**
+   * The page itself, and with it every surface and every piece of text — the
+   * whole ramp is derived from this one colour, including which way up the app
+   * runs. Absent on themes saved before backgrounds could be chosen.
+   */
+  background?: string
 }
 
 /** A short, timed note from the DJ to everyone in the room. */

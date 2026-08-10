@@ -215,6 +215,7 @@ export class SupabaseService implements DataService {
     if (patch.theme !== undefined) {
       update.theme_primary = patch.theme?.primary ?? null
       update.theme_accent = patch.theme?.accent ?? null
+      update.theme_background = patch.theme?.background ?? null
     }
 
     const { data, error } = await this.db

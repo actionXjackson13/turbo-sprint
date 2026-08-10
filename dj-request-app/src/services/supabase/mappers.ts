@@ -63,7 +63,15 @@ export function toEvent(row: Row, djDisplayName?: string): EventRecord {
     // Both halves or neither — a row with one colour set is not a theme.
     theme:
       row.theme_primary && row.theme_accent
-        ? { primary: row.theme_primary, accent: row.theme_accent }
+        ? {
+            primary: row.theme_primary,
+            accent: row.theme_accent,
+            // Added after themes shipped, so a theme saved before then has
+            // none and falls back to the app's own page.
+            ...(row.theme_background
+              ? { background: row.theme_background }
+              : {}),
+          }
         : null,
     createdAt: row.created_at,
     endedAt: row.ended_at ?? null,
