@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DemoService } from '../../src/services/demo/DemoService'
 import { resetDemoDb, getActiveGuestUserId } from '../../src/services/demo/demoStore'
 import { PeerHost } from '../../src/services/peer/PeerHost'
 import { PeerGuestService } from '../../src/services/peer/PeerGuestService'
 import {
   __setPeerTransportFactory,
+  PeerError,
+  type PeerErrorKind,
   type PeerLinkEvents,
   type PeerTransport,
 } from '../../src/services/peer/signalling'
@@ -425,5 +427,118 @@ describe('hosting follows the event on screen', () => {
 
     expect(built).toEqual(['soundboard-AAAA', 'soundboard-CCCC'])
     expect(links.has('soundboard-CCCC')).toBe(true)
+  })
+})
+
+/**
+ * Getting the party open when the first attempt fails.
+ *
+ * The relay holds a code until the socket that claimed it is reaped, so a DJ
+ * who reloads, takes a call, or has the app killed and reopened comes back to
+ * find their *own* previous session still holding it. One attempt was all this
+ * ever made, so the party stayed shut for the rest of the session while the DJ
+ * held up a code nobody could use.
+ */
+describe('a registration that does not take the first time', () => {
+  beforeEach(() => {
+    resetDemoDb()
+    __resetPartySession()
+    links.clear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    __setPeerTransportFactory(null)
+    __resetPartySession()
+    stopHosting()
+    links.clear()
+  })
+
+  /** Fails `failures` times with `kind`, then registers normally. */
+  function flakyFactory(failures: number, kind: PeerErrorKind) {
+    const attempts = { count: 0 }
+    __setPeerTransportFactory((id, events) => {
+      const link = new LoopbackLink(id, events)
+      const realConnect = link.connect.bind(link)
+      link.connect = async () => {
+        attempts.count += 1
+        if (attempts.count <= failures) {
+          links.delete(id)
+          throw new PeerError(kind, 'nope')
+        }
+        return realConnect()
+      }
+      return link
+    })
+    return attempts
+  }
+
+  /**
+   * Fake timers throughout: the backoff is seconds long by design, and a unit
+   * suite should assert the schedule rather than sit through it.
+   */
+  it('keeps trying until the code is free, and then opens', async () => {
+    vi.useFakeTimers()
+    const attempts = flakyFactory(3, 'id-taken')
+
+    const opening = startHosting('event-1', 'AAAA')
+    await vi.advanceTimersByTimeAsync(30_000)
+    await opening
+
+    expect(attempts.count).toBe(4)
+    expect(getPartyState()).toMatchObject({
+      mode: 'hosting',
+      hostedEventId: 'event-1',
+      error: null,
+    })
+  })
+
+  it('says what is happening while it retries', async () => {
+    vi.useFakeTimers()
+    flakyFactory(1, 'id-taken')
+
+    const opening = startHosting('event-1', 'AAAA')
+
+    // Caught between the failure and the retry landing.
+    await vi.advanceTimersByTimeAsync(0)
+    expect(getPartyState().mode).toBe('sandbox')
+    expect(getPartyState().error).toMatch(/reopening the party/i)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await opening
+    expect(getPartyState().mode).toBe('hosting')
+  })
+
+  it('retries a relay that could not be reached', async () => {
+    vi.useFakeTimers()
+    const attempts = flakyFactory(2, 'signal-failed')
+
+    const opening = startHosting('event-1', 'AAAA')
+    await vi.advanceTimersByTimeAsync(30_000)
+    await opening
+
+    expect(attempts.count).toBe(3)
+    expect(getPartyState().mode).toBe('hosting')
+  })
+
+  /** The DJ ending the event has to stop the retrying, or it never stops. */
+  it('stops retrying once the DJ moves on', async () => {
+    vi.useFakeTimers()
+    const attempts = flakyFactory(50, 'id-taken')
+
+    const opening = startHosting('event-1', 'AAAA')
+    await vi.advanceTimersByTimeAsync(5_000)
+
+    stopHosting()
+    const settled = attempts.count
+
+    // Time has to keep moving for the pending backoff to come back and find
+    // that it has been superseded — freezing the clock here would only prove
+    // that a stopped timer does not fire.
+    await vi.advanceTimersByTimeAsync(120_000)
+    await opening
+
+    expect(attempts.count).toBe(settled)
+    expect(getPartyState().mode).toBe('sandbox')
   })
 })

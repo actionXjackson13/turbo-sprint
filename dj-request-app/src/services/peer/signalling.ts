@@ -23,15 +23,42 @@
 const SIGNAL_HOST = 'wss://0.peerjs.com/peerjs?key=peerjs&version=1.5.4'
 
 /**
- * STUN lets each side discover the address the other can actually reach it on.
- * There is deliberately no TURN server: relaying media costs money, and a
- * party is one room on one WiFi, which is the case direct connections handle
- * well. See `PeerJoinError` for what happens when they cannot.
+ * How the two phones find a route to each other.
+ *
+ * STUN lets each side discover the address the other can actually reach it on,
+ * and for two phones on the same home WiFi that is enough. It is not enough
+ * anywhere near as often as it sounds: a guest on mobile data instead of the
+ * WiFi, a venue or café network with client isolation turned on, a carrier
+ * behind symmetric NAT — in all of those, both sides gather candidates, none of
+ * them work, and the connection fails silently. That is most of what "it just
+ * says it can't find the party" turns out to be.
+ *
+ * TURN is the answer to exactly that case: a relay in the middle that both
+ * phones *can* reach. It was left out originally because relays cost money, but
+ * the Open Relay Project runs a free one for this purpose, so the reachability
+ * is worth having.
+ *
+ * Order matters and costs nothing: ICE always prefers a direct route and only
+ * falls back to the relay when there isn't one, so the common case — one room,
+ * one WiFi — is unchanged and never touches these servers. The `:443` entries
+ * are the ones that get through restrictive networks, since a relay reachable
+ * on the HTTPS port looks like ordinary web traffic to a firewall that drops
+ * everything else.
  */
 const ICE: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turns:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
 }
 
@@ -176,6 +203,15 @@ export class PeerLink {
   private readonly connectionIds = new Map<string, string>()
 
   private closed = false
+  /**
+   * Whether this link has ever been registered.
+   *
+   * Both halves of the close handler — reporting a lost party, and reaching for
+   * it again — only make sense for a link that was once live. A registration
+   * that never succeeded has nothing to lose and nothing to get back, and
+   * saying otherwise told the DJ they had lost a party they had not yet opened.
+   */
+  private opened = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectAttempts = 0
 
@@ -190,9 +226,24 @@ export class PeerLink {
     this.acceptsOffers = acceptsOffers
   }
 
-  /** Registers `id` with the relay. Rejects if it is taken or unreachable. */
+  /**
+   * Registers `id` with the relay. Rejects if it is taken or unreachable.
+   *
+   * A registration that never came up is torn down rather than left lying
+   * there. It looks like a detail and it was the worst bug in this file: the
+   * socket closed by a rejected attempt still ran the close handler, which
+   * cannot tell "never opened" from "dropped mid-party" and so scheduled a
+   * reconnect. That reconnect would often succeed a few seconds later — and
+   * claim the host's id on the relay, on a link whose owner had already given
+   * up and wired nothing to it. Guests then dialled the code, got a data
+   * channel, sent their first call into it and were never answered, while the
+   * DJ's own screen said the party was not open.
+   */
   connect(): Promise<void> {
-    return this.openSocket()
+    return this.openSocket().catch((err: unknown) => {
+      this.close()
+      throw err
+    })
   }
 
   /**
@@ -256,6 +307,7 @@ export class PeerLink {
         if (msg.type === 'OPEN') {
           settle(() => {
             this.ws = ws
+            this.opened = true
             if (this.heartbeat) clearInterval(this.heartbeat)
             this.heartbeat = setInterval(() => {
               if (ws.readyState === WebSocket.OPEN) {
@@ -311,7 +363,10 @@ export class PeerLink {
          * It only matters while nobody is connected yet, when it is the one
          * thing a guest is waiting on.
          */
-        if (this.closed) return
+        // Never registered, so there is nothing to mourn and nothing to
+        // reconnect to — `connect` has already rejected and its caller has
+        // moved on.
+        if (this.closed || !this.opened) return
 
         if (this.peers.size === 0) {
           this.events.onError?.(

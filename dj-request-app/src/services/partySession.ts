@@ -2,7 +2,7 @@ import { getDataService } from './index'
 import type { DataService } from './types'
 import { PeerHost } from './peer/PeerHost'
 import { PeerGuestService } from './peer/PeerGuestService'
-import { PeerError } from './peer/signalling'
+import { PeerError, type PeerErrorKind } from './peer/signalling'
 import { isDemoMode } from '../lib/env'
 import { DEMO_EVENT_CODE } from './demo/seed'
 
@@ -137,6 +137,32 @@ export function isRemoteCode(code: string): boolean {
 // ---- Hosting ---------------------------------------------------------------
 
 /**
+ * Registration failures that fix themselves if we simply ask again.
+ *
+ * `id-taken` is the common one and it is almost never a real collision: the
+ * relay holds a code until the socket that claimed it is reaped, so a DJ who
+ * reloads the page, gets a call, or has the app killed and reopened comes back
+ * to find their own previous session still holding their code. That clears
+ * within a minute — but the first attempt was the only attempt, so the party
+ * stayed shut for the rest of the session while the DJ looked at a code nobody
+ * could use. `signal-failed` is the same shape of problem one layer down.
+ */
+const RETRYABLE_HOST_ERRORS: ReadonlySet<PeerErrorKind> = new Set<PeerErrorKind>(
+  ['id-taken', 'signal-failed'],
+)
+
+const HOST_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 20_000]
+
+/** What to tell the DJ while a retry is in flight. */
+function hostRetryMessage(kind: PeerErrorKind): string {
+  return kind === 'id-taken'
+    ? 'Reopening the party — your last session is still letting go of this code. This usually clears within a minute.'
+    : 'Reaching the connection service… retrying.'
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
  * Open this device's event to other phones.
  *
  * Idempotent: the control panel calls it on mount, so navigating away and back
@@ -206,7 +232,41 @@ export async function startHosting(
 
   starting = (async () => {
     try {
-      await next.start(code)
+      /**
+       * Keep trying for as long as the DJ is still on this event.
+       *
+       * There is no deadline because there is no better thing to do at the end
+       * of one: a DJ looking at a join code wants it to work, and the only exit
+       * that means anything is them leaving the event or ending it — both of
+       * which supersede this attempt and break the loop. The backoff tops out
+       * at twenty seconds, so a relay that is genuinely down costs one socket
+       * every twenty seconds rather than a spin.
+       */
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await next.start(code)
+          break
+        } catch (err) {
+          if (superseded()) return
+
+          const kind = err instanceof PeerError ? err.kind : null
+          if (!kind || !RETRYABLE_HOST_ERRORS.has(kind)) throw err
+
+          // Still shut, still trying — and the DJ is told which of those it is.
+          setState({
+            mode: 'sandbox',
+            hostedEventId: null,
+            error: hostRetryMessage(kind),
+          })
+
+          const wait =
+            HOST_RETRY_DELAYS_MS[
+              Math.min(attempt, HOST_RETRY_DELAYS_MS.length - 1)
+            ]!
+          await sleep(wait)
+          if (superseded()) return
+        }
+      }
 
       if (superseded()) {
         next.stop()

@@ -162,7 +162,7 @@ export class PeerGuestService implements DataService {
           finish(
             new PeerError(
               'unreachable',
-              'Could not reach the DJ. Make sure you are on the same WiFi, and that the DJ still has the app open.',
+              'Could not reach the DJ. Check the code, and make sure the DJ still has the app open on their phone.',
             ),
           ),
         CONNECT_TIMEOUT_MS,
