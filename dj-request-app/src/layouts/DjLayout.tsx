@@ -19,6 +19,7 @@ import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
+import { useEventTheme } from '../features/theme/useEventTheme'
 
 /**
  * Shell for the DJ's per-event screens. The dashboard and create-event screens
@@ -53,6 +54,9 @@ export function DjLayout() {
 
   return (
     <DjEventProvider eventId={eventId}>
+      {/* Inside the provider, so it sees the event — and so a colour the DJ
+          changes is on their own screen before they leave the settings page. */}
+      <DjThemeStage eventId={eventId} />
       {/* Both above the outlet, so the music keeps playing and requests keep
           being taken while the DJ is looking at something else. */}
       <AutoAcceptProvider eventId={eventId}>
@@ -139,4 +143,14 @@ function DjEventGate({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>
+}
+
+/**
+ * Paints the DJ's own app in the event's colours — the same ones every guest
+ * is seeing, so what the DJ picks is what the DJ checks.
+ */
+function DjThemeStage({ eventId }: { eventId: string }) {
+  const { event } = useDjEvent()
+  useEventTheme(eventId, event?.theme)
+  return null
 }

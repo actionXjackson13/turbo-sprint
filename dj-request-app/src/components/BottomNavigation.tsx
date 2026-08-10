@@ -46,7 +46,7 @@ export function BottomNavigation({ items }: BottomNavigationProps) {
               <span className="relative" aria-hidden="true">
                 {item.icon}
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-brand-500 px-1 text-[10px] leading-4 font-bold text-white">
+                  <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-brand-600 px-1 text-[10px] leading-4 font-bold text-on-brand">
                     {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 )}

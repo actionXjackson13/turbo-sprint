@@ -4,6 +4,7 @@ import type {
   EventGuest,
   EventRecord,
   Profile,
+  EventTheme,
   RequestIntakeStatus,
   RequestSort,
   RequestStatus,
@@ -111,6 +112,8 @@ export interface CreateVotingRoundInput {
 export interface EventSettingsPatch {
   name?: string
   requestStatus?: RequestIntakeStatus
+  /** Null puts the app's own colours back. */
+  theme?: EventTheme | null
 }
 
 export interface DataService {

@@ -48,6 +48,20 @@ export interface NowPlaying {
   artworkUrl: string | null
 }
 
+/**
+ * The colours the room is wearing tonight.
+ *
+ * Only two are stored. Every other shade the app paints is derived from these
+ * at render time, which is what keeps a DJ from choosing a pair that makes text
+ * unreadable — see `features/theme/palette`.
+ */
+export interface EventTheme {
+  /** Buttons, links, the active tab. */
+  primary: string
+  /** Highlights, dividers, the second voice. */
+  accent: string
+}
+
 /** A short, timed note from the DJ to everyone in the room. */
 export interface Announcement {
   message: string
@@ -71,6 +85,11 @@ export interface EventRecord {
    * clock, so a message ending does not need a round trip to notice.
    */
   announcement: Announcement | null
+  /**
+   * Set by the DJ, applied to everyone. Null means the app's own colours —
+   * events created before themes existed, and DJs who never changed it.
+   */
+  theme: EventTheme | null
   createdAt: string
   endedAt: string | null
 }

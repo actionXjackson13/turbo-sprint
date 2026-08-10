@@ -161,6 +161,7 @@ export class DemoService implements DataService {
         requestStatus: 'open',
         nowPlaying: null,
         announcement: null,
+        theme: null,
         createdAt: nowIso(),
         endedAt: null,
       }
@@ -203,6 +204,7 @@ export class DemoService implements DataService {
         if (patch.requestStatus !== undefined) {
           event.requestStatus = patch.requestStatus
         }
+        if (patch.theme !== undefined) event.theme = patch.theme
         return clone(event)
       },
       channels.event(eventId),

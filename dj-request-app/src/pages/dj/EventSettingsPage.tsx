@@ -22,6 +22,15 @@ import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
 import { stopHosting } from '../../services/partySession'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
+import { presetFor } from '../../features/theme/palette'
+import type { EventTheme } from '../../types/domain'
+
+/** Names the theme where it has a name, and says "custom" where it does not. */
+function themeLabel(theme: EventTheme | null): string {
+  const preset = presetFor(theme)
+  if (preset) return preset.name
+  return 'Custom colours'
+}
 
 export function EventSettingsPage() {
   const { eventId = '' } = useParams<{ eventId: string }>()
@@ -145,6 +154,17 @@ export function EventSettingsPage() {
                 : 'Set up the in-app player'
             }
             onClick={() => navigate(routes.dj.music(eventId))}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup
+          title="Look"
+          footer="Colours apply to every guest's phone, not just yours."
+        >
+          <SettingsRow
+            label="Theme"
+            description={themeLabel(event.theme)}
+            onClick={() => navigate(routes.dj.theme(eventId))}
           />
         </SettingsGroup>
 

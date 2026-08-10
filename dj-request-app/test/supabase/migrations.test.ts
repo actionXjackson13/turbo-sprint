@@ -112,6 +112,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0011_dj_sets.sql'))
     await db.exec(read('0012_queue_groups.sql'))
     await db.exec(read('0013_no_duplicate_songs.sql'))
+    await db.exec(read('0014_event_theme.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -126,7 +127,8 @@ describe('supabase migrations', () => {
         on public.song_requests to app_user;
       revoke update on public.events from app_user;
       grant update (name, request_status, now_playing_title, now_playing_artist,
-                    now_playing_request_id, status, ended_at)
+                    now_playing_request_id, status, ended_at,
+                    theme_primary, theme_accent)
         on public.events to app_user;
     `)
 
@@ -1125,6 +1127,117 @@ describe('supabase migrations', () => {
         [requestId],
       )
       expect(after.rows[0]!.status).toBe('played')
+    })
+  })
+
+  describe('event theme', () => {
+    it('starts unset, meaning the app\u2019s own colours', async () => {
+      const res = await db.query<{ p: string | null; a: string | null }>(
+        `select theme_primary as p, theme_accent as a
+         from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.p).toBeNull()
+      expect(res.rows[0]!.a).toBeNull()
+    })
+
+    it('lets the event owner set both colours', async () => {
+      await runAs(
+        DJ,
+        `update public.events set theme_primary = '#f97316', theme_accent = '#38bdf8'
+         where id = $1`,
+        [eventId],
+      )
+      const res = await db.query<{ p: string }>(
+        `select theme_primary as p from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.p).toBe('#f97316')
+    })
+
+    /**
+     * Guests see the colours; they do not choose them. RLS hides the row rather
+     * than raising, so the thing worth asserting is that the colour did not
+     * move — an error would be a weaker claim than that.
+     */
+    it('does not let a guest change the theme', async () => {
+      await runAs(
+        DJ,
+        `update public.events set theme_primary = '#123456' where id = $1`,
+        [eventId],
+      )
+      await runAs(
+        GUEST_A,
+        `update public.events set theme_primary = '#ff0000' where id = $1`,
+        [eventId],
+      )
+
+      const res = await db.query<{ p: string }>(
+        `select theme_primary as p from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.p).toBe('#123456')
+    })
+
+    it('does not let another DJ change the theme', async () => {
+      await runAs(
+        DJ,
+        `update public.events set theme_primary = '#123456' where id = $1`,
+        [eventId],
+      )
+      await runAs(
+        OTHER_DJ,
+        `update public.events set theme_primary = '#ff0000' where id = $1`,
+        [eventId],
+      )
+
+      const res = await db.query<{ p: string }>(
+        `select theme_primary as p from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.p).toBe('#123456')
+    })
+
+    /**
+     * The client rebuilds lightness for every role, so what is stored only has
+     * to be a colour at all — but it does have to be that, or the palette has
+     * nothing to work from and every phone in the room falls back at once.
+     */
+    it('refuses anything that is not a hex colour', async () => {
+      for (const bad of ['red', '#12345', 'ff0000', '#gggggg', '']) {
+        await expect(
+          db.query(
+            `update public.events set theme_primary = $2 where id = $1`,
+            [eventId, bad],
+          ),
+          bad,
+        ).rejects.toThrow()
+      }
+    })
+
+    it('accepts both hex forms', async () => {
+      for (const good of ['#abc', '#AABBCC', '#22d3ee']) {
+        await expect(
+          db.query(
+            `update public.events set theme_accent = $2 where id = $1`,
+            [eventId, good],
+          ),
+        ).resolves.toBeDefined()
+      }
+    })
+
+    it('can be cleared back to the default colours', async () => {
+      await runAs(
+        DJ,
+        `update public.events set theme_primary = null, theme_accent = null
+         where id = $1`,
+        [eventId],
+      )
+      const res = await db.query<{ p: string | null }>(
+        `select theme_primary as p from public.events where id = $1`,
+        [eventId],
+      )
+      expect(res.rows[0]!.p).toBeNull()
     })
   })
 

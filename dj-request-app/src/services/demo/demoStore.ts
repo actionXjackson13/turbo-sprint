@@ -73,7 +73,11 @@ function normalize(stored: Partial<DemoDb>): DemoDb {
   const seed = buildSeed()
   return {
     profiles: stored.profiles ?? seed.profiles,
-    events: stored.events ?? seed.events,
+    // Events stored before themes existed come back without the field.
+    events: (stored.events ?? seed.events).map((e) => ({
+      ...e,
+      theme: e.theme ?? null,
+    })),
     guests: stored.guests ?? seed.guests,
     requests: stored.requests ?? seed.requests,
     requestVotes: stored.requestVotes ?? seed.requestVotes,

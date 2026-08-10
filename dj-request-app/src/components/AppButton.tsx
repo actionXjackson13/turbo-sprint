@@ -26,8 +26,12 @@ export interface AppButtonProps
 const variantStyles: Record<Variant, string> = {
   // brand-600 rather than brand-500: white on the lighter purple measured
   // 4.2:1, under the AA floor for small text. This sits at 5.7:1.
+  //
+  // text-on-brand rather than text-white, because the fill is themeable now:
+  // the palette guarantees this pairing clears 4.5:1 whatever colour the DJ
+  // picked, flipping the label to near-black if the brand colour is light.
   primary:
-    'bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-600 disabled:bg-ink-700 disabled:text-fg-subtle',
+    'bg-brand-600 text-on-brand hover:bg-brand-500 active:bg-brand-600 disabled:bg-ink-700 disabled:text-fg-subtle',
   secondary:
     'border border-hairline-strong bg-ink-800 text-fg hover:bg-ink-700 active:bg-ink-800 disabled:text-fg-subtle',
   ghost:

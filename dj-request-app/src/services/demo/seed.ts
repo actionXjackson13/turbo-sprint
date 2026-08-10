@@ -300,6 +300,7 @@ export function buildSeed(): DemoDb {
           artworkUrl: artworkFor('Get Lucky'),
         },
         announcement: null,
+        theme: null,
         createdAt: minutesAgo(95),
         endedAt: null,
       },

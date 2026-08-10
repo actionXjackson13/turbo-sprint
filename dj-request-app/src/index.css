@@ -30,10 +30,17 @@
   --color-fg-muted: #c2c0da;
   --color-fg-subtle: #a3a1bd;
 
-  /* Brand — neon party accents */
+  /* Brand — neon party accents.
+     These six are the only tokens a theme replaces: the DJ picks two colours
+     in Event settings and every guest's app is repainted from them at runtime
+     (see features/theme). The values here are the default theme, and are what
+     the app falls back to before an event has loaded. */
   --color-brand-400: #a78bfa;
   --color-brand-500: #8b5cf6;
   --color-brand-600: #7c3aed;
+  /* Text drawn on top of a solid brand fill. Part of the palette rather than a
+     hard-coded white, because a light enough brand colour has to flip it. */
+  --color-on-brand: #ffffff;
   --color-accent-400: #22d3ee;
   --color-accent-500: #06b6d4;
 

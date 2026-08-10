@@ -13,6 +13,7 @@ import { useParty } from '../hooks/useParty'
 import { GuestSessionProvider } from '../contexts/GuestSessionProvider'
 import { useGuestSession } from '../hooks/useGuestSession'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
+import { useEventTheme } from '../features/theme/useEventTheme'
 
 /**
  * Shell for every in-event guest screen: session provider, scrollable content,
@@ -28,6 +29,8 @@ export function GuestLayout() {
 
   return (
     <GuestSessionProvider eventId={eventId}>
+      {/* The DJ chose these colours; the guest's app wears them too. */}
+      <GuestThemeStage eventId={eventId} />
       <RootLayout hasBottomNav>
         <GuestGate>
           <Outlet />
@@ -103,4 +106,17 @@ function GuestGate({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>
+}
+
+/**
+ * The event's colours, applied to this guest's screen.
+ *
+ * The session provider already re-reads the event whenever it changes, so a
+ * theme the DJ switches mid-party lands here without anything extra: the room
+ * changes colour together.
+ */
+function GuestThemeStage({ eventId }: { eventId: string }) {
+  const { event } = useGuestSession()
+  useEventTheme(eventId, event?.theme)
+  return null
 }

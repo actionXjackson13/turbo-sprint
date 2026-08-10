@@ -30,6 +30,7 @@ import { EventControlPanelPage } from './pages/dj/EventControlPanelPage'
 import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
 import { MusicSetupPage } from './pages/dj/MusicSetupPage'
+import { ThemePage } from './pages/dj/ThemePage'
 import { AddSongPage } from './pages/dj/AddSongPage'
 import { FeaturesPage } from './pages/dj/FeaturesPage'
 import { NightSummaryPage } from './pages/dj/NightSummaryPage'
@@ -157,6 +158,7 @@ export default function App() {
                   <Route path="requests" element={<ManageRequestsPage />} />
                   <Route path="queue" element={<QueuePage />} />
                   <Route path="music" element={<MusicSetupPage />} />
+                  <Route path="theme" element={<ThemePage />} />
                   <Route path="add" element={<AddSongPage />} />
                   <Route path="features" element={<FeaturesPage />} />
                   <Route path="summary" element={<NightSummaryPage />} />

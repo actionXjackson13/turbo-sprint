@@ -60,6 +60,11 @@ export function toEvent(row: Row, djDisplayName?: string): EventRecord {
           expiresAt: row.announcement_expires_at ?? '',
         }
       : null,
+    // Both halves or neither — a row with one colour set is not a theme.
+    theme:
+      row.theme_primary && row.theme_accent
+        ? { primary: row.theme_primary, accent: row.theme_accent }
+        : null,
     createdAt: row.created_at,
     endedAt: row.ended_at ?? null,
   }

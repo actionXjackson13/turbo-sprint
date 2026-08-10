@@ -210,6 +210,12 @@ export class SupabaseService implements DataService {
     if (patch.requestStatus !== undefined) {
       update.request_status = patch.requestStatus
     }
+    // Two columns rather than one json blob, so the check constraint on each
+    // can refuse anything that is not a hex colour.
+    if (patch.theme !== undefined) {
+      update.theme_primary = patch.theme?.primary ?? null
+      update.theme_accent = patch.theme?.accent ?? null
+    }
 
     const { data, error } = await this.db
       .from('events')
