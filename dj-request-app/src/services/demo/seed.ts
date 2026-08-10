@@ -7,7 +7,7 @@ import type {
   VotingOption,
   VotingResponse,
 } from '../../types/domain'
-import type { DemoDb, StoredVotingRound } from './demoStore'
+import type { DemoAccount, DemoDb, StoredVotingRound } from './demoStore'
 
 /**
  * Sample data for demo mode: one DJ, one live event, a handful of guests, a
@@ -82,6 +82,11 @@ export function buildSeed(): DemoDb {
       displayName: 'DJ Nova',
       createdAt: minutesAgo(600),
     },
+  ]
+
+  // The sample DJ signs in with the credentials shown on the sign-in screen.
+  const accounts: DemoAccount[] = [
+    { email: DEMO_DJ_EMAIL, profileId: DJ_ID },
   ]
 
   const guests: EventGuest[] = [
@@ -284,6 +289,7 @@ export function buildSeed(): DemoDb {
 
   return {
     profiles,
+    accounts,
     events: [
       {
         id: EVENT_ID,

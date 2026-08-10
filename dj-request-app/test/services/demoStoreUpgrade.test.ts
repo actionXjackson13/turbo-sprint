@@ -89,6 +89,23 @@ describe('loading a database saved by an older version', () => {
     expect(db.currentDjId).toBe('dj-1')
   })
 
+  /**
+   * Sign-in identities arrived long after this format did, so an older
+   * database has no accounts at all. The sample DJ has to stay reachable —
+   * otherwise the fix for signing in as yourself locks out the one account
+   * everybody has.
+   */
+  it('leaves the sample DJ able to sign in', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(legacyDb()))
+
+    const { getDb } = await import('../../src/services/demo/demoStore')
+    const { DEMO_DJ_EMAIL } = await import('../../src/services/demo/seed')
+
+    const db = getDb()
+    expect(db.accounts.length).toBeGreaterThan(0)
+    expect(db.accounts.map((a) => a.email)).toContain(DEMO_DJ_EMAIL)
+  })
+
   it('still falls back to a fresh seed for something that is not a database', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ nonsense: true }))
 

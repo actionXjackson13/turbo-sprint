@@ -35,10 +35,6 @@ import {
   subscribe,
   type StoredVotingRound,
 } from './demoStore'
-import {
-  DEMO_DJ_EMAIL,
-  DEMO_DJ_PASSWORD,
-} from './seed'
 import { songMatchKey } from '../../utils/normalizeText'
 import {
   isAlreadyIn,
@@ -65,47 +61,90 @@ import { generateEventCode, normalizeEventCode } from '../../data/eventCodeGener
  * unremovable, expired rounds rejecting votes — so that behaviour verified in
  * demo mode is the behaviour you get against Supabase.
  */
+/**
+ * Sign-in has to match what was typed at sign-up, and people do not type an
+ * email the same way twice — a stray capital or a trailing space from a paste
+ * would otherwise be a different account.
+ */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+/** Supabase Auth's default, mirrored so both backends refuse the same input. */
+const MIN_PASSWORD_LENGTH = 6
+
 export class DemoService implements DataService {
   // ---- DJ authentication -------------------------------------------------
 
   async signUpDj(
-    _email: string,
-    _password: string,
+    email: string,
+    password: string,
     displayName: string,
   ): Promise<Profile> {
     await demoDelay()
 
-    // Demo mode stores no credentials — there is nothing to authenticate
-    // against. Sign-up simply creates a profile and signs it in.
+    const normalized = normalizeEmail(email)
+
     return mutate((db) => {
+      // Two profiles behind one email is how a DJ ends up signing into an
+      // account they did not mean to, which is the failure this whole path
+      // exists to avoid.
+      if (db.accounts.some((a) => a.email === normalized)) {
+        throw new ServiceError(
+          'duplicate',
+          'There is already an account with that email. Sign in instead.',
+        )
+      }
+      if (password.length < MIN_PASSWORD_LENGTH) {
+        throw new ServiceError(
+          'invalid_input',
+          `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        )
+      }
+
       const profile: Profile = {
         id: `demo-dj-${crypto.randomUUID().slice(0, 8)}`,
         displayName: displayName.trim(),
         createdAt: nowIso(),
       }
       db.profiles.push(profile)
+      db.accounts.push({ email: normalized, profileId: profile.id })
       db.currentDjId = profile.id
       return profile
     })
   }
 
+  /**
+   * Sign in as whoever owns this email.
+   *
+   * It used to look up the account by `currentDjId` and fall back to the first
+   * profile in the database when that was null — which, after signing out, it
+   * always is. So every sign-in landed on the seeded sample DJ regardless of
+   * what was typed, and a DJ who had made their own account could never get
+   * back into it.
+   *
+   * The password is checked for length and then ignored. Demo mode stores no
+   * password to compare against and deliberately never will (see DemoAccount),
+   * so pretending to verify one would be theatre; what matters is that the
+   * email decides the account rather than a fallback.
+   */
   async signInDj(email: string, password: string): Promise<Profile> {
     await demoDelay()
-    const normalized = email.trim().toLowerCase()
+    const normalized = normalizeEmail(email)
 
-    // Demo mode accepts the sample credentials, or any account created during
-    // this session (passwords are not stored — there is nothing to protect).
     return mutate((db) => {
-      const isSampleDj =
-        normalized === DEMO_DJ_EMAIL && password === DEMO_DJ_PASSWORD
-      const profile = isSampleDj
-        ? db.profiles[0]
-        : db.profiles.find((p) => p.id === db.currentDjId) ?? db.profiles[0]
+      const account = db.accounts.find((a) => a.email === normalized)
+      const profile = account
+        ? db.profiles.find((p) => p.id === account.profileId)
+        : undefined
 
       if (!profile) {
-        throw new ServiceError('unauthorized', 'Incorrect email or password.')
+        throw new ServiceError(
+          'unauthorized',
+          'No account found with that email on this device. Demo accounts live on the phone that made them.',
+        )
       }
-      if (!isSampleDj && password.length < 6) {
+      if (password.length < MIN_PASSWORD_LENGTH) {
         throw new ServiceError('unauthorized', 'Incorrect email or password.')
       }
 

@@ -24,8 +24,29 @@ import { buildSeed, DEMO_GUEST_USER_ID } from './seed'
 /** A round as stored — options live in their own collection, as in Postgres. */
 export type StoredVotingRound = Omit<VotingRound, 'options'>
 
+/**
+ * What links a typed-in email to a profile.
+ *
+ * Kept beside the profiles rather than on them because `Profile` is the shared
+ * domain type and the real backend does not hand an email to the client —
+ * Supabase keeps that in `auth.users`, where this belongs too.
+ *
+ * There is no password here on purpose. Demo mode authenticates nothing: the
+ * database is this browser's localStorage and anyone who can read it can read
+ * the party anyway, so storing a password people genuinely use elsewhere would
+ * take on a real risk to protect nothing. What sign-in actually needs is to
+ * land in the right account, and an email does that.
+ */
+export interface DemoAccount {
+  /** Normalised — lowercased and trimmed — so lookups are exact. */
+  email: string
+  profileId: string
+}
+
 export interface DemoDb {
   profiles: Profile[]
+  /** Sign-in identities. One per profile that was created by signing up. */
+  accounts: DemoAccount[]
   events: EventRecord[]
   guests: EventGuest[]
   requests: SongRequest[]
@@ -87,6 +108,11 @@ function normalize(stored: Partial<DemoDb>): DemoDb {
     // Added after the storage format was already in the wild, so it is the one
     // most likely to be missing — and the reason this function exists.
     djSets: stored.djSets ?? [],
+    // Databases stored before sign-in could tell two DJs apart have no
+    // accounts at all. Falling back to the seed keeps the sample DJ reachable;
+    // any account created before this existed has no email recorded anywhere,
+    // so there is nothing to restore it from.
+    accounts: stored.accounts ?? seed.accounts,
     currentDjId: stored.currentDjId ?? null,
   }
 }
