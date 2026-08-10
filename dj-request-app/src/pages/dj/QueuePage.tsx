@@ -343,18 +343,24 @@ export function QueuePage() {
  * between two cards rather than a boundary, on the one screen where knowing
  * which side a song is on decides whether it plays tonight.
  *
- * So the weight sits on the left, where the eye starts: a solid chip naming
- * the half, with the rule growing out of it and tapering away across the
- * screen. The taper is a clip-path wedge rather than a plain line, so the
- * colour is thickest against the word and thins to nothing — the shape says
- * "this is where it begins" without needing a second word to explain it.
+ * So the weight sits on the left, where the eye starts: a chip naming the half,
+ * with a rule running out from the bottom of it across the screen.
+ *
+ * The rule is one thickness the whole way. It used to be a wedge, thick against
+ * the word and tapering to nothing, which drew attention to itself rather than
+ * to the boundary it was marking — and a line that changes size as it crosses
+ * the screen reads as decoration. Aligning it with the underside of the chip
+ * rather than its middle is what makes it look like it comes *from* the label
+ * instead of being skewered by it.
  *
  * Cyan rather than the red used on requested rows: this marks structure, not
  * ownership, and the two must not be mistaken for each other.
  */
 function SubgroupDivider() {
   return (
-    <div className="flex items-center pt-2 pb-1" aria-hidden="true">
+    // `items-end` is doing the work: it puts the rule on the chip's bottom
+    // edge, so the two meet flush however tall the label ends up.
+    <div className="flex items-end pt-2 pb-1" aria-hidden="true">
       <span
         className={
           'shrink-0 rounded-full border border-accent-400/60 bg-accent-500/20 ' +
@@ -363,13 +369,7 @@ function SubgroupDivider() {
       >
         Subgroup
       </span>
-      <span
-        className="h-2 flex-1 bg-gradient-to-r from-accent-400 to-accent-400/0"
-        style={{
-          // Thick where it meets the chip, tapering to a hairline as it goes.
-          clipPath: 'polygon(0 0, 100% 44%, 100% 56%, 0 100%)',
-        }}
-      />
+      <span className="h-0.5 flex-1 rounded-full bg-accent-400" />
     </div>
   )
 }
