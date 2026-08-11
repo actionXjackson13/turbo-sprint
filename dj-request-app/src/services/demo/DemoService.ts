@@ -141,7 +141,7 @@ export class DemoService implements DataService {
       if (!profile) {
         throw new ServiceError(
           'unauthorized',
-          'No account found with that email on this device. Demo accounts live on the phone that made them.',
+          'No account with that email on this phone. Demo accounts live on the phone that made them — pick yours from the list below.',
         )
       }
       if (password.length < MIN_PASSWORD_LENGTH) {

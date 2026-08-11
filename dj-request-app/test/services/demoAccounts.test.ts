@@ -6,6 +6,10 @@ import {
   DEMO_DJ_PASSWORD,
 } from '../../src/services/demo/seed'
 import { ServiceError } from '../../src/services/types'
+import {
+  adoptDemoProfile,
+  listDemoDjAccounts,
+} from '../../src/services/demo/demoAuth'
 
 /**
  * Signing in as yourself.
@@ -123,5 +127,62 @@ describe('demo accounts', () => {
     expect((await service.getDjEvents()).map((e) => e.name)).toContain(
       'A’s party',
     )
+  })
+
+  /**
+   * The way back in when the email is the thing that has been lost.
+   *
+   * A demo account lives in this browser and nowhere else: no password is
+   * checked, no reset can be sent. Without a list of what is on the device, a
+   * half-remembered email is permanent.
+   */
+  describe('the accounts on this device', () => {
+    it('lists the sample DJ with the email that signs it in', async () => {
+      const accounts = listDemoDjAccounts()
+      expect(accounts).toHaveLength(1)
+      expect(accounts[0]!.email).toBe(DEMO_DJ_EMAIL)
+    })
+
+    it('lists an account made here, newest first', async () => {
+      await service.signUpDj('mine@example.com', 'password', 'DJ Mine')
+
+      const accounts = listDemoDjAccounts()
+      expect(accounts.map((a) => a.profile.displayName)).toEqual([
+        'DJ Mine',
+        'DJ Nova',
+      ])
+      expect(accounts[0]!.email).toBe('mine@example.com')
+    })
+
+    it('signs in as one of them without an email at all', async () => {
+      const created = await service.signUpDj('mine@example.com', 'password', 'DJ Mine')
+      await service.signOutDj()
+
+      const back = adoptDemoProfile(created.id)
+      expect(back.id).toBe(created.id)
+      expect((await service.getCurrentDjProfile())?.id).toBe(created.id)
+    })
+
+    /**
+     * Profiles created before sign-up recorded an email have none, and this
+     * list is the only route back into them — so they must appear, marked.
+     */
+    it('shows an account whose email was never recorded', async () => {
+      const created = await service.signUpDj('mine@example.com', 'password', 'DJ Mine')
+      // Strip the account row, leaving the profile as older versions left it.
+      const { getDb } = await import('../../src/services/demo/demoStore')
+      const db = getDb()
+      db.accounts = db.accounts.filter((a) => a.profileId !== created.id)
+
+      const orphan = listDemoDjAccounts().find((a) => a.profile.id === created.id)
+      expect(orphan).toBeDefined()
+      expect(orphan!.email).toBeNull()
+
+      expect(adoptDemoProfile(created.id).id).toBe(created.id)
+    })
+
+    it('refuses an account that is not on this device', () => {
+      expect(() => adoptDemoProfile('nope')).toThrow(ServiceError)
+    })
   })
 })

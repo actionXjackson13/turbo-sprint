@@ -12,6 +12,11 @@ export interface DjAuthValue {
     displayName: string,
   ) => Promise<void>
   signOut: () => Promise<void>
+  /**
+   * Sign in as an account already on this device, chosen from a list rather
+   * than identified by email. Demo mode only — see services/demo/demoAuth.
+   */
+  signInAsDemoProfile: (profileId: string) => Promise<void>
 }
 
 export const DjAuthContext = createContext<DjAuthValue | null>(null)

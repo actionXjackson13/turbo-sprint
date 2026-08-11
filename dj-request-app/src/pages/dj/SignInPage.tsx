@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { AppButton, AppInput } from '../../components'
 import { AuthLayout } from '../../layouts/AuthLayout'
@@ -6,12 +6,13 @@ import { routes } from '../../lib/router'
 import { useDjAuth } from '../../hooks/useDjAuth'
 import { validateEmail, validatePassword } from '../../utils/validation'
 import { getErrorMessage } from '../../utils/errors'
-import { showDemoShortcuts } from '../../lib/env'
+import { isDemoMode, showDemoShortcuts } from '../../lib/env'
 import { DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD } from '../../services/demo/seed'
+import { listDemoDjAccounts } from '../../services/demo/demoAuth'
 
 export function SignInPage() {
   const navigate = useNavigate()
-  const { profile, loading, signIn } = useDjAuth()
+  const { profile, loading, signIn, signInAsDemoProfile } = useDjAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,6 +22,28 @@ export function SignInPage() {
     form?: string
   }>({})
   const [submitting, setSubmitting] = useState(false)
+
+  /**
+   * Read once. The list cannot change while this screen is open — nothing here
+   * creates an account — and re-reading it on every keystroke would be work
+   * for nothing.
+   */
+  const demoAccounts = useMemo(
+    () => (isDemoMode() ? listDemoDjAccounts() : []),
+    [],
+  )
+
+  const continueAs = async (profileId: string) => {
+    setSubmitting(true)
+    try {
+      await signInAsDemoProfile(profileId)
+      navigate(routes.dj.dashboard, { replace: true })
+    } catch (err) {
+      setErrors({ form: getErrorMessage(err) })
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (!loading && profile) {
     return <Navigate to={routes.dj.dashboard} replace />
@@ -105,13 +128,50 @@ export function SignInPage() {
         </AppButton>
 
         {showDemoShortcuts() && (
-          <div className="rounded-control border border-dashed border-hairline-strong p-3">
-            <p className="mb-2 text-center text-label text-fg-subtle uppercase">
-              Demo mode
+          <div className="space-y-3 rounded-control border border-dashed border-hairline-strong p-3">
+            <p className="text-center text-label text-fg-subtle uppercase">
+              On this phone
             </p>
+
+            {/*
+              The way back in. Demo accounts live in this browser and nowhere
+              else — there is no password to check and no reset to send — so an
+              email remembered slightly wrong would otherwise lock a DJ out of
+              their own events for good.
+            */}
+            <ul className="space-y-2">
+              {demoAccounts.map(({ profile: account, email }) => (
+                <li key={account.id}>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => void continueAs(account.id)}
+                    className={
+                      'flex min-h-12 w-full items-center gap-3 rounded-control ' +
+                      'border border-hairline bg-ink-900 px-3 py-2 text-left ' +
+                      'transition-colors active:bg-ink-800 disabled:opacity-50'
+                    }
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-fg">
+                        {account.displayName}
+                      </span>
+                      <span className="block truncate text-meta text-fg-muted">
+                        {email ?? 'Made before sign-in remembered emails'}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-meta text-brand-400">
+                      Continue
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
             <AppButton
-              variant="secondary"
+              variant="ghost"
               fullWidth
+              size="sm"
               loading={submitting}
               onClick={() => {
                 setEmail(DEMO_DJ_EMAIL)
@@ -119,10 +179,11 @@ export function SignInPage() {
                 void submit(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
               }}
             >
-              Use the demo DJ account
+              Use the sample DJ account
             </AppButton>
           </div>
         )}
+
       </form>
     </AuthLayout>
   )
