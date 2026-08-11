@@ -66,5 +66,20 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setupTests.ts'],
     css: false,
+    /**
+     * The suite tests the app, not the machine it is running on.
+     *
+     * A developer with a .env pointing at a real Supabase project would
+     * otherwise see the peer-to-peer tests fail — those paths only exist when
+     * there is no backend, and the app decides that from these very variables.
+     * Pinning demo mode here keeps the result the same on a laptop with
+     * credentials and one without. Anything that needs the Supabase client
+     * builds it explicitly with a stub.
+     */
+    env: {
+      VITE_DEMO_MODE: 'true',
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
   },
 })

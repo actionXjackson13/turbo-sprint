@@ -287,7 +287,7 @@ export class SupabaseService implements DataService {
   }
 
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe {
-    return this.channel(`event:${eventId}`, onChange, (channel) =>
+    return this.channel(`event:${eventId}`, onChange, (channel, notify) =>
       channel.on(
         'postgres_changes',
         {
@@ -296,7 +296,7 @@ export class SupabaseService implements DataService {
           table: 'events',
           filter: `id=eq.${eventId}`,
         },
-        onChange,
+        notify,
       ),
     )
   }
@@ -708,7 +708,7 @@ export class SupabaseService implements DataService {
   subscribeSongRequests(eventId: string, onChange: () => void): Unsubscribe {
     // Vote changes reach us through this same table: the vote-count trigger
     // updates song_requests, which emits an UPDATE here.
-    return this.channel(`requests:${eventId}`, onChange, (channel) =>
+    return this.channel(`requests:${eventId}`, onChange, (channel, notify) =>
       channel.on(
         'postgres_changes',
         {
@@ -717,7 +717,7 @@ export class SupabaseService implements DataService {
           table: 'song_requests',
           filter: `event_id=eq.${eventId}`,
         },
-        onChange,
+        notify,
       ),
     )
   }
@@ -954,7 +954,7 @@ export class SupabaseService implements DataService {
   }
 
   subscribeVotingRounds(eventId: string, onChange: () => void): Unsubscribe {
-    return this.channel(`rounds:${eventId}`, onChange, (channel) =>
+    return this.channel(`rounds:${eventId}`, onChange, (channel, notify) =>
       channel
         .on(
           'postgres_changes',
@@ -964,7 +964,7 @@ export class SupabaseService implements DataService {
             table: 'voting_rounds',
             filter: `event_id=eq.${eventId}`,
           },
-          onChange,
+          notify,
         )
         // Responses and options carry no event_id, so these are unfiltered.
         // RLS still limits delivery to rows this client may read, and the
@@ -972,12 +972,12 @@ export class SupabaseService implements DataService {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'voting_responses' },
-          onChange,
+          notify,
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'voting_options' },
-          onChange,
+          notify,
         ),
     )
   }
@@ -1034,19 +1034,79 @@ export class SupabaseService implements DataService {
    * happened while disconnected was missed, so a successful (re)subscribe
    * triggers a reload rather than assuming the cached view is still correct.
    */
+  /**
+   * One realtime channel per topic, shared by everyone who asks for it.
+   *
+   * Several parts of a DJ's screen watch the same table at once — the control
+   * panel, the player and the auto-accept sweep all follow this event's
+   * requests. Each used to open its own channel on the same topic, and a
+   * socket can only join a topic once: the first subscriber worked and the
+   * rest were quietly refused, so whichever component happened to mount second
+   * simply stopped receiving updates. Nothing errored; the queue just went
+   * still.
+   *
+   * So subscribers are counted. The first one opens the channel, the rest
+   * attach to it, and it is torn down when the last one leaves.
+   */
+  private readonly channels = new Map<
+    string,
+    {
+      channel: RealtimeChannel | null
+      listeners: Set<() => void>
+      /** Whether the join has completed, so late arrivals get the same nudge. */
+      live: boolean
+    }
+  >()
+
   private channel(
     name: string,
     onChange: () => void,
-    configure: (channel: RealtimeChannel) => RealtimeChannel,
+    configure: (
+      channel: RealtimeChannel,
+      notify: () => void,
+    ) => RealtimeChannel,
   ): Unsubscribe {
-    const channel = configure(this.db.channel(name))
+    const existing = this.channels.get(name)
 
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') onChange()
-    })
+    if (existing) {
+      existing.listeners.add(onChange)
+      /**
+       * The channel is already joined, so this subscriber will never see the
+       * SUBSCRIBED callback that tells the first one to re-read. Deferred
+       * rather than called straight away: this runs inside an effect, and a
+       * synchronous state update from here would be a surprise to the caller.
+       */
+      if (existing.live) queueMicrotask(onChange)
+    } else {
+      const entry = {
+        channel: null as RealtimeChannel | null,
+        listeners: new Set<() => void>([onChange]),
+        live: false,
+      }
+      // In the map before the join starts, so a second subscriber arriving
+      // during the round trip attaches here rather than opening a rival
+      // channel on the same topic.
+      this.channels.set(name, entry)
+
+      const notify = () => {
+        for (const listener of [...entry.listeners]) listener()
+      }
+      entry.channel = configure(this.db.channel(name), notify).subscribe(
+        (status) => {
+          if (status !== 'SUBSCRIBED') return
+          entry.live = true
+          notify()
+        },
+      )
+    }
 
     return () => {
-      void this.db.removeChannel(channel)
+      const current = this.channels.get(name)
+      if (!current || !current.listeners.delete(onChange)) return
+      if (current.listeners.size > 0) return
+
+      this.channels.delete(name)
+      if (current.channel) void this.db.removeChannel(current.channel)
     }
   }
 }
