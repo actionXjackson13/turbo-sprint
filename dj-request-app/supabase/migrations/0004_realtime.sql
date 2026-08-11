@@ -16,9 +16,25 @@
 -- publication does not carry, which would break every vote-count update.
 -- ============================================================================
 
-alter publication supabase_realtime add table public.events;
-alter publication supabase_realtime add table public.song_requests;
-alter publication supabase_realtime add table public.request_votes;
-alter publication supabase_realtime add table public.voting_rounds;
-alter publication supabase_realtime add table public.voting_options;
-alter publication supabase_realtime add table public.voting_responses;
+-- Postgres has no "add table if not exists" for publications, and adding one
+-- twice is an error — so this checks first. That matters because the whole
+-- schema is meant to be safe to run again: a project set up by pasting it into
+-- the SQL editor should not break on the second paste.
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'events', 'song_requests', 'request_votes',
+    'voting_rounds', 'voting_options', 'voting_responses'
+  ] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;

@@ -145,7 +145,16 @@ export class SupabaseService implements DataService {
     // No session yet: mint an anonymous one. Supabase persists and refreshes
     // it, which is what makes the guest survive a reload.
     const { data, error } = await this.db.auth.signInAnonymously()
-    if (error) translateError(error, 'Could not start a guest session.')
+    if (error) {
+      // The one setup step with no other symptom: with anonymous sign-ins
+      // switched off, every guest bounces off the join screen while the DJ's
+      // own account works perfectly, which looks like anything but a project
+      // setting.
+      translateError(
+        error,
+        'Could not start a guest session. If this is a new project, turn on anonymous sign-ins in Supabase under Authentication → Sign In / Providers.',
+      )
+    }
     if (!data.user) {
       throw new ServiceError('unknown', 'Could not start a guest session.')
     }
