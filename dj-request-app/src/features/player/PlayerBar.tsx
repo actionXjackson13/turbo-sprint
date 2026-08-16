@@ -18,10 +18,21 @@ import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
  */
 export function PlayerBar({ eventId }: { eventId: string }) {
   const navigate = useNavigate()
-  const { hostRef, status, current, togglePause, skip } = usePartyPlayerState()
+  const { hostRef, status, current, failure, togglePause, skip } =
+    usePartyPlayerState()
 
   const hidden = status === 'idle'
   const busy = status === 'resolving'
+  /**
+   * A halted player used to say nothing at all here.
+   *
+   * The reason was rendered on the Queue tab and nowhere else, so pressing play
+   * from any other screen produced a bar that appeared, sat there, and never
+   * explained itself — a missing key, a spent quota and a song YouTube will not
+   * embed all looked identical, and all looked like the app being broken. The
+   * bar follows the DJ everywhere; the failure has to follow it.
+   */
+  const halted = status === 'error' && failure !== null
 
   return (
     <div
@@ -52,11 +63,34 @@ export function PlayerBar({ eventId }: { eventId: string }) {
         >
           <AlbumArt url={current?.artworkUrl} size="sm" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-fg">
-              {current?.title ?? 'Nothing playing'}
+            <span
+              className={clsx(
+                'block truncate text-sm font-semibold',
+                halted ? 'text-danger-500' : 'text-fg',
+              )}
+            >
+              {halted
+                ? 'Can’t play this'
+                : (current?.title ?? 'Nothing playing')}
             </span>
-            <span className="block truncate text-meta text-fg-muted">
-              {busy ? 'Finding it…' : (current?.artist ?? '')}
+            {/*
+              Two lines for a failure, one for a song. These messages say what
+              to do about it — which key to check, which setting to turn on —
+              and a message truncated to a single line says nothing useful.
+            */}
+            <span
+              className={clsx(
+                'block text-meta',
+                halted
+                  ? 'line-clamp-2 text-fg-muted'
+                  : 'truncate text-fg-muted',
+              )}
+            >
+              {halted
+                ? failure
+                : busy
+                  ? 'Finding it…'
+                  : (current?.artist ?? '')}
             </span>
           </span>
         </button>
@@ -64,7 +98,7 @@ export function PlayerBar({ eventId }: { eventId: string }) {
         <button
           type="button"
           aria-label={status === 'paused' ? 'Resume' : 'Pause'}
-          disabled={busy}
+          disabled={busy || halted}
           onClick={togglePause}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ink-700 text-fg disabled:opacity-40"
         >
