@@ -155,13 +155,28 @@ export function getPartyState(): PartyState {
 /**
  * The backend screens should be using.
  *
- * Three answers, most specific first: the DJ's guest preview, a party joined
- * over the wire, or this build's own backend. Every screen reads through this,
- * so swapping it is what lets the same request form be a guest's one moment and
- * the DJ's the next without a single component knowing.
+ * Deliberately *not* including the guest preview. Swapping this swaps it for
+ * the whole app, and the whole app includes the thing that decides whether a DJ
+ * is signed in: pointing that at an anonymous guest session made the app
+ * conclude the DJ had signed out and bounce them to the sign-in screen —
+ * signing in again then landed on the preview's own client, which killed the
+ * preview and dumped them on their events list.
+ *
+ * The preview belongs to the guest screens and nowhere else. GuestLayout hands
+ * it to its own subtree; see getPreviewService.
  */
 export function getActiveService(): DataService {
-  return previewService ?? guestService ?? getDataService()
+  return guestService ?? getDataService()
+}
+
+/**
+ * The DJ's guest session, for the guest screens to read through.
+ *
+ * Null unless a preview is running, in which case the screens under GuestLayout
+ * — and only those — talk to the party as a guest.
+ */
+export function getPreviewService(): DataService | null {
+  return previewService
 }
 
 /**

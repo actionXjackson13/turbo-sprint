@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useParams } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useContext, useSyncExternalStore, type ReactNode } from 'react'
 import { RootLayout } from './RootLayout'
 import {
   BottomNavigation,
@@ -12,6 +12,8 @@ import {
 import { routes } from '../lib/router'
 import { useParty } from '../hooks/useParty'
 import { GuestSessionProvider } from '../contexts/GuestSessionProvider'
+import { ServiceContext } from '../contexts/serviceContext'
+import { getPreviewService, subscribeParty } from '../services/partySession'
 import { useGuestSession } from '../hooks/useGuestSession'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 import { useEventTheme } from '../features/theme/useEventTheme'
@@ -29,7 +31,8 @@ export function GuestLayout() {
   if (!eventId) return <Navigate to={routes.guest.join} replace />
 
   return (
-    <GuestSessionProvider eventId={eventId}>
+    <GuestServiceScope>
+      <GuestSessionProvider eventId={eventId}>
       {/* The DJ chose these colours; the guest's app wears them too. */}
       <GuestThemeStage eventId={eventId} />
       <RootLayout hasBottomNav>
@@ -40,8 +43,34 @@ export function GuestLayout() {
         </GuestGate>
         <GuestNav eventId={eventId} />
         {sandbox && <DemoSwitcher eventId={eventId} view="guest" />}
-      </RootLayout>
-    </GuestSessionProvider>
+        </RootLayout>
+      </GuestSessionProvider>
+    </GuestServiceScope>
+  )
+}
+
+/**
+ * Points the guest screens at the DJ's preview session, when there is one.
+ *
+ * Scoped here rather than swapped globally on purpose. The app resolves its
+ * backend from one place, and that one place also answers "is a DJ signed in" —
+ * so making the preview global signed the DJ out of their own app to show them
+ * their party. Only what is under this needs to be a guest.
+ */
+function GuestServiceScope({ children }: { children: ReactNode }) {
+  const preview = useSyncExternalStore(
+    subscribeParty,
+    getPreviewService,
+    getPreviewService,
+  )
+  const inherited = useContext(ServiceContext)
+  const service = preview ?? inherited
+
+  if (!service) return <>{children}</>
+  return (
+    <ServiceContext.Provider value={service}>
+      {children}
+    </ServiceContext.Provider>
   )
 }
 

@@ -48,16 +48,33 @@ describe('looking at your own party as a guest', () => {
   })
 
   /**
-   * The whole app reads through this one function, so it is what decides
-   * whether the request form belongs to a guest or to the DJ.
+   * The bug that shipped: making the preview the app-wide backend pointed the
+   * "is a DJ signed in" check at an anonymous guest session, so the app decided
+   * the DJ had signed out and bounced them to the sign-in screen. The preview
+   * belongs to the guest screens; the rest of the app must not see it.
    */
-  it('puts the DJ’s own backend back when the preview ends', async () => {
+  it('never becomes the app’s own backend', async () => {
     const own = getActiveService()
 
     await startGuestPreview('event-1', 'ABCD', 'You (preview)')
-    stopGuestPreview()
-
     expect(getActiveService()).toBe(own)
+
+    stopGuestPreview()
+    expect(getActiveService()).toBe(own)
+  })
+
+  it('offers the guest session only to whoever asks for it', async () => {
+    const { getPreviewService } = await import(
+      '../../src/services/partySession'
+    )
+    expect(getPreviewService()).toBeNull()
+
+    await startGuestPreview('event-1', 'ABCD', 'You (preview)')
+    // Demo mode installs no second service — its database is already local.
+    expect(getPartyState().previewingEventId).toBe('event-1')
+
+    stopGuestPreview()
+    expect(getPreviewService()).toBeNull()
   })
 
   it('tells every screen when the view changes', async () => {
