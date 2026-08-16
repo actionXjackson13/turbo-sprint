@@ -250,6 +250,15 @@ export class DemoService implements DataService {
     )
   }
 
+  async importApplePlaylist(): Promise<never> {
+    // Demo mode is this browser and nothing else, and Apple will not let a
+    // browser read one of its pages. There is nowhere for the fetch to happen.
+    throw new ServiceError(
+      'invalid_input',
+      'Importing a playlist needs the online backend. It is not available in demo mode.',
+    )
+  }
+
   async setNowPlaying(
     eventId: string,
     nowPlaying: {

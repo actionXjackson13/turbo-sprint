@@ -21,6 +21,7 @@ import {
   type CreateVotingRoundInput,
   type DataService,
   type EventSettingsPatch,
+  type ImportedPlaylist,
   type GuestIdentity,
   type Unsubscribe,
 } from '../types'
@@ -54,6 +55,25 @@ const EVENT_SELECT = '*, profiles!events_dj_id_fkey(display_name)'
  *    finalising rounds, promoting winners. The corresponding tables
  *    deliberately have no INSERT/UPDATE policy for those paths.
  */
+/**
+ * The message an edge function actually sent.
+ *
+ * supabase-js flattens any non-2xx into "Edge Function returned a non-2xx
+ * status code" and hangs the real response off the error. The function answers
+ * a bad playlist link with an explanation of how to fix it, and that is the
+ * only part worth showing anybody.
+ */
+async function readFunctionError(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown })?.context
+  if (!(context instanceof Response)) return null
+  try {
+    const body = (await context.json()) as { error?: unknown }
+    return typeof body.error === 'string' ? body.error : null
+  } catch {
+    return null
+  }
+}
+
 export class SupabaseService implements DataService {
   private readonly db: SupabaseClient
 
@@ -236,6 +256,32 @@ export class SupabaseService implements DataService {
 
     if (error) translateError(error, 'Could not update the event.')
     return toEvent(data)
+  }
+
+  async importApplePlaylist(url: string): Promise<ImportedPlaylist> {
+    const { data, error } = await this.db.functions.invoke('import-playlist', {
+      body: { url },
+    })
+
+    if (error) {
+      /**
+       * The function answers a bad link with a 400 and an explanation of what
+       * to do about it. supabase-js turns any non-2xx into a generic error and
+       * keeps the body on the context, so the useful half is dug back out here
+       * rather than shown as "Edge Function returned a non-2xx status code".
+       */
+      const detail = await readFunctionError(error)
+      throw new ServiceError(
+        'invalid_input',
+        detail ?? 'Could not read that playlist.',
+      )
+    }
+
+    const body = data as ImportedPlaylist | null
+    if (!body || !Array.isArray(body.songIds)) {
+      throw new ServiceError('unknown', 'Could not read that playlist.')
+    }
+    return { name: body.name ?? null, songIds: body.songIds }
   }
 
   async setNowPlaying(

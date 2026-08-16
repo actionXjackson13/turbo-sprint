@@ -13,6 +13,7 @@ import { useToast } from '../../../hooks/useToast'
 import { useAsyncData } from '../../../hooks/useAsyncData'
 import { skippedMessage } from '../../../features/requests/duplicates'
 import { getErrorMessage } from '../../../utils/errors'
+import { isDemoMode } from '../../../lib/env'
 
 export interface SetsPanelProps {
   /**
@@ -99,6 +100,21 @@ export function SetsPanel({ eventId, onLoaded }: SetsPanelProps) {
           Create
         </AppButton>
       </div>
+
+      {/*
+        Typing a set out song by song is fine for six and absurd for sixty, and
+        a DJ's night is usually already arranged in Apple Music. Offered right
+        beside the empty name field, which is the moment that job starts.
+      */}
+      {!isDemoMode() && (
+        <AppButton
+          variant="secondary"
+          fullWidth
+          onClick={() => navigate(routes.dj.importPlaylist)}
+        >
+          Import from an Apple Music playlist
+        </AppButton>
+      )}
 
       {loading && !sets ? (
         <div className="space-y-2">

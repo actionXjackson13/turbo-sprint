@@ -27,6 +27,7 @@ export const routes = {
     createEvent: '/dj/events/new',
     /** Song lists the DJ reuses across nights, so not scoped to an event. */
     sets: '/dj/sets',
+    importPlaylist: '/dj/sets/import',
     set: (setId = ':setId') => `/dj/sets/${setId}`,
     event: (eventId = ':eventId') => `/dj/events/${eventId}`,
     share: (eventId = ':eventId') => `/dj/events/${eventId}/share`,

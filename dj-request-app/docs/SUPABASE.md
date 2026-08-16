@@ -107,3 +107,49 @@ rebuilding by hand, and there are not many yet.
 
 If you want to look at the old data, an unconfigured build (or
 `VITE_DEMO_MODE=true`) still opens the same local database.
+
+---
+
+## 7. Optional: importing an Apple Music playlist
+
+Building a set a song at a time is fine for six and absurd for sixty. With one
+small function deployed, the app can take an Apple Music playlist's share link
+and build the set from it.
+
+It needs a function because Apple serves playlist pages without the header a
+browser requires to read another site's response. The page itself is public —
+anyone can open it — but only something outside the browser can fetch it. That
+is the entire job: fetch the page, return the song ids on it. The titles and
+artists are then looked up by the app through Apple's free catalogue endpoint,
+the same one the search box already uses.
+
+### Deploying it
+
+1. In Supabase, open **Edge Functions** in the left sidebar.
+2. **Deploy a new function** → **Via Editor**.
+3. Name it exactly `import-playlist`. The app calls it by that name.
+4. It gives you a file called `index.ts`. Replace its contents with
+   `supabase/functions/import-playlist/index.ts` from this repository.
+5. Add a second file called `parse.ts`, alongside it, holding
+   `supabase/functions/import-playlist/parse.ts`.
+6. **Deploy**.
+
+Leave JWT verification on. Only a signed-in DJ ever calls this, and the app
+sends their session automatically.
+
+### Using it
+
+**My sets → Import from an Apple Music playlist**, then paste the link.
+
+The playlist has to be shared first — in Apple Music, open it, tap the three
+dots, and turn on sharing. Apple only puts the track list on a page that anyone
+can open, so a private playlist comes back empty however valid the link looks.
+
+Nothing is written to your Apple Music account. The songs are copied into a set
+here, and the app reads the page once.
+
+### What it cannot do
+
+Read your library or your private playlists. That needs Apple's Music API and a
+paid Apple Developer membership, which is the same wall this project hit when
+it looked at Shortcuts. Sharing a playlist is the free way around it.

@@ -389,6 +389,9 @@ export class PeerGuestService implements DataService {
   setNowPlaying(): Promise<EventRecord> {
     return this.djOnly()
   }
+  importApplePlaylist(): Promise<never> {
+    return this.djOnly()
+  }
   endEvent(): Promise<EventRecord> {
     return this.djOnly()
   }

@@ -116,6 +116,12 @@ export interface EventSettingsPatch {
   theme?: EventTheme | null
 }
 
+/** What an Apple Music playlist page yielded. Titles are looked up after. */
+export interface ImportedPlaylist {
+  name: string | null
+  songIds: string[]
+}
+
 export interface DataService {
   // ---- DJ authentication -------------------------------------------------
   signUpDj(
@@ -145,6 +151,13 @@ export interface DataService {
     eventId: string,
     patch: EventSettingsPatch,
   ): Promise<EventRecord>
+  /**
+   * Reads the song ids off a shared Apple Music playlist.
+   *
+   * Needs a server: Apple serves those pages without the header a browser
+   * requires to read another site's response, so the backend fetches it.
+   */
+  importApplePlaylist(url: string): Promise<ImportedPlaylist>
   setNowPlaying(
     eventId: string,
     nowPlaying: {

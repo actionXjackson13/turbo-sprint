@@ -36,6 +36,7 @@ import { FeaturesPage } from './pages/dj/FeaturesPage'
 import { NightSummaryPage } from './pages/dj/NightSummaryPage'
 import { GuestsPage } from './pages/dj/GuestsPage'
 import { SetsPage } from './pages/dj/SetsPage'
+import { ImportPlaylistPage } from './pages/dj/ImportPlaylistPage'
 import { SetEditorPage } from './pages/dj/SetEditorPage'
 import { CreateVotingRoundPage } from './pages/dj/CreateVotingRoundPage'
 import { EventSettingsPage } from './pages/dj/EventSettingsPage'
@@ -130,6 +131,15 @@ export default function App() {
                   element={
                     <RequireDj>
                       <SetsPage />
+                    </RequireDj>
+                  }
+                />
+                {/* Ahead of the :setId route, or "import" is read as an id. */}
+                <Route
+                  path="/dj/sets/import"
+                  element={
+                    <RequireDj>
+                      <ImportPlaylistPage />
                     </RequireDj>
                   }
                 />
