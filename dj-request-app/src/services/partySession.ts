@@ -40,6 +40,14 @@ export interface PartyState {
   guestCount: number
   /** Set when a party ended badly, for the UI to explain. */
   error: string | null
+  /**
+   * The event the DJ is currently looking at as a guest, if any.
+   *
+   * Only ever set on the DJ's own device: it is a second session this browser
+   * chose to open, not anything the party knows about. A real guest cannot be
+   * in this state, which is why the way back out is safe to show whenever it is.
+   */
+  previewingEventId: string | null
 }
 
 type Listener = () => void
@@ -52,11 +60,14 @@ let hostedTarget: { eventId: string; code: string } | null = null
 /** A registration in flight, so concurrent callers share one attempt. */
 let starting: Promise<void> | null = null
 let guestService: PeerGuestService | null = null
+/** The DJ looking at their own party through a guest's session. */
+let previewService: DataService | null = null
 let state: PartyState = {
   mode: isDemoMode() ? 'sandbox' : 'supabase',
   hostedEventId: null,
   guestCount: 0,
   error: null,
+  previewingEventId: null,
 }
 
 /**
@@ -67,6 +78,41 @@ let state: PartyState = {
  * the relay would refuse the duplicate id and break the first one.
  */
 const RESUME_KEY = 'soundboard.party'
+
+/**
+ * The guest preview, so a reload does not strand the DJ.
+ *
+ * Without it, refreshing while looking at the party as a guest leaves the app
+ * on guest screens with the DJ's own session behind them — no guest row, no way
+ * back, and nothing on screen explaining why. sessionStorage rather than
+ * localStorage for the same reason as the party: this belongs to the tab that
+ * opened it, not to the browser.
+ */
+const PREVIEW_KEY = 'soundboard.guestPreview'
+
+interface PreviewResume {
+  eventId: string
+  code: string
+  displayName: string
+}
+
+function readPreview(): PreviewResume | null {
+  try {
+    const raw = sessionStorage.getItem(PREVIEW_KEY)
+    return raw ? (JSON.parse(raw) as PreviewResume) : null
+  } catch {
+    return null
+  }
+}
+
+function writePreview(value: PreviewResume | null): void {
+  try {
+    if (value) sessionStorage.setItem(PREVIEW_KEY, JSON.stringify(value))
+    else sessionStorage.removeItem(PREVIEW_KEY)
+  } catch {
+    // Storage blocked; the preview simply will not survive a refresh.
+  }
+}
 
 interface Resume {
   role: 'host' | 'guest'
@@ -106,9 +152,16 @@ export function getPartyState(): PartyState {
   return state
 }
 
-/** The backend screens should be using. Changes when a party is joined. */
+/**
+ * The backend screens should be using.
+ *
+ * Three answers, most specific first: the DJ's guest preview, a party joined
+ * over the wire, or this build's own backend. Every screen reads through this,
+ * so swapping it is what lets the same request form be a guest's one moment and
+ * the DJ's the next without a single component knowing.
+ */
 export function getActiveService(): DataService {
-  return guestService ?? getDataService()
+  return previewService ?? guestService ?? getDataService()
 }
 
 /**
@@ -309,6 +362,57 @@ export function stopHosting(): void {
   setState({ mode: 'sandbox', hostedEventId: null, guestCount: 0 })
 }
 
+// ---- Seeing it as a guest ---------------------------------------------------
+
+/**
+ * Look at your own party the way the room does.
+ *
+ * Not a mock and not a preview mode inside the DJ's session: a real anonymous
+ * guest, joined through the same RPC every phone at the door goes through, on a
+ * second Supabase session that sits beside the DJ's rather than replacing it.
+ * Requests made here are real requests and appear in the real queue, because a
+ * preview that cannot do the thing being previewed answers nothing.
+ *
+ * The DJ's own session is untouched throughout, so coming back is instant.
+ */
+export async function startGuestPreview(
+  eventId: string,
+  code: string,
+  displayName: string,
+): Promise<void> {
+  // Demo mode already lets a device act as a guest, and its whole database is
+  // local — there is no second identity to establish.
+  if (isDemoMode()) {
+    writePreview({ eventId, code, displayName })
+    setState({ previewingEventId: eventId })
+    return
+  }
+
+  const { SupabaseService } = await import('./supabase/SupabaseService')
+  const { getPreviewClient } = await import('./supabase/previewClient')
+
+  const service = new SupabaseService(getPreviewClient())
+  await service.getOrCreateGuestIdentity()
+
+  // Idempotent server-side: a guest already in the event keeps their row.
+  await service.joinEvent(code, displayName)
+
+  previewService = service
+  writePreview({ eventId, code, displayName })
+  setState({ previewingEventId: eventId })
+}
+
+export function stopGuestPreview(): void {
+  previewService = null
+  writePreview(null)
+  setState({ previewingEventId: null })
+
+  if (isDemoMode()) return
+  void import('./supabase/previewClient').then((m) =>
+    m.clearPreviewSession(),
+  )
+}
+
 // ---- Joining ---------------------------------------------------------------
 
 /**
@@ -350,6 +454,22 @@ export function leaveParty(): void {
  * is nothing useful to say on a cold start.
  */
 export async function resumeParty(): Promise<void> {
+  const preview = readPreview()
+  if (preview) {
+    try {
+      await startGuestPreview(
+        preview.eventId,
+        preview.code,
+        preview.displayName,
+      )
+    } catch {
+      // The event ended, or the guest identity could not be rebuilt. Dropping
+      // the flag is what puts the DJ back on their own screens.
+      writePreview(null)
+      setState({ previewingEventId: null })
+    }
+  }
+
   const saved = readResume()
   if (!saved || !canRunPeerParty()) return
 
@@ -367,11 +487,14 @@ export function __resetPartySession(): void {
   hostedTarget = null
   starting = null
   guestService = null
+  previewService = null
+  writePreview(null)
   state = {
     mode: isDemoMode() ? 'sandbox' : 'supabase',
     hostedEventId: null,
     guestCount: 0,
     error: null,
+    previewingEventId: null,
   }
   writeResume(null)
 }

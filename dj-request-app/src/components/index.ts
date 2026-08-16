@@ -55,6 +55,7 @@ export {
 } from './ConfirmationDialog'
 export { DemoSwitcher, type DemoSwitcherProps } from './DemoSwitcher'
 export { PartyStatus, type PartyStatusProps } from './PartyStatus'
+export { GuestPreviewBar } from './GuestPreviewBar'
 export { RotateGate } from './RotateGate'
 export {
   ToastViewport,

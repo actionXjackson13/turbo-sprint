@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useParams } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { RootLayout } from './RootLayout'
 import {
   BottomNavigation,
@@ -20,6 +20,7 @@ import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 import { useEventTheme } from '../features/theme/useEventTheme'
+import { getPartyState, stopGuestPreview } from '../services/partySession'
 
 /**
  * Shell for the DJ's per-event screens. The dashboard and create-event screens
@@ -28,6 +29,22 @@ import { useEventTheme } from '../features/theme/useEventTheme'
 export function DjLayout() {
   const { eventId } = useParams<{ eventId: string }>()
   const { profile, loading } = useDjAuth()
+  /**
+   * Reaching a DJ screen ends the guest preview, whatever brought you here.
+   *
+   * "Back to DJ" stops it on the way out, but the back button, a deep link and
+   * a restored tab do not — and a DJ screen running on a guest's session is a
+   * control panel where every action is refused by rules working exactly as
+   * intended. Standing here at all is the signal.
+   *
+   * On mount only, and reading the state rather than watching it. Watching it
+   * meant *starting* a preview from Event settings cancelled itself: this
+   * layout is still mounted at that moment, so the effect fired on the change
+   * it had just caused and undid it before the guest screen ever appeared.
+   */
+  useEffect(() => {
+    if (getPartyState().previewingEventId) stopGuestPreview()
+  }, [])
   // Acting as a guest edits this device's store directly, behind the back of
   // anyone connected to it. Sandbox only.
   const sandbox = useParty().mode === 'sandbox'

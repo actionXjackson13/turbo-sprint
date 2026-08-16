@@ -4,6 +4,7 @@ import { RootLayout } from './RootLayout'
 import {
   BottomNavigation,
   DemoSwitcher,
+  GuestPreviewBar,
   LoadingSkeleton,
   NavIcons,
   type NavItem,
@@ -32,6 +33,8 @@ export function GuestLayout() {
       {/* The DJ chose these colours; the guest's app wears them too. */}
       <GuestThemeStage eventId={eventId} />
       <RootLayout hasBottomNav>
+        {/* Only ever rendered on the DJ's own device — see GuestPreviewBar. */}
+        <GuestPreviewBar />
         <GuestGate>
           <Outlet />
         </GuestGate>

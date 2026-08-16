@@ -20,7 +20,7 @@ import { FIELD_LIMITS } from '../../data/constants'
 import { getErrorMessage } from '../../utils/errors'
 import { isDemoMode } from '../../lib/env'
 import { resetDemoDb } from '../../services/demo/demoStore'
-import { stopHosting } from '../../services/partySession'
+import { startGuestPreview, stopHosting } from '../../services/partySession'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
 import { presetFor } from '../../features/theme/palette'
 import type { EventTheme } from '../../types/domain'
@@ -45,6 +45,27 @@ export function EventSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [ending, setEnding] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+
+  /**
+   * Walk in the front door of your own party.
+   *
+   * A genuine guest session rather than a rehearsal: the request form posts a
+   * real request into the real queue, which is the only version of this worth
+   * having — a preview that cannot do the thing being previewed answers none of
+   * the questions you opened it to ask.
+   */
+  const enterGuestView = async () => {
+    if (!event) return
+    setPreviewing(true)
+    try {
+      await startGuestPreview(event.id, event.code, 'You (preview)')
+      navigate(routes.guest.home(event.id))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+      setPreviewing(false)
+    }
+  }
 
   // Seed the field once the event arrives, without clobbering later edits.
   useEffect(() => {
@@ -178,6 +199,12 @@ export function EventSettingsPage() {
             label="The night"
             description="What played, and what the room wanted"
             onClick={() => navigate(routes.dj.summary(eventId))}
+          />
+          <SettingsRow
+            label="See it as a guest"
+            description="Join your own party and request a song"
+            disabled={previewing}
+            onClick={() => void enterGuestView()}
           />
         </SettingsGroup>
 
