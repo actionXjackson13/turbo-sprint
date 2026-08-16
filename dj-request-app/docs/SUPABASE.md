@@ -128,11 +128,14 @@ the same one the search box already uses.
 1. In Supabase, open **Edge Functions** in the left sidebar.
 2. **Deploy a new function** → **Via Editor**.
 3. Name it exactly `import-playlist`. The app calls it by that name.
-4. It gives you a file called `index.ts`. Replace its contents with
+4. It gives you a file called `index.ts`. Replace everything in it with
    `supabase/functions/import-playlist/index.ts` from this repository.
-5. Add a second file called `parse.ts`, alongside it, holding
-   `supabase/functions/import-playlist/parse.ts`.
-6. **Deploy**.
+5. **Deploy**.
+
+That is one file and one paste. `index.ts` is generated — the function is
+written as `parse.ts` and `handler.ts`, and `npm run function` flattens them
+into the single file above, because a second file in the browser editor is a
+step that gets missed and fails the build with "Module not found".
 
 Leave JWT verification on. Only a signed-in DJ ever calls this, and the app
 sends their session automatically.
