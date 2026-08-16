@@ -23,6 +23,9 @@ interface PlayerHandle {
   /** Set when the player script itself could not be loaded. */
   loadError: string | null
   playing: boolean
+  /** Seconds into the current song, and how long it is. Both 0 when idle. */
+  position: number
+  duration: number
   play: (videoId: string) => void
   pause: () => void
   resume: () => void
@@ -45,6 +48,8 @@ export function useYouTubePlayer({ onEnded, onUnplayable }: Options): PlayerHand
   const [ready, setReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
+  const [position, setPosition] = useState(0)
+  const [duration, setDuration] = useState(0)
 
   /**
    * Held in refs so a re-render with new closures does not tear down a playing
@@ -130,7 +135,41 @@ export function useYouTubePlayer({ onEnded, onUnplayable }: Options): PlayerHand
     }
   }, [])
 
+  /**
+   * Where we are in the song.
+   *
+   * Polled, because the IFrame API has no time-update event — it will tell you
+   * that playback started and that it ended, and nothing in between. Once a
+   * second is enough for a clock a DJ glances at, and the interval only runs
+   * while something is actually playing so a paused or idle bar costs nothing.
+   */
+  useEffect(() => {
+    if (!playing) return
+
+    const read = () => {
+      const player = playerRef.current
+      if (!player) return
+      try {
+        setPosition(player.getCurrentTime())
+        // A live stream reports 0; so does a video still opening. Either way
+        // there is no length to count down from, and 0 is how the bar knows.
+        setDuration(player.getDuration())
+      } catch {
+        // The player was torn down between the tick and the read.
+      }
+    }
+
+    read()
+    const timer = setInterval(read, 1_000)
+    return () => clearInterval(timer)
+  }, [playing])
+
   const play = useCallback((videoId: string) => {
+    // Zeroed straight away rather than left showing the last song's clock for
+    // the second it takes the next one to report its own.
+    setPosition(0)
+    setDuration(0)
+
     const player = playerRef.current
     if (!player) {
       pendingRef.current = videoId
@@ -144,7 +183,20 @@ export function useYouTubePlayer({ onEnded, onUnplayable }: Options): PlayerHand
   const stop = useCallback(() => {
     playerRef.current?.stopVideo()
     setPlaying(false)
+    setPosition(0)
+    setDuration(0)
   }, [])
 
-  return { hostRef, ready, loadError, playing, play, pause, resume, stop }
+  return {
+    hostRef,
+    ready,
+    loadError,
+    playing,
+    position,
+    duration,
+    play,
+    pause,
+    resume,
+    stop,
+  }
 }

@@ -30,6 +30,9 @@ export interface PartyPlayerState {
   /** Which video was chosen for it, so the DJ can see the pick. */
   match: VideoMatch | null
   queue: SongRequest[]
+  /** Seconds into the current song and its length; both 0 when unknown. */
+  position: number
+  duration: number
   loading: boolean
   /** Set when playback has halted and needs the DJ. */
   failure: string | null
@@ -124,7 +127,16 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
     next: () => {},
   })
 
-  const { hostRef, loadError, play, pause, resume, stop } = useYouTubePlayer({
+  const {
+    hostRef,
+    loadError,
+    position,
+    duration,
+    play,
+    pause,
+    resume,
+    stop,
+  } = useYouTubePlayer({
     onEnded: () => endedRef.current(),
     onUnplayable: () => unplayableRef.current(),
   })
@@ -389,6 +401,8 @@ export function usePartyPlayer(eventId: string): PartyPlayerState {
     current,
     match,
     queue,
+    position,
+    duration,
     loading,
     // A player script that never loaded is a failure like any other, and the
     // screen has one place to show one.

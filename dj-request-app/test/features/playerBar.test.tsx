@@ -43,6 +43,8 @@ function renderBar(overrides: Partial<PartyPlayerState>) {
     match: null,
     queue: [],
     loading: false,
+    position: 0,
+    duration: 0,
     failure: null,
     start: () => {},
     skip: () => {},
@@ -97,6 +99,40 @@ describe('the player bar', () => {
   it('still lets the DJ move on', () => {
     renderBar({ status: 'error', current: song, failure: 'Quota spent.' })
     expect(screen.getByLabelText(/skip/i)).toBeEnabled()
+  })
+
+  /**
+   * The clock counts down, because the only question it answers is how long
+   * until the next thing is needed.
+   */
+  it('shows the time left, not the time elapsed', () => {
+    renderBar({ status: 'playing', current: song, position: 45, duration: 184 })
+    expect(screen.getByText('−2:19')).toBeInTheDocument()
+  })
+
+  it('keeps the clock up while paused', () => {
+    renderBar({ status: 'paused', current: song, position: 45, duration: 184 })
+    expect(screen.getByText('−2:19')).toBeInTheDocument()
+  })
+
+  it('never shows a negative countdown when a song overruns', () => {
+    renderBar({ status: 'playing', current: song, position: 200, duration: 184 })
+    expect(screen.getByText('−0:00')).toBeInTheDocument()
+  })
+
+  /**
+   * A player that has not reported a length yet — and a live stream, which
+   * never will — has nothing to count down from. Better nothing than a clock
+   * stuck at zero.
+   */
+  it('shows no clock when the length is unknown', () => {
+    renderBar({ status: 'playing', current: song, position: 12, duration: 0 })
+    expect(screen.queryByText(/−\d/)).not.toBeInTheDocument()
+  })
+
+  it('shows no clock while it is still finding the song', () => {
+    renderBar({ status: 'resolving', current: song, position: 0, duration: 0 })
+    expect(screen.queryByText(/−\d/)).not.toBeInTheDocument()
   })
 
   it('stays out of the way when nothing is on', () => {

@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { AlbumArt } from '../../components'
 import { routes } from '../../lib/router'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
+import { formatCountdown } from '../../utils/formatRelativeTime'
 
 /**
  * The transport that follows the DJ around.
@@ -18,8 +19,16 @@ import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
  */
 export function PlayerBar({ eventId }: { eventId: string }) {
   const navigate = useNavigate()
-  const { hostRef, status, current, failure, togglePause, skip } =
-    usePartyPlayerState()
+  const {
+    hostRef,
+    status,
+    current,
+    failure,
+    position,
+    duration,
+    togglePause,
+    skip,
+  } = usePartyPlayerState()
 
   const hidden = status === 'idle'
   const busy = status === 'resolving'
@@ -34,6 +43,18 @@ export function PlayerBar({ eventId }: { eventId: string }) {
    */
   const halted = status === 'error' && failure !== null
 
+  /**
+   * Time left, not time elapsed.
+   *
+   * The DJ is not watching a film — the only question this clock answers is
+   * "how long before I need the next thing", so it counts down. A duration of
+   * zero means the player has not reported one yet (or it is a live stream),
+   * and showing 0:00 counting nowhere would be worse than showing nothing.
+   */
+  const timed = duration > 0 && (status === 'playing' || status === 'paused')
+  const remaining = timed ? Math.max(0, duration - position) : 0
+  const elapsedFraction = timed ? Math.min(1, position / duration) : 0
+
   return (
     <div
       className={clsx(
@@ -45,6 +66,20 @@ export function PlayerBar({ eventId }: { eventId: string }) {
       )}
       aria-hidden={hidden}
     >
+      {/*
+        Along the top edge rather than in the row: the bar is two thumbnails
+        tall on a phone and has no vertical space to spare, and a line on the
+        boundary is legible at a glance without asking for any.
+      */}
+      {timed && (
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-ink-700">
+          <div
+            className="h-full bg-brand-500 transition-[width] duration-1000 ease-linear"
+            style={{ width: `${elapsedFraction * 100}%` }}
+          />
+        </div>
+      )}
+
       <div className="flex items-center gap-2.5 px-3 py-2">
         {/*
           The video itself. Kept at a deliberate 16:9 thumbnail rather than
@@ -94,6 +129,15 @@ export function PlayerBar({ eventId }: { eventId: string }) {
             </span>
           </span>
         </button>
+
+        {timed && (
+          <span
+            className="shrink-0 text-meta tabular-nums text-fg-muted"
+            aria-label={`${formatCountdown(remaining)} left`}
+          >
+            −{formatCountdown(remaining)}
+          </span>
+        )}
 
         <button
           type="button"
