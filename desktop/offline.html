@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SoundBoard</title>
+    <style>
+      /*
+        Deliberately plain and self-contained. This page exists precisely for
+        the moment the app could not be reached, so it cannot depend on
+        anything that would have to be fetched.
+      */
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0a0a12;
+        color: #e8e8f0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        text-align: center;
+        padding: 2rem;
+      }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { margin: 0 0 1.25rem; color: #a0a0b8; line-height: 1.5; max-width: 30rem; }
+      code { color: #8b7cf6; font-size: 0.85em; word-break: break-all; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: #fff;
+        background: #7c3aed;
+        border: 0;
+        border-radius: 0.75rem;
+        padding: 0.7rem 1.4rem;
+        cursor: pointer;
+      }
+      button:active { background: #6d28d9; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Can’t reach SoundBoard</h1>
+      <p>
+        The app itself lives on the web, so this window needs an internet
+        connection to load it. Check the laptop’s Wi-Fi and try again.
+      </p>
+      <p><code id="reason"></code></p>
+      <button onclick="location.reload()">Try again</button>
+    </main>
+    <script>
+      // The failure the main process saw, passed through the hash so this page
+      // can say what actually went wrong instead of guessing.
+      const reason = decodeURIComponent(location.hash.slice(1))
+      if (reason) document.getElementById('reason').textContent = reason
+    </script>
+  </body>
+</html>

@@ -25,6 +25,15 @@ export const routes = {
     signUp: '/dj/sign-up',
     dashboard: '/dj',
     createEvent: '/dj/events/new',
+    /**
+     * The floating panel, for a DJ working from a laptop.
+     *
+     * Deliberately not nested under `/dj/events/:eventId` — that whole subtree
+     * is one layout with a bottom navigation bar and the player in it, and the
+     * panel must have neither. Its own top-level path also keeps the route
+     * ranking unambiguous.
+     */
+    panel: (eventId = ':eventId') => `/dj/panel/${eventId}`,
     /** Song lists the DJ reuses across nights, so not scoped to an event. */
     sets: '/dj/sets',
     importPlaylist: '/dj/sets/import',

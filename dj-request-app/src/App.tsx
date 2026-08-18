@@ -8,6 +8,7 @@ import { DjAuthProvider } from './contexts/DjAuthProvider'
 import { useDjAuth } from './hooks/useDjAuth'
 import { GuestLayout } from './layouts/GuestLayout'
 import { DjLayout } from './layouts/DjLayout'
+import { DjPanelLayout } from './layouts/DjPanelLayout'
 import { RootLayout } from './layouts/RootLayout'
 import { routes } from './lib/router'
 
@@ -29,6 +30,7 @@ import { ShareEventPage } from './pages/dj/ShareEventPage'
 import { EventControlPanelPage } from './pages/dj/EventControlPanelPage'
 import { ManageRequestsPage } from './pages/dj/ManageRequestsPage'
 import { QueuePage } from './pages/dj/QueuePage'
+import { OverlayPanelPage } from './pages/dj/OverlayPanelPage'
 import { MusicSetupPage } from './pages/dj/MusicSetupPage'
 import { ThemePage } from './pages/dj/ThemePage'
 import { AddSongPage } from './pages/dj/AddSongPage'
@@ -161,6 +163,11 @@ export default function App() {
                     </RequireDj>
                   }
                 />
+
+                {/* The floating panel: one event, no app around it. */}
+                <Route path="/dj/panel/:eventId" element={<DjPanelLayout />}>
+                  <Route index element={<OverlayPanelPage />} />
+                </Route>
 
                 {/* DJ, scoped to one event */}
                 <Route path="/dj/events/:eventId" element={<DjLayout />}>

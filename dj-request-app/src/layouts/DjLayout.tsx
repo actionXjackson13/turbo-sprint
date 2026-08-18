@@ -18,6 +18,7 @@ import { PlayerBarSpacer } from '../features/player/PlayerBar'
 import { useDjEvent } from '../hooks/useDjEvent'
 import { useDjAuth } from '../hooks/useDjAuth'
 import { useWakeLock } from '../hooks/useWakeLock'
+import { useKeepAwake } from '../features/desktop/useKeepAwake'
 import { useVotingRound } from '../features/voting-rounds/useVotingRound'
 import { useEventTheme } from '../features/theme/useEventTheme'
 import { getPartyState, stopGuestPreview } from '../services/partySession'
@@ -54,6 +55,9 @@ export function DjLayout() {
   // while mixing. Guest screens deliberately do not do this — it is the DJ's
   // battery to spend, not a guest's.
   useWakeLock(Boolean(profile))
+  // And, in the desktop app, from outside the browser — where being covered up
+  // by rekordbox is not a reason to let the machine sleep.
+  useKeepAwake(Boolean(profile))
 
   if (loading) {
     return (

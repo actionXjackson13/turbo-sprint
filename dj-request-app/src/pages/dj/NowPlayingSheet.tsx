@@ -20,6 +20,14 @@ export interface NowPlayingSheetProps {
   onPick: (song: NowPlayingPick) => void
   onClose: () => void
   saving?: boolean
+  /**
+   * Where the sheet mounts. Defaults to this document's body.
+   *
+   * The floating panel renders inside a separate Picture-in-Picture window, and
+   * a sheet that portalled to the main document's body would open behind it —
+   * on the screen the DJ is not looking at.
+   */
+  container?: HTMLElement | null
 }
 
 /**
@@ -46,6 +54,7 @@ export function NowPlayingSheet({
   onPick,
   onClose,
   saving = false,
+  container = null,
 }: NowPlayingSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [term, setTerm] = useState('')
@@ -67,7 +76,8 @@ export function NowPlayingSheet({
 
   useDialogBehavior({ open, panelRef, onDismiss: onClose })
 
-  if (!open || typeof document === 'undefined') return null
+  const host = container ?? (typeof document === 'undefined' ? null : document.body)
+  if (!open || !host) return null
 
   const submitTyped = () => {
     const titleError = validateSongTitle(title)
@@ -183,6 +193,6 @@ export function NowPlayingSheet({
         )}
       </div>
     </div>,
-    document.body,
+    host,
   )
 }

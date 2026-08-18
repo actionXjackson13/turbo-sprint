@@ -28,6 +28,7 @@ import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
 import { usePlaybackMode } from '../../hooks/usePlaybackMode'
 import { useSetNowPlaying } from '../../features/requests/useSetNowPlaying'
 import { NowPlayingSheet } from './NowPlayingSheet'
+import { FloatingPanelButton } from '../../features/desktop/FloatingPanelButton'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -256,6 +257,13 @@ export function EventControlPanelPage() {
             </div>
           </NowPlayingCard>
         </div>
+
+        {/*
+          Only appears where it can do something: a laptop browser that can pin
+          a window above other apps, or the desktop app. A phone gets nothing
+          here, and is not told about a feature it cannot use.
+        */}
+        <FloatingPanelButton eventId={eventId} />
 
         <Section
           title="Queue"
