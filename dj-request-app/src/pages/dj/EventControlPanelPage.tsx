@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlbumArt,
@@ -25,6 +25,9 @@ import { selectMostWanted } from '../../features/requests/requestLists'
 import { usePlayNext } from '../../features/requests/usePlayNext'
 import { useQueueRequest } from '../../features/requests/useQueueRequest'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
+import { usePlaybackMode } from '../../hooks/usePlaybackMode'
+import { useSetNowPlaying } from '../../features/requests/useSetNowPlaying'
+import { NowPlayingSheet } from './NowPlayingSheet'
 import { RequestActionSheet } from './RequestActionSheet'
 import { CardActions } from './requestActions'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -64,6 +67,9 @@ export function EventControlPanelPage() {
   const { playNext, pendingId } = usePlayNext(eventId, reload)
   const { queueRequest } = useQueueRequest(eventId, reload)
 
+  /** Whether the app is the thing playing the music tonight. */
+  const ownDecks = usePlaybackMode() === 'my-own-decks'
+
   const player = usePartyPlayerState()
   const playerLive =
     player.status === 'playing' ||
@@ -86,6 +92,12 @@ export function EventControlPanelPage() {
   const visible = view === 'new' ? pending.slice(0, 4) : mostWanted
 
   const upNext = queue[0] ?? null
+
+  const nowPlaying = useSetNowPlaying(
+    eventId,
+    queue,
+    useCallback(() => Promise.all([refresh(), reload()]), [refresh, reload]),
+  )
 
   const copyCode = async () => {
     if (!event) return
@@ -209,13 +221,37 @@ export function EventControlPanelPage() {
                 request={upNext}
                 emptyText="Nothing queued. Queue a request below."
               />
+
+              {/*
+                On their own decks the DJ has already chosen and dropped the
+                track — usually one of their own that the queue has never heard
+                of — so naming it is the button that matters, and taking the
+                next queued song drops to second. With the app playing, the
+                queue *is* what is on, and only the transport makes sense.
+              */}
+              {ownDecks && (
+                <AppButton
+                  size="lg"
+                  fullWidth
+                  disabled={busy || nowPlaying.saving}
+                  onClick={nowPlaying.ask}
+                >
+                  What’s on now
+                </AppButton>
+              )}
+
               <AppButton
-                size="lg"
+                size={ownDecks ? 'md' : 'lg'}
+                variant={ownDecks ? 'secondary' : 'primary'}
                 fullWidth
                 disabled={busy || (!upNext && !playerLive)}
                 onClick={() => void startNextSong()}
               >
-                {playerLive ? 'Skip to next song' : 'Play next song'}
+                {playerLive
+                  ? 'Skip to next song'
+                  : ownDecks
+                    ? 'Next from the queue'
+                    : 'Play next song'}
               </AppButton>
             </div>
           </NowPlayingCard>
@@ -409,6 +445,13 @@ export function EventControlPanelPage() {
         onClose={() => setSheetFor(null)}
         onSetStatus={quickAction}
         onPlayNext={(request) => void playNext(request)}
+      />
+
+      <NowPlayingSheet
+        open={nowPlaying.open}
+        saving={nowPlaying.saving}
+        onPick={(song) => void nowPlaying.choose(song)}
+        onClose={nowPlaying.close}
       />
     </>
   )

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AppButton,
@@ -22,9 +22,12 @@ import {
   splitQueue,
 } from '../../features/requests/queueOrdering'
 import { usePartyPlayerState } from '../../hooks/usePartyPlayerState'
+import { usePlaybackMode } from '../../hooks/usePlaybackMode'
 import { hasYouTubeKey } from '../../services/player/playerSettings'
+import { useSetNowPlaying } from '../../features/requests/useSetNowPlaying'
 import { QueueList } from './QueueList'
 import { LoadSetDialog } from './LoadSetDialog'
+import { NowPlayingSheet } from './NowPlayingSheet'
 import { getErrorMessage } from '../../utils/errors'
 import type { SongRequest } from '../../types/domain'
 import {
@@ -62,6 +65,13 @@ export function QueuePage() {
 
   const enforceOrder = useEnforceQueueOrder(eventId)
 
+  /**
+   * Whose decks these are. In own-decks mode the app is not playing anything,
+   * so every control that implies it is would be a lie — and the one control
+   * that matters, saying what is on, becomes the primary action.
+   */
+  const ownDecks = usePlaybackMode() === 'my-own-decks'
+
   const player = usePartyPlayerState()
   /** Running, in any sense the DJ would call running. */
   const playerLive =
@@ -79,6 +89,12 @@ export function QueuePage() {
 
   const requested = useMemo(() => countRoomSongs(queue), [queue])
   const { main, sub } = useMemo(() => splitQueue(queue), [queue])
+
+  const nowPlaying = useSetNowPlaying(
+    eventId,
+    queue,
+    useCallback(() => Promise.all([refresh(), reload()]), [refresh, reload]),
+  )
 
   /**
    * Reordering happens inside one half, but the queue is numbered end to end —
@@ -203,22 +219,45 @@ export function QueuePage() {
             emptyHint="Nothing playing yet."
           >
             <div className="space-y-2">
-              {playerLive ? (
+              {ownDecks ? (
+                /*
+                  Naming the song is the primary action here, not advancing the
+                  queue: the DJ has already chosen and dropped the track, and
+                  the app's whole remaining job is to tell the room which one it
+                  was. Taking the next queued song is still one tap away,
+                  because when the song *is* a request that is the quicker path.
+                */
                 <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <AppButton
-                      size="lg"
-                      disabled={player.status === 'resolving'}
-                      onClick={player.togglePause}
-                    >
-                      {player.status === 'paused' ? 'Resume' : 'Pause'}
-                    </AppButton>
-                    <AppButton size="lg" variant="secondary" onClick={player.skip}>
-                      Skip
-                    </AppButton>
-                  </div>
-
+                  <AppButton
+                    size="lg"
+                    fullWidth
+                    disabled={busy || nowPlaying.saving}
+                    onClick={nowPlaying.ask}
+                  >
+                    What’s on now
+                  </AppButton>
+                  <AppButton
+                    variant="secondary"
+                    fullWidth
+                    disabled={busy || queue.length === 0}
+                    onClick={() => void markNextAsPlaying()}
+                  >
+                    Next from the queue
+                  </AppButton>
                 </>
+              ) : playerLive ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <AppButton
+                    size="lg"
+                    disabled={player.status === 'resolving'}
+                    onClick={player.togglePause}
+                  >
+                    {player.status === 'paused' ? 'Resume' : 'Pause'}
+                  </AppButton>
+                  <AppButton size="lg" variant="secondary" onClick={player.skip}>
+                    Skip
+                  </AppButton>
+                </div>
               ) : (
                 <>
                   <AppButton
@@ -254,13 +293,18 @@ export function QueuePage() {
           </NowPlayingCard>
         </div>
 
-        {player.failure && (
+        {!ownDecks && player.failure && (
           <AppCard className="border-danger-500/40 bg-danger-500/10">
             <p className="text-sm text-fg">{player.failure}</p>
           </AppCard>
         )}
 
-        {!hasYouTubeKey() && (
+        {/*
+          Not shown to a DJ who has said they play the music themselves. It
+          nags about setting up a player they have already declined, on the
+          screen they use most, all night.
+        */}
+        {!ownDecks && !hasYouTubeKey() && (
           <AppCard>
             <p className="text-sm text-fg-muted">
               To have the app play these itself, add a free YouTube key. Takes a
@@ -331,6 +375,13 @@ export function QueuePage() {
         eventId={eventId}
         onClose={() => setLoadingSet(false)}
         onLoaded={reload}
+      />
+
+      <NowPlayingSheet
+        open={nowPlaying.open}
+        saving={nowPlaying.saving}
+        onPick={(song) => void nowPlaying.choose(song)}
+        onClose={nowPlaying.close}
       />
     </>
   )
