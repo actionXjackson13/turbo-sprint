@@ -1,9 +1,21 @@
-import { useCallback, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useService } from '../../hooks/useService'
-import { useLiveData } from '../../hooks/useAsyncData'
 import { useToast } from '../../hooks/useToast'
 import { getErrorMessage } from '../../utils/errors'
 import { haptic } from '../../utils/haptics'
+import {
+  getEventRequestsSnapshot,
+  reloadEventRequests,
+  reloadEventRequestsIfStale,
+  selectRequests,
+  subscribeEventRequests,
+} from './eventRequestsStore'
 import type { RequestSort, RequestStatus, SongRequest } from '../../types/domain'
 
 export interface EventRequestsState {
@@ -19,8 +31,14 @@ export interface EventRequestsState {
 }
 
 /**
- * Loads an event's requests together with the current guest's votes, and keeps
- * both live. Vote toggling is centralised here so every list behaves the same.
+ * An event's requests, in whatever order and selection this screen wants.
+ *
+ * Every caller gets the same underlying list — see `eventRequestsStore` for why
+ * that matters — and shapes it here. The hook's shape has not changed; what has
+ * changed is that three screens asking for it now cost one request instead of
+ * six.
+ *
+ * Vote toggling stays centralised here so every list behaves the same.
  */
 export function useEventRequests(
   eventId: string,
@@ -31,31 +49,49 @@ export function useEventRequests(
   const [pendingVotes, setPendingVotes] = useState<Set<string>>(new Set())
 
   const sort = opts?.sort
-  // Serialise the status filter so the loader identity is stable across
-  // renders even though the caller passes a fresh array each time.
+  // Serialised so the memo below is stable across renders even though the
+  // caller passes a fresh array each time.
   const statusKey = opts?.statuses?.join(',') ?? ''
 
-  const loader = useCallback(async () => {
-    const statuses = statusKey
-      ? (statusKey.split(',') as RequestStatus[])
-      : undefined
-    const [requests, votes] = await Promise.all([
-      service.listSongRequests(eventId, { sort, statuses }),
-      service.getMyRequestVotes(eventId),
-    ])
-    return { requests, votes }
-  }, [service, eventId, sort, statusKey])
-
   const subscribe = useCallback(
-    (onChange: () => void) => service.subscribeSongRequests(eventId, onChange),
+    (onChange: () => void) =>
+      subscribeEventRequests(service, eventId, onChange),
     [service, eventId],
   )
 
-  const { data, loading, error, reload } = useLiveData(loader, subscribe)
+  const snapshot = useSyncExternalStore(subscribe, () =>
+    getEventRequestsSnapshot(service, eventId),
+  )
+
+  const reload = useCallback(
+    () => reloadEventRequests(service, eventId),
+    [service, eventId],
+  )
+
+  /**
+   * Catching up after a spell with nobody watching.
+   *
+   * The store keeps its rows when the last screen unmounts, so a tab switch
+   * paints instantly instead of on a skeleton. Those rows may be stale if the
+   * DJ was away for a while — but a tab switch is not, on its own, a reason to
+   * ask again, so this only refreshes rows old enough to be worth doubting.
+   */
+  useEffect(() => {
+    reloadEventRequestsIfStale(service, eventId)
+  }, [service, eventId])
+
+  const requests = useMemo(() => {
+    const rows = snapshot.data?.requests
+    if (!rows) return []
+    const statuses = statusKey
+      ? (statusKey.split(',') as RequestStatus[])
+      : undefined
+    return selectRequests(rows, { sort, statuses })
+  }, [snapshot.data, sort, statusKey])
 
   const myVotes = useMemo(
-    () => new Set(data?.votes ?? []),
-    [data?.votes],
+    () => new Set(snapshot.data?.votes ?? []),
+    [snapshot.data],
   )
 
   const toggleVote = useCallback(
@@ -89,10 +125,12 @@ export function useEventRequests(
   )
 
   return {
-    requests: data?.requests ?? [],
+    requests,
     myVotes,
-    loading,
-    error,
+    // Only a first load is a loading state. A refresh behind a list already on
+    // screen is not something to interrupt the DJ with.
+    loading: snapshot.loading && !snapshot.data,
+    error: snapshot.error,
     reload,
     pendingVotes,
     toggleVote,

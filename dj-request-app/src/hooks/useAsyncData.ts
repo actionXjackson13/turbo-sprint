@@ -23,6 +23,8 @@ export function useAsyncData<T>(loader: () => Promise<T>): AsyncState<T> {
   const [error, setError] = useState<string | null>(null)
 
   const mounted = useRef(true)
+  /** Whether anything has ever loaded, read outside render by `run`. */
+  const hasData = useRef(false)
   // Guards against an earlier, slower response overwriting a newer one.
   const sequence = useRef(0)
 
@@ -35,10 +37,20 @@ export function useAsyncData<T>(loader: () => Promise<T>): AsyncState<T> {
 
   const run = useCallback(async () => {
     const ticket = ++sequence.current
-    setLoading(true)
+    /**
+     * Only the first load is a loading state.
+     *
+     * A refresh — a realtime change, a return to the tab, a screen remounting
+     * on a tab switch — used to replace whatever was on screen with skeletons
+     * for as long as the round trip took. That is what made the app feel slow
+     * everywhere rather than just on opening: the data was usually already
+     * there and correct, and it was being hidden anyway.
+     */
+    if (!hasData.current) setLoading(true)
     try {
       const result = await loader()
       if (!mounted.current || ticket !== sequence.current) return
+      hasData.current = true
       setData(result)
       setError(null)
     } catch (err) {
@@ -69,17 +81,33 @@ export function useLiveData<T>(
 ): AsyncState<T> {
   const state = useAsyncData(loader)
   const { reload } = state
+  // Mount counts as a refresh: the loader has just run.
+  const lastRefresh = useRef(Date.now())
 
   useEffect(() => {
     if (!subscribe) return
     return subscribe(() => {
+      lastRefresh.current = Date.now()
       void reload()
     })
   }, [subscribe, reload])
 
   useEffect(() => {
     const refresh = () => {
-      if (document.visibilityState === 'visible') void reload()
+      if (document.visibilityState !== 'visible') return
+      /**
+       * A glance away is not a reason to ask again.
+       *
+       * This exists to recover after a phone has been asleep or offline, where
+       * the live subscription will have been dropped and reconnected. A DJ
+       * flicking to their messages and straight back is a different thing
+       * entirely, and it was costing a full reload of every screen each time —
+       * which, on a screen watching several things at once, was most of why
+       * the app felt slow to come back to.
+       */
+      if (Date.now() - lastRefresh.current < STALE_AFTER_MS) return
+      lastRefresh.current = Date.now()
+      void reload()
     }
     document.addEventListener('visibilitychange', refresh)
     window.addEventListener('online', refresh)
@@ -91,3 +119,12 @@ export function useLiveData<T>(
 
   return state
 }
+
+/**
+ * How long a returning screen is trusted without asking again.
+ *
+ * Long enough that switching apps to read a text does not reload the party;
+ * short enough that a phone left in a pocket through two songs comes back
+ * current.
+ */
+const STALE_AFTER_MS = 15_000

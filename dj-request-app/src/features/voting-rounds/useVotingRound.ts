@@ -28,10 +28,21 @@ export function useVotingRound(eventId: string): VotingRoundState {
   const toast = useToast()
   const [castingOptionId, setCastingOptionId] = useState<string | null>(null)
 
+  /**
+   * The latest round, whatever state it is in — one query rather than two.
+   *
+   * This used to ask for the active round and then, on the usual answer of
+   * "there isn't one", ask again for the most recent. Two round trips in
+   * sequence, on every DJ screen, because the nav bar carries the vote badge.
+   *
+   * Asking only for the latest is equivalent: a unique index on
+   * `voting_rounds` allows one active round per event, so a new round cannot
+   * be started while one is running — which means an active round is always
+   * the most recent one. Callers already read `round.status` to tell a running
+   * vote from a finished one.
+   */
   const loader = useCallback(async () => {
-    const round =
-      (await service.getActiveVotingRound(eventId)) ??
-      (await service.getLatestVotingRound(eventId))
+    const round = await service.getLatestVotingRound(eventId)
     if (!round) return null
     return service.getVotingRoundResults(round.id)
   }, [service, eventId])

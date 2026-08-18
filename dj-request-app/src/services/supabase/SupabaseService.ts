@@ -8,7 +8,6 @@ import type {
   RequestSort,
   RequestStatus,
   SongRequest,
-  VotingOption,
   VotingRound,
   VotingRoundResults,
 } from '../../types/domain'
@@ -40,6 +39,19 @@ import {
 import { normalizeEventCode } from '../../data/eventCodeGenerator'
 
 const EVENT_SELECT = '*, profiles!events_dj_id_fkey(display_name)'
+
+/**
+ * A round and its options in one read.
+ *
+ * Fetching them separately cost two round trips every time a vote was looked
+ * at — and the nav bar looks at one on every DJ screen, so it was two trips
+ * per screen before anything on the screen was loaded.
+ *
+ * Postgres gives no ordering guarantee on an embedded relation, but
+ * `toVotingRound` already sorts by `displayOrder`, so nothing here depends on
+ * the order they arrive in.
+ */
+const ROUND_SELECT = '*, voting_options(*)'
 
 /**
  * Supabase-backed implementation of the data contract.
@@ -74,11 +86,46 @@ async function readFunctionError(error: unknown): Promise<string | null> {
   }
 }
 
+/** A round row with its options embedded, as `ROUND_SELECT` returns them. */
+function toEmbeddedRound(row: unknown): VotingRound {
+  const record = row as { voting_options?: unknown[] }
+  const options = (record.voting_options ?? []).map((option) =>
+    toVotingOption(asRow(option)),
+  )
+  return toVotingRound(asRow(row), options)
+}
+
 export class SupabaseService implements DataService {
   private readonly db: SupabaseClient
 
+  /**
+   * Reads that are already on their way.
+   *
+   * Screens mount together and ask the same questions at the same instant —
+   * measured on the DJ's control panel, twelve calls to open one screen and
+   * half of them identical, fired in the same tick. Each caller was right to
+   * ask; there was just nothing noticing they had all asked at once.
+   *
+   * Only ever *in flight*, never a result. Once an answer arrives the entry is
+   * dropped, so nobody is served a stale row: this shares a request that is
+   * already happening, which is the one case where two callers were always
+   * going to get the same answer anyway.
+   */
+  private readonly reads = new Map<string, Promise<unknown>>()
+
   constructor(client: SupabaseClient = getSupabaseClient()) {
     this.db = client
+  }
+
+  private share<T>(key: string, run: () => Promise<T>): Promise<T> {
+    const existing = this.reads.get(key) as Promise<T> | undefined
+    if (existing) return existing
+
+    const pending = run().finally(() => {
+      this.reads.delete(key)
+    })
+    this.reads.set(key, pending)
+    return pending
   }
 
   // ---- DJ authentication -------------------------------------------------
@@ -130,22 +177,37 @@ export class SupabaseService implements DataService {
   }
 
   async getCurrentDjProfile(): Promise<Profile | null> {
-    const user = await this.getUser()
-    // An anonymous guest session is not a DJ, even though it is a real user.
-    if (!user || user.is_anonymous) return null
+    return this.share('currentDj', async () => {
+      const user = await this.getUser()
+      // An anonymous guest session is not a DJ, even though it is a real user.
+      if (!user || user.is_anonymous) return null
 
-    const { data, error } = await this.db
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+      const { data, error } = await this.db
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    if (error) translateError(error, 'Could not load your profile.')
-    return data ? toProfile(data) : null
+      if (error) translateError(error, 'Could not load your profile.')
+      return data ? toProfile(data) : null
+    })
   }
 
   onDjAuthStateChange(cb: (profile: Profile | null) => void): Unsubscribe {
-    const { data } = this.db.auth.onAuthStateChange((_event, session) => {
+    const { data } = this.db.auth.onAuthStateChange((event, session) => {
+      /**
+       * Two events say nothing new about who is signed in.
+       *
+       * `INITIAL_SESSION` fires the moment anything subscribes, reporting the
+       * session that was already in storage — which the caller has just read
+       * for itself. Answering it meant every load fetched the DJ's profile
+       * twice, in the same instant, for the same answer.
+       *
+       * `TOKEN_REFRESHED` is the same person with a newer token, and it
+       * arrives on a timer for as long as the app is open.
+       */
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return
+
       const user = session?.user
       if (!user || user.is_anonymous) {
         cb(null)
@@ -208,14 +270,16 @@ export class SupabaseService implements DataService {
   }
 
   async getEventById(eventId: string): Promise<EventRecord | null> {
-    const { data, error } = await this.db
-      .from('events')
-      .select(EVENT_SELECT)
-      .eq('id', eventId)
-      .maybeSingle()
+    return this.share(`event:${eventId}`, async () => {
+      const { data, error } = await this.db
+        .from('events')
+        .select(EVENT_SELECT)
+        .eq('id', eventId)
+        .maybeSingle()
 
-    if (error) translateError(error, 'Could not load the event.')
-    return data ? toEvent(data) : null
+      if (error) translateError(error, 'Could not load the event.')
+      return data ? toEvent(data) : null
+    })
   }
 
   async getEventByCode(code: string): Promise<EventRecord | null> {
@@ -373,28 +437,32 @@ export class SupabaseService implements DataService {
   }
 
   async getGuestSession(eventId: string): Promise<EventGuest | null> {
-    const user = await this.getUser()
-    if (!user) return null
+    return this.share(`guestSession:${eventId}`, async () => {
+      const user = await this.getUser()
+      if (!user) return null
 
-    const { data, error } = await this.db
-      .from('event_guests')
-      .select('*')
-      .eq('event_id', eventId)
-      .eq('guest_user_id', user.id)
-      .maybeSingle()
+      const { data, error } = await this.db
+        .from('event_guests')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('guest_user_id', user.id)
+        .maybeSingle()
 
-    if (error) translateError(error, 'Could not load your session.')
-    return data ? toEventGuest(data) : null
+      if (error) translateError(error, 'Could not load your session.')
+      return data ? toEventGuest(data) : null
+    })
   }
 
   async getEventGuestCount(eventId: string): Promise<number> {
-    const { count, error } = await this.db
-      .from('event_guests')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_id', eventId)
+    return this.share(`guestCount:${eventId}`, async () => {
+      const { count, error } = await this.db
+        .from('event_guests')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', eventId)
 
-    if (error) translateError(error, 'Could not count guests.')
-    return count ?? 0
+      if (error) translateError(error, 'Could not count guests.')
+      return count ?? 0
+    })
   }
 
   async listEventGuests(eventId: string): Promise<EventGuest[]> {
@@ -771,17 +839,31 @@ export class SupabaseService implements DataService {
   // ---- Request voting ----------------------------------------------------
 
   async getMyRequestVotes(eventId: string): Promise<string[]> {
-    const guest = await this.getGuestSession(eventId)
-    if (!guest) return []
+    return this.share(`myVotes:${eventId}`, async () => {
+      const user = await this.getUser()
+      if (!user) return []
 
-    const { data, error } = await this.db
-      .from('request_votes')
-      .select('request_id, song_requests!inner(event_id)')
-      .eq('guest_id', guest.id)
-      .eq('song_requests.event_id', eventId)
+      /**
+       * One query, joined, rather than a guest lookup followed by a vote lookup.
+       *
+       * The old shape cost two round trips for a guest and — worse — one for a
+       * DJ, who has no `event_guests` row and therefore no votes, ever. That
+       * wasted trip was being paid on every screen that showed a list.
+       *
+       * Both joins are inner, so a viewer with no guest row simply gets nothing
+       * back, which is the right answer arrived at without asking twice.
+       */
+      const { data, error } = await this.db
+        .from('request_votes')
+        .select(
+          'request_id, song_requests!inner(event_id), event_guests!inner(guest_user_id)',
+        )
+        .eq('song_requests.event_id', eventId)
+        .eq('event_guests.guest_user_id', user.id)
 
-    if (error) translateError(error, 'Could not load your votes.')
-    return (data ?? []).map((row) => (row as { request_id: string }).request_id)
+      if (error) translateError(error, 'Could not load your votes.')
+      return (data ?? []).map((row) => (row as { request_id: string }).request_id)
+    })
   }
 
   async voteRequest(requestId: string): Promise<void> {
@@ -854,67 +936,76 @@ export class SupabaseService implements DataService {
   }
 
   async getActiveVotingRound(eventId: string): Promise<VotingRound | null> {
-    const { data, error } = await this.db
-      .from('voting_rounds')
-      .select('*')
-      .eq('event_id', eventId)
-      .eq('status', 'active')
-      .maybeSingle()
+    return this.share(`activeRound:${eventId}`, async () => {
+      const { data, error } = await this.db
+        .from('voting_rounds')
+        .select(ROUND_SELECT)
+        .eq('event_id', eventId)
+        .eq('status', 'active')
+        .maybeSingle()
 
-    if (error) translateError(error, 'Could not load the vote.')
-    if (!data) return null
-    return toVotingRound(data, await this.loadOptions(data.id))
+      if (error) translateError(error, 'Could not load the vote.')
+      return data ? toEmbeddedRound(data) : null
+    })
   }
 
   async getLatestVotingRound(eventId: string): Promise<VotingRound | null> {
-    const { data, error } = await this.db
-      .from('voting_rounds')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    return this.share(`latestRound:${eventId}`, async () => {
+      const { data, error } = await this.db
+        .from('voting_rounds')
+        .select(ROUND_SELECT)
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    if (error) translateError(error, 'Could not load the vote.')
-    if (!data) return null
-    return toVotingRound(data, await this.loadOptions(data.id))
+      if (error) translateError(error, 'Could not load the vote.')
+      return data ? toEmbeddedRound(data) : null
+    })
   }
 
   async getVotingRoundResults(roundId: string): Promise<VotingRoundResults> {
-    const round = await this.loadRound(roundId)
-    if (!round) throw new ServiceError('not_found', 'Vote not found.')
+    return this.share(`roundResults:${roundId}`, async () => {
+      const round = await this.loadRound(roundId)
+      if (!round) throw new ServiceError('not_found', 'Vote not found.')
 
-    // Totals come from the aggregate view, never from counting rows here.
-    const { data: tallyRows, error: tallyError } = await this.db
-      .from('voting_round_tallies')
-      .select('option_id, votes')
-      .eq('round_id', roundId)
-
-    if (tallyError) translateError(tallyError, 'Could not load vote totals.')
-
-    const tallies = (tallyRows ?? []).map((row) => ({
-      optionId: (row as { option_id: string }).option_id,
-      votes: (row as { votes: number }).votes,
-    }))
-
-    const guest = await this.getGuestSession(round.eventId)
-    let myOptionId: string | null = null
-    if (guest) {
-      const { data: mine } = await this.db
-        .from('voting_responses')
-        .select('option_id')
+      // Totals come from the aggregate view, never from counting rows here.
+      const { data: tallyRows, error: tallyError } = await this.db
+        .from('voting_round_tallies')
+        .select('option_id, votes')
         .eq('round_id', roundId)
-        .eq('guest_id', guest.id)
-        .maybeSingle()
-      myOptionId = mine?.option_id ?? null
-    }
 
-    return {
-      round,
-      tallies,
-      totalVotes: tallies.reduce((sum, t) => sum + t.votes, 0),
-      myOptionId,
-    }
+      if (tallyError) translateError(tallyError, 'Could not load vote totals.')
+
+      const tallies = (tallyRows ?? []).map((row) => ({
+        optionId: (row as { option_id: string }).option_id,
+        votes: (row as { votes: number }).votes,
+      }))
+
+      /**
+       * How this viewer voted — one joined query rather than a guest lookup and
+       * then a response lookup. A DJ has no guest row, so the inner join simply
+       * returns nothing, which is the right answer without the extra trip.
+       */
+      const user = await this.getUser()
+      let myOptionId: string | null = null
+      if (user) {
+        const { data: mine } = await this.db
+          .from('voting_responses')
+          .select('option_id, event_guests!inner(guest_user_id)')
+          .eq('round_id', roundId)
+          .eq('event_guests.guest_user_id', user.id)
+          .maybeSingle()
+        myOptionId = (mine as { option_id: string } | null)?.option_id ?? null
+      }
+
+      return {
+        round,
+        tallies,
+        totalVotes: tallies.reduce((sum, t) => sum + t.votes, 0),
+        myOptionId,
+      }
+    })
   }
 
   async castRoundVote(roundId: string, optionId: string): Promise<void> {
@@ -1049,27 +1140,15 @@ export class SupabaseService implements DataService {
     return toProfile(data)
   }
 
-  private async loadOptions(roundId: string): Promise<VotingOption[]> {
-    const { data, error } = await this.db
-      .from('voting_options')
-      .select('*')
-      .eq('round_id', roundId)
-      .order('display_order', { ascending: true })
-
-    if (error) translateError(error, 'Could not load the vote options.')
-    return (data ?? []).map(toVotingOption)
-  }
-
   private async loadRound(roundId: string): Promise<VotingRound | null> {
     const { data, error } = await this.db
       .from('voting_rounds')
-      .select('*')
+      .select(ROUND_SELECT)
       .eq('id', roundId)
       .maybeSingle()
 
     if (error) translateError(error, 'Could not load the vote.')
-    if (!data) return null
-    return toVotingRound(data, await this.loadOptions(data.id))
+    return data ? toEmbeddedRound(data) : null
   }
 
   /**
