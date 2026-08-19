@@ -33,6 +33,8 @@ export type ServiceErrorCode =
   | 'requests_closed'
   | 'limit_reached'
   | 'duplicate'
+  /** A vote is already running for this event, so a second cannot start. */
+  | 'vote_running'
   | 'round_closed'
   | 'invalid_input'
   | 'network'
@@ -181,6 +183,16 @@ export interface DataService {
   ): Promise<EventRecord>
   /** Event row changes (intake status, now playing, ended). */
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe
+  /**
+   * Who is at the event, and who is blocked.
+   *
+   * Its own channel rather than a corner of `subscribeEvent`, because the two
+   * answer different questions and one of them is answered on a phone that is
+   * not the DJ's: a blocked guest needs to be told, and until this existed
+   * nothing told them. Their screen only caught up when some unrelated
+   * subscription fired, which in practice meant when the next song started.
+   */
+  subscribeGuests(eventId: string, onChange: () => void): Unsubscribe
 
   // ---- Guest membership --------------------------------------------------
   /** Joins (or rejoins) an event by code. Idempotent per guest. */

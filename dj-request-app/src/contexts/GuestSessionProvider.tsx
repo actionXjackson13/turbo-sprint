@@ -78,6 +78,24 @@ export function GuestSessionProvider({
     })
   }, [service, eventId, refresh])
 
+  /**
+   * And keep *this guest's own row* live, which is how they find out they have
+   * been blocked or let back in.
+   *
+   * Nothing watched it before. The DJ's screen looked fine because it reloads
+   * after its own tap, so the fault was only ever visible from the other phone:
+   * the guest carried on being told they could request until some unrelated
+   * subscription happened to fire, which in practice meant when the next song
+   * started. Being refused a song a minute after being blocked is
+   * indistinguishable from the app being broken.
+   */
+  useEffect(() => {
+    if (!eventId) return
+    return service.subscribeGuests(eventId, () => {
+      void refresh()
+    })
+  }, [service, eventId, refresh])
+
   const join = useCallback(
     async (code: string, displayName: string) => {
       const result = await service.joinEvent(code, displayName)

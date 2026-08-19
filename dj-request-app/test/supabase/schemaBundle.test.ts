@@ -58,7 +58,7 @@ describe('the generated schema bundle', () => {
     const listed = [...sql.matchAll(/^-- >>> (\d{4}_[a-z_]+\.sql)/gm)].map(
       (m) => m[1],
     )
-    expect(listed.length).toBe(15)
+    expect(listed.length).toBe(16)
     expect(listed).toEqual([...listed].sort())
     expect(listed[0]).toBe('0001_init_schema.sql')
   })

@@ -30,8 +30,20 @@ export function DjEventProvider({
     return { event, guestCount }
   }, [service, eventId])
 
+  /**
+   * Both, because this loads both: the event row and how many people are at it.
+   * Watching only the event meant the guest count sat still all night while
+   * people arrived.
+   */
   const subscribe = useCallback(
-    (onChange: () => void) => service.subscribeEvent(eventId, onChange),
+    (onChange: () => void) => {
+      const offEvent = service.subscribeEvent(eventId, onChange)
+      const offGuests = service.subscribeGuests(eventId, onChange)
+      return () => {
+        offEvent()
+        offGuests()
+      }
+    },
     [service, eventId],
   )
 

@@ -387,7 +387,16 @@ describe('DemoService', () => {
       ).rejects.toMatchObject({ code: 'invalid_input' })
     })
 
-    it('allows only one active round per event', async () => {
+    /**
+     * Its own code, not the generic one for bad input.
+     *
+     * The create screen reads it to offer ending the vote from last time,
+     * which is the fix in every case that actually happens: a vote with no
+     * time limit runs until somebody ends it, and a timed one is ended by a
+     * countdown in the DJ's browser — so closing the app mid-vote leaves one
+     * running for good, and every attempt afterwards was a dead end.
+     */
+    it('refuses a second vote by name', async () => {
       await service.signInDj(DEMO_DJ_EMAIL, DEMO_DJ_PASSWORD)
 
       await expect(
@@ -399,7 +408,7 @@ describe('DemoService', () => {
             { title: 'B', artist: 'Y' },
           ],
         }),
-      ).rejects.toMatchObject({ code: 'invalid_input' })
+      ).rejects.toMatchObject({ code: 'vote_running' })
     })
 
     it('pushes the winner into the queue', async () => {

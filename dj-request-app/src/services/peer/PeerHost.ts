@@ -135,6 +135,11 @@ export class PeerHost {
       subscribe(channels.event(this.eventId), () =>
         this.announce(channels.event(this.eventId)),
       ),
+      // Who is here and who is blocked. Without this a blocked guest's phone
+      // never hears about it from the host.
+      subscribe(channels.guests(this.eventId), () =>
+        this.announce(channels.guests(this.eventId)),
+      ),
     ]
   }
 

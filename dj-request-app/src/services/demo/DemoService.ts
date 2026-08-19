@@ -358,6 +358,10 @@ export class DemoService implements DataService {
     return subscribe(channels.event(eventId), onChange)
   }
 
+  subscribeGuests(eventId: string, onChange: () => void): Unsubscribe {
+    return subscribe(channels.guests(eventId), onChange)
+  }
+
   // ---- Guest membership --------------------------------------------------
 
   async joinEvent(
@@ -402,6 +406,8 @@ export class DemoService implements DataService {
         return { event: clone(event), guest: clone(guest) }
       },
       channels.event(target.id),
+      // A new arrival changes the roster and the guest count with it.
+      channels.guests(target.id),
     )
   }
 
@@ -437,6 +443,9 @@ export class DemoService implements DataService {
         if (!guest) throw new ServiceError('not_found', 'Guest not found.')
         guest.isBlocked = blocked
       },
+      channels.guests(eventId),
+      // Request lists show who asked for what and grey out a blocked guest's
+      // rows, so they want to know too.
       channels.requests(eventId),
     )
   }
@@ -1100,8 +1109,10 @@ export class DemoService implements DataService {
           (r) => r.eventId === input.eventId && r.status === 'active',
         )
         if (alreadyActive) {
+          // Same code the real backend raises, so the screen can offer the
+          // same way out of it in either mode.
           throw new ServiceError(
-            'invalid_input',
+            'vote_running',
             'A vote is already running for this event.',
           )
         }

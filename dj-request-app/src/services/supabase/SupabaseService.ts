@@ -396,6 +396,21 @@ export class SupabaseService implements DataService {
     return event
   }
 
+  subscribeGuests(eventId: string, onChange: () => void): Unsubscribe {
+    return this.channel(`guests:${eventId}`, onChange, (channel, notify) =>
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'event_guests',
+          filter: `event_id=eq.${eventId}`,
+        },
+        notify,
+      ),
+    )
+  }
+
   subscribeEvent(eventId: string, onChange: () => void): Unsubscribe {
     return this.channel(`event:${eventId}`, onChange, (channel, notify) =>
       channel.on(
@@ -921,9 +936,21 @@ export class SupabaseService implements DataService {
   async createVotingRound(input: CreateVotingRoundInput): Promise<VotingRound> {
     const { data, error } = await this.db.rpc('create_voting_round', {
       p_event_id: input.eventId,
+      /**
+       * The catalogue fields travel too.
+       *
+       * They were being dropped here — only the title and artist were sent —
+       * even though the function has taken them since migration 0009 and the
+       * vote builder collects them from the search. The result was every vote
+       * the room saw having a blank square where the cover should be, on the
+       * one screen designed to be looked at rather than read.
+       */
       p_options: input.options.map((o) => ({
         title: o.title.trim(),
         artist: o.artist.trim(),
+        catalogId: o.catalogId ?? null,
+        artworkUrl: o.artworkUrl ?? null,
+        catalogUrl: o.catalogUrl ?? null,
       })),
       p_duration_seconds: input.durationSeconds,
     })

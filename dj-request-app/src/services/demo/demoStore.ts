@@ -166,6 +166,8 @@ export const channels = {
   requests: (eventId: string) => `requests:${eventId}`,
   rounds: (eventId: string) => `rounds:${eventId}`,
   event: (eventId: string) => `event:${eventId}`,
+  /** Who has joined, and who is blocked. */
+  guests: (eventId: string) => `guests:${eventId}`,
   /**
    * Demo-only: the acting guest changed, or the roster gained a member. Has no
    * Supabase counterpart because a real client is only ever one person.

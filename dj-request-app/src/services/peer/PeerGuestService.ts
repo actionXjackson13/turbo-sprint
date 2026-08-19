@@ -403,6 +403,10 @@ export class PeerGuestService implements DataService {
     return this.listen(channels.event(eventId), onChange)
   }
 
+  subscribeGuests(eventId: string, onChange: () => void): Unsubscribe {
+    return this.listen(channels.guests(eventId), onChange)
+  }
+
   // ---- Guest membership --------------------------------------------------
 
   joinEvent(

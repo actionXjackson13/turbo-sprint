@@ -6,6 +6,7 @@ import {
   AppButton,
   AppCard,
   AppInput,
+  ConfirmationDialog,
   PageHeader,
 } from '../../components'
 import { SongPickerSheet } from './SongPickerSheet'
@@ -21,6 +22,7 @@ import {
 } from '../../data/constants'
 import { validateArtist, validateSongTitle } from '../../utils/validation'
 import { getErrorMessage } from '../../utils/errors'
+import { ServiceError } from '../../services/types'
 
 interface OptionDraft {
   title: string
@@ -43,6 +45,8 @@ export function CreateVotingRoundPage() {
     { ...emptyOption },
   ])
   const [durationSeconds, setDurationSeconds] = useState<number | null>(60)
+  /** Set when the only thing standing in the way is a vote from earlier. */
+  const [blockedByRunning, setBlockedByRunning] = useState(false)
   const [errors, setErrors] = useState<
     Record<number, { title?: string; artist?: string }>
   >({})
@@ -128,16 +132,56 @@ export function CreateVotingRoundPage() {
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
+    await start()
+  }
+
+  /**
+   * Starting the vote, and coping with the one refusal that has an obvious fix.
+   *
+   * A vote with no time limit runs until somebody ends it, and a timed one is
+   * ended by a countdown in the DJ's own browser — so closing the app mid-vote
+   * leaves one running for good. Every attempt after that was refused with
+   * "That already exists.", the app's generic wording for a duplicate, which
+   * reads as though it is talking about a song and points at nothing.
+   */
+  const start = async () => {
     setSubmitting(true)
     try {
       await service.createVotingRound({ eventId, options, durationSeconds })
       toast.success('Vote is live.')
       navigate(routes.dj.features(eventId), { replace: true })
     } catch (err) {
+      if (err instanceof ServiceError && err.code === 'vote_running') {
+        setBlockedByRunning(true)
+        return
+      }
       toast.error(getErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
+  }
+
+  /**
+   * End the one that is running, then start this one.
+   *
+   * Deliberately a question rather than something done automatically: ending a
+   * vote discards what the room has put into it, and a DJ who has simply
+   * forgotten about an hour-old vote and one who is mid-vote on the dancefloor
+   * look identical from here.
+   */
+  const replaceRunning = async () => {
+    setSubmitting(true)
+    try {
+      const running = await service.getActiveVotingRound(eventId)
+      if (running) await service.endVotingRound(running.id)
+      setBlockedByRunning(false)
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+      setSubmitting(false)
+      return
+    }
+    setSubmitting(false)
+    await start()
   }
 
   return (
@@ -286,6 +330,17 @@ export function CreateVotingRoundPage() {
           </AppButton>
         </form>
       </main>
+
+      <ConfirmationDialog
+        open={blockedByRunning}
+        title="A vote is already running"
+        description="Only one vote can run at a time. Ending the current one keeps whatever the room has voted for so far as its result, then this vote starts."
+        confirmLabel="End it and start this vote"
+        cancelLabel="Leave it running"
+        loading={submitting}
+        onConfirm={() => void replaceRunning()}
+        onCancel={() => setBlockedByRunning(false)}
+      />
 
       <SongPickerSheet
         open={searchingIndex !== null}

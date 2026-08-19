@@ -114,6 +114,7 @@ describe('supabase migrations', () => {
     await db.exec(read('0013_no_duplicate_songs.sql'))
     await db.exec(read('0014_event_theme.sql'))
     await db.exec(read('0015_event_theme_background.sql'))
+    await db.exec(read('0016_vote_conflict_and_guest_realtime.sql'))
 
     // app_user stands in for a logged-in client; give it the same table
     // privileges Supabase grants `authenticated`.
@@ -497,7 +498,17 @@ describe('supabase migrations', () => {
       ).rejects.toThrow(/invalid_input/)
     })
 
-    it('allows only one active round per event', async () => {
+    /**
+     * The refusal is right; what it *said* was not.
+     *
+     * A second running vote would split the room, so the database has always
+     * refused one. It refused it with a bare unique-violation, though, which
+     * the app renders as its generic wording for any duplicate — "That already
+     * exists." — and a DJ reads that as being about a song. The commonest way
+     * to get here is an untimed vote from an hour ago that nobody ended, and
+     * nothing in that sentence points at it.
+     */
+    it('says a vote is already running, rather than raising a constraint', async () => {
       await expect(
         runAs(DJ, `select public.create_voting_round($1, $2::jsonb, null)`, [
           eventId,
@@ -506,7 +517,67 @@ describe('supabase migrations', () => {
             { title: 'B', artist: 'Y' },
           ]),
         ]),
+      ).rejects.toThrow(/vote_running/)
+    })
+
+    /**
+     * The index is still the guarantee. The check above is a courtesy in front
+     * of it — two DJs racing on two devices would both pass the check, and
+     * only the index decides which one wins.
+     */
+    it('still refuses a second active round written directly', async () => {
+      await expect(
+        db.query(
+          `insert into public.voting_rounds (event_id, status) values ($1, 'active')`,
+          [eventId],
+        ),
       ).rejects.toThrow(/duplicate key|unique/i)
+    })
+
+    it('carries the catalogue fields onto each option', async () => {
+      // Dropped by the client for a long while, so the round trip is worth
+      // pinning: a vote with no artwork is a worse screen to be shown.
+      // A fresh event, because this one already has a vote running.
+      const other = await runAs<{ id: string }>(
+        DJ,
+        `select * from public.create_event('Artwork Party')`,
+      )
+      const otherEventId = other.rows[0]!.id
+
+      const withArt = await runAs(
+        DJ,
+        `select public.create_voting_round($1, $2::jsonb, null)`,
+        [
+          otherEventId,
+          JSON.stringify([
+            {
+              title: 'A',
+              artist: 'X',
+              catalogId: '123',
+              artworkUrl: 'https://example.test/a.jpg',
+              catalogUrl: 'https://example.test/a',
+            },
+            { title: 'B', artist: 'Y' },
+          ]),
+        ],
+      )
+
+      const rows = await db.query<{
+        catalog_id: string | null
+        artwork_url: string | null
+        catalog_url: string | null
+      }>(
+        `select catalog_id, artwork_url, catalog_url from public.voting_options
+         where round_id = $1 order by display_order`,
+        [(withArt.rows[0] as { create_voting_round: string }).create_voting_round],
+      )
+
+      expect(rows.rows[0]).toMatchObject({
+        catalog_id: '123',
+        artwork_url: 'https://example.test/a.jpg',
+        catalog_url: 'https://example.test/a',
+      })
+      expect(rows.rows[1]?.catalog_id).toBeNull()
     })
 
     it('records a vote and moves it rather than adding one on change', async () => {

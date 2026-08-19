@@ -8,6 +8,7 @@ const KNOWN_CODES: ServiceErrorCode[] = [
   'requests_closed',
   'limit_reached',
   'duplicate',
+  'vote_running',
   'round_closed',
   'invalid_input',
   'network',

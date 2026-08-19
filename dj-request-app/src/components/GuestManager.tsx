@@ -31,10 +31,11 @@ export function GuestManager({ eventId }: GuestManagerProps) {
     () => service.listEventGuests(eventId),
     [service, eventId],
   )
-  // Blocking writes to event_guests but the app's live channel is requests, so
-  // reload explicitly after a change rather than waiting for a broadcast.
+  // The roster has its own channel now. It used to listen to song requests as
+  // a stand-in, which meant the list only caught up when a song changed — and
+  // left the blocked guest's own phone with nothing listening at all.
   const subscribe = useCallback(
-    (onChange: () => void) => service.subscribeSongRequests(eventId, onChange),
+    (onChange: () => void) => service.subscribeGuests(eventId, onChange),
     [service, eventId],
   )
 
